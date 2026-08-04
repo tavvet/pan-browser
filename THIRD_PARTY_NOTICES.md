@@ -2,7 +2,7 @@
 
 ## Lucide Icons
 
-Selected SVG icons in `qt/assets/icons` are from
+Selected SVG icons in `src/assets/icons` are from
 [Lucide](https://github.com/lucide-icons/lucide).
 
 ISC License

@@ -3,8 +3,8 @@
 set -euo pipefail
 
 project_dir="$(cd "$(dirname "$0")/.." && pwd)"
-build_dir="$project_dir/build-qt"
-destination="$project_dir/dist/PanBrowser-Qt.app"
+build_dir="$project_dir/build"
+destination="$project_dir/dist/PanBrowser.app"
 
 # macdeployqt mutates the generated bundle and installs a helper symlink.
 # Reusing that deployed bundle makes a later deployment recurse through itself.

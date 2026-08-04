@@ -16,20 +16,20 @@ Requirements: macOS, Xcode command-line tools, Homebrew, and Qt 6.10 or newer.
 
 ```sh
 brew install qtwebengine cmake ninja
-./scripts/build-qt-app.sh
-open dist/PanBrowser-Qt.app
+./scripts/build-app.sh
+open dist/PanBrowser.app
 ```
 
 For a development build:
 
 ```sh
-cmake -S . -B build-qt -G Ninja -DCMAKE_BUILD_TYPE=Debug
-cmake --build build-qt --parallel
-ctest --test-dir build-qt --output-on-failure
+cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug
+cmake --build build --parallel
+ctest --test-dir build --output-on-failure
 ```
 
 The deploy script creates a self-contained, ad-hoc signed application at
-`dist/PanBrowser-Qt.app`. Qt WebEngine makes the bundle approximately 300 MB.
+`dist/PanBrowser.app`. Qt WebEngine makes the bundle approximately 300 MB.
 
 On first launch PanBrowser creates:
 
@@ -108,5 +108,5 @@ verified source, and compare their SHA-256 fingerprints before use.
 ## Tests
 
 ```sh
-ctest --test-dir build-qt --output-on-failure
+ctest --test-dir build --output-on-failure
 ```
