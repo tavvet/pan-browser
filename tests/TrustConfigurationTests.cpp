@@ -1,5 +1,6 @@
 #include "TrustConfiguration.h"
 #include "TrustSettings.h"
+#include "WindowPlacement.h"
 
 #include <QFile>
 #include <QTemporaryDir>
@@ -16,6 +17,10 @@ private slots:
     void overlappingEnabledDomainsAreRejected();
     void customModeRequiresCertificate();
     void disabledDraftMayBeIncomplete();
+    void visibleWindowPlacementIsPreserved();
+    void disconnectedScreenFallsBackToPrimary();
+    void inaccessibleTitleAreaIsRecentered();
+    void oversizedWindowFitsSmallerResolution();
 };
 
 void TrustConfigurationTests::exactDomainIsCaseInsensitive()
@@ -134,6 +139,48 @@ void TrustConfigurationTests::disabledDraftMayBeIncomplete()
         settings.validate(directory.filePath(QStringLiteral("rules.json")), &error),
         qPrintable(error)
     );
+}
+
+void TrustConfigurationTests::visibleWindowPlacementIsPreserved()
+{
+    const QRect screen(0, 0, 1440, 900);
+    const QRect window(120, 80, 1180, 760);
+    QCOMPARE(adjustedWindowGeometry(window, {screen}, screen), window);
+}
+
+void TrustConfigurationTests::disconnectedScreenFallsBackToPrimary()
+{
+    const QRect primaryScreen(0, 0, 1440, 900);
+    const QRect windowOnRemovedScreen(1800, 80, 1000, 700);
+    const QRect restored = adjustedWindowGeometry(
+        windowOnRemovedScreen,
+        {primaryScreen},
+        primaryScreen
+    );
+
+    QVERIFY(primaryScreen.contains(restored));
+    QCOMPARE(restored.size(), windowOnRemovedScreen.size());
+    QCOMPARE(restored.center(), primaryScreen.center());
+}
+
+void TrustConfigurationTests::inaccessibleTitleAreaIsRecentered()
+{
+    const QRect screen(0, 0, 1440, 900);
+    const QRect windowWithBodyOnly(-900, -500, 1000, 700);
+    const QRect restored = adjustedWindowGeometry(windowWithBodyOnly, {screen}, screen);
+
+    QVERIFY(restored != windowWithBodyOnly);
+    QVERIFY(screen.contains(restored));
+    QCOMPARE(restored.center(), screen.center());
+}
+
+void TrustConfigurationTests::oversizedWindowFitsSmallerResolution()
+{
+    const QRect smallerScreen(0, 0, 1280, 720);
+    const QRect largeWindow(80, 40, 2560, 1400);
+    const QRect restored = adjustedWindowGeometry(largeWindow, {smallerScreen}, smallerScreen);
+
+    QCOMPARE(restored, smallerScreen);
 }
 
 QTEST_MAIN(TrustConfigurationTests)

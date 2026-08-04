@@ -12,7 +12,8 @@ int main(int argc, char *argv[])
     application.setWindowIcon(QIcon(QStringLiteral(":/assets/app-icon.svg")));
     QCoreApplication::setApplicationName(QStringLiteral("PanBrowser"));
     QCoreApplication::setApplicationVersion(QStringLiteral("0.2.0"));
-    QCoreApplication::setOrganizationName(QString());
+    QCoreApplication::setOrganizationName(QStringLiteral("PanBrowser"));
+    QCoreApplication::setOrganizationDomain(QStringLiteral("panbrowser.dev"));
 
     MainWindow window;
     window.show();

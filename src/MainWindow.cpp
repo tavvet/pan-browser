@@ -2,13 +2,16 @@
 
 #include "CertificateTrustValidator.h"
 #include "TrustRulesDialog.h"
+#include "WindowPlacement.h"
 
 #include <QAction>
 #include <QApplication>
+#include <QCloseEvent>
 #include <QDesktopServices>
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
+#include <QGuiApplication>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -18,6 +21,8 @@
 #include <QIcon>
 #include <QProgressBar>
 #include <QSaveFile>
+#include <QScreen>
+#include <QSettings>
 #include <QStandardPaths>
 #include <QStatusBar>
 #include <QStyle>
@@ -31,6 +36,7 @@ MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
 {
     createInterface();
+    restoreWindowPlacement();
     connectBrowserSignals();
     reloadRules();
 
@@ -39,6 +45,17 @@ MainWindow::MainWindow(QWidget *parent)
         ? QUrl::fromUserInput(arguments.at(1))
         : m_trustPolicy.startPage();
     m_webView->setUrl(initialUrl);
+}
+
+void MainWindow::closeEvent(QCloseEvent *event)
+{
+    QSettings settings;
+    settings.beginGroup(QStringLiteral("MainWindow"));
+    settings.setValue(QStringLiteral("geometry"), saveGeometry());
+    settings.setValue(QStringLiteral("state"), saveState(1));
+    settings.endGroup();
+    settings.sync();
+    QMainWindow::closeEvent(event);
 }
 
 void MainWindow::createInterface()
@@ -294,6 +311,39 @@ void MainWindow::setTrustStatus(const QString &text, bool error)
     m_trustStatus->style()->unpolish(m_trustStatus);
     m_trustStatus->style()->polish(m_trustStatus);
     m_trustStatus->update();
+}
+
+void MainWindow::restoreWindowPlacement()
+{
+    QSettings settings;
+    settings.beginGroup(QStringLiteral("MainWindow"));
+    const QByteArray geometryData = settings.value(QStringLiteral("geometry")).toByteArray();
+    const QByteArray stateData = settings.value(QStringLiteral("state")).toByteArray();
+    settings.endGroup();
+
+    if (geometryData.isEmpty())
+        return;
+
+    restoreGeometry(geometryData);
+    if (!stateData.isEmpty())
+        restoreState(stateData, 1);
+
+    QList<QRect> availableScreens;
+    for (const QScreen *screen : QGuiApplication::screens())
+        availableScreens.append(screen->availableGeometry());
+
+    const QScreen *primaryScreen = QGuiApplication::primaryScreen();
+    const QRect fallback = primaryScreen ? primaryScreen->availableGeometry() : QRect();
+    const bool specialState = isMaximized() || isFullScreen();
+    const QRect restored = specialState ? normalGeometry() : geometry();
+    const QRect adjusted = adjustedWindowGeometry(restored, availableScreens, fallback);
+    if (adjusted == restored)
+        return;
+
+    const Qt::WindowStates savedState = windowState();
+    setWindowState(Qt::WindowNoState);
+    setGeometry(adjusted);
+    setWindowState(savedState);
 }
 
 QString MainWindow::ensureConfiguration()
