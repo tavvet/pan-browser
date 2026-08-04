@@ -36,6 +36,7 @@ private:
     void removeRule();
     void importCertificates();
     void removeCertificate();
+    void showCertificateDetails();
     void testDomain();
     void saveAndClose();
     void cleanupPendingCertificates(bool keepReferenced);
@@ -57,6 +58,7 @@ private:
     QListWidget *m_certificates = nullptr;
     QPushButton *m_deleteRule = nullptr;
     QPushButton *m_removeCertificate = nullptr;
+    QPushButton *m_viewCertificate = nullptr;
     QLineEdit *m_testDomain = nullptr;
     QLabel *m_testResult = nullptr;
 };

@@ -1,6 +1,8 @@
 #include "TrustRulesDialog.h"
 
+#include <QApplication>
 #include <QCheckBox>
+#include <QClipboard>
 #include <QComboBox>
 #include <QCryptographicHash>
 #include <QDateTime>
@@ -263,9 +265,12 @@ void TrustRulesDialog::createInterface()
     auto *certificateButtons = new QHBoxLayout();
     auto *importButton = new QPushButton(QStringLiteral("Import certificate…"), m_editor);
     importButton->setObjectName(QStringLiteral("secondaryButton"));
+    m_viewCertificate = new QPushButton(QStringLiteral("View details…"), m_editor);
+    m_viewCertificate->setObjectName(QStringLiteral("secondaryButton"));
     m_removeCertificate = new QPushButton(QStringLiteral("Remove from rule"), m_editor);
     m_removeCertificate->setObjectName(QStringLiteral("secondaryButton"));
     certificateButtons->addWidget(importButton);
+    certificateButtons->addWidget(m_viewCertificate);
     certificateButtons->addWidget(m_removeCertificate);
     certificateButtons->addStretch();
     editorLayout->addLayout(certificateButtons);
@@ -304,12 +309,17 @@ void TrustRulesDialog::createInterface()
     connect(addButton, &QPushButton::clicked, this, &TrustRulesDialog::addRule);
     connect(m_deleteRule, &QPushButton::clicked, this, &TrustRulesDialog::removeRule);
     connect(importButton, &QPushButton::clicked, this, &TrustRulesDialog::importCertificates);
+    connect(m_viewCertificate, &QPushButton::clicked, this, &TrustRulesDialog::showCertificateDetails);
     connect(m_removeCertificate, &QPushButton::clicked, this, &TrustRulesDialog::removeCertificate);
+    connect(m_certificates, &QListWidget::itemDoubleClicked, this, [this] {
+        showCertificateDetails();
+    });
     connect(testButton, &QPushButton::clicked, this, &TrustRulesDialog::testDomain);
     connect(m_testDomain, &QLineEdit::returnPressed, this, &TrustRulesDialog::testDomain);
     connect(buttons, &QDialogButtonBox::accepted, this, &TrustRulesDialog::saveAndClose);
     connect(buttons, &QDialogButtonBox::rejected, this, &QDialog::reject);
     connect(m_certificates, &QListWidget::currentRowChanged, this, [this](int row) {
+        m_viewCertificate->setEnabled(row >= 0 && m_currentRule >= 0);
         m_removeCertificate->setEnabled(row >= 0 && m_currentRule >= 0);
     });
 
@@ -510,6 +520,7 @@ void TrustRulesDialog::refreshCertificates()
         );
     }
     m_removeCertificate->setEnabled(m_certificates->currentRow() >= 0);
+    m_viewCertificate->setEnabled(m_certificates->currentRow() >= 0);
 }
 
 void TrustRulesDialog::addRule()
@@ -637,6 +648,145 @@ void TrustRulesDialog::removeCertificate()
 
     m_settings.rules()[m_currentRule].anchors.removeAt(row);
     refreshCertificates();
+}
+
+void TrustRulesDialog::showCertificateDetails()
+{
+    const QListWidgetItem *item = m_certificates->currentItem();
+    if (!item)
+        return;
+
+    const QString configuredPath = item->data(Qt::UserRole).toString();
+    const QDir baseDirectory = QFileInfo(m_configurationPath).absoluteDir();
+    const QString absolutePath = QFileInfo(configuredPath).isAbsolute()
+        ? configuredPath
+        : baseDirectory.filePath(configuredPath);
+    const QList<QSslCertificate> certificates = readCertificates(absolutePath);
+    if (certificates.isEmpty()) {
+        QMessageBox::warning(
+            this,
+            QStringLiteral("Certificate unavailable"),
+            QStringLiteral("Cannot read certificate file:\n%1").arg(absolutePath)
+        );
+        return;
+    }
+
+    QDialog details(this);
+    details.setObjectName(QStringLiteral("certificateDetailsDialog"));
+    details.setWindowTitle(QStringLiteral("Certificate Details"));
+    details.setWindowIcon(QIcon(QStringLiteral(":/assets/icons/shield-check.svg")));
+    details.resize(640, 510);
+
+    auto *layout = new QVBoxLayout(&details);
+    layout->setContentsMargins(22, 20, 22, 18);
+    layout->setSpacing(12);
+
+    auto *title = new QLabel(QStringLiteral("Certificate Details"), &details);
+    title->setObjectName(QStringLiteral("dialogTitle"));
+    layout->addWidget(title);
+
+    auto *fileName = new QLabel(QFileInfo(absolutePath).fileName(), &details);
+    fileName->setObjectName(QStringLiteral("dialogSubtitle"));
+    fileName->setTextInteractionFlags(Qt::TextSelectableByMouse);
+    fileName->setToolTip(absolutePath);
+    layout->addWidget(fileName);
+
+    QComboBox *certificateSelector = nullptr;
+    if (certificates.size() > 1) {
+        certificateSelector = new QComboBox(&details);
+        for (qsizetype index = 0; index < certificates.size(); ++index) {
+            certificateSelector->addItem(
+                QStringLiteral("Certificate %1 — %2")
+                    .arg(index + 1)
+                    .arg(certificateName(certificates.at(index)))
+            );
+        }
+        layout->addWidget(certificateSelector);
+    }
+
+    auto *status = new QLabel(&details);
+    status->setObjectName(QStringLiteral("certificateStatus"));
+    layout->addWidget(status);
+
+    auto *form = new QFormLayout();
+    form->setHorizontalSpacing(18);
+    form->setVerticalSpacing(12);
+    form->setFieldGrowthPolicy(QFormLayout::AllNonFixedFieldsGrow);
+
+    const auto selectableValue = [&details] {
+        auto *label = new QLabel(&details);
+        label->setObjectName(QStringLiteral("certificateValue"));
+        label->setWordWrap(true);
+        label->setTextInteractionFlags(Qt::TextSelectableByMouse);
+        return label;
+    };
+
+    auto *subject = selectableValue();
+    auto *issuer = selectableValue();
+    auto *serial = selectableValue();
+    auto *validFrom = selectableValue();
+    auto *validUntil = selectableValue();
+    auto *fingerprint = selectableValue();
+    fingerprint->setObjectName(QStringLiteral("certificateFingerprint"));
+
+    form->addRow(QStringLiteral("Subject"), subject);
+    form->addRow(QStringLiteral("Issuer"), issuer);
+    form->addRow(QStringLiteral("Serial number"), serial);
+    form->addRow(QStringLiteral("Valid from"), validFrom);
+    form->addRow(QStringLiteral("Valid until"), validUntil);
+    form->addRow(QStringLiteral("SHA-256"), fingerprint);
+    layout->addLayout(form, 1);
+
+    auto *buttons = new QDialogButtonBox(QDialogButtonBox::Close, &details);
+    auto *copyFingerprint = buttons->addButton(
+        QStringLiteral("Copy fingerprint"),
+        QDialogButtonBox::ActionRole
+    );
+    layout->addWidget(buttons);
+
+    const auto showCertificate = [=](int index) {
+        const QSslCertificate &certificate = certificates.at(index);
+        subject->setText(certificateName(certificate));
+
+        QStringList issuerNames = certificate.issuerInfo(QSslCertificate::CommonName);
+        if (issuerNames.isEmpty())
+            issuerNames = certificate.issuerInfo(QSslCertificate::Organization);
+        issuer->setText(
+            issuerNames.isEmpty() ? QStringLiteral("Unknown") : issuerNames.join(QStringLiteral(", "))
+        );
+        serial->setText(QString::fromLatin1(certificate.serialNumber()).toUpper());
+        validFrom->setText(certificate.effectiveDate().toLocalTime().toString(Qt::ISODate));
+        validUntil->setText(certificate.expiryDate().toLocalTime().toString(Qt::ISODate));
+        fingerprint->setText(certificateFingerprint(certificate));
+
+        const QDateTime now = QDateTime::currentDateTimeUtc();
+        if (now < certificate.effectiveDate().toUTC()) {
+            status->setText(QStringLiteral("Not valid yet"));
+            status->setProperty("state", QStringLiteral("warning"));
+        } else if (now > certificate.expiryDate().toUTC()) {
+            status->setText(QStringLiteral("Expired"));
+            status->setProperty("state", QStringLiteral("error"));
+        } else {
+            status->setText(QStringLiteral("Valid"));
+            status->setProperty("state", QStringLiteral("valid"));
+        }
+        repolish(status);
+    };
+
+    if (certificateSelector) {
+        connect(
+            certificateSelector,
+            &QComboBox::currentIndexChanged,
+            &details,
+            showCertificate
+        );
+    }
+    connect(copyFingerprint, &QPushButton::clicked, &details, [fingerprint] {
+        QApplication::clipboard()->setText(fingerprint->text());
+    });
+    connect(buttons, &QDialogButtonBox::rejected, &details, &QDialog::reject);
+    showCertificate(0);
+    details.exec();
 }
 
 void TrustRulesDialog::testDomain()
