@@ -1,0 +1,12 @@
+<RCC>
+    <qresource prefix="/">
+        <file>assets/theme.qss</file>
+        <file>assets/app-icon.svg</file>
+        <file>assets/icons/arrow-left.svg</file>
+        <file>assets/icons/arrow-right.svg</file>
+        <file>assets/icons/rotate-cw.svg</file>
+        <file>assets/icons/shield-check.svg</file>
+        <file>assets/icons/triangle-alert.svg</file>
+        <file>assets/icons/folder-open.svg</file>
+    </qresource>
+</RCC>
