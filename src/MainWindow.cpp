@@ -1,6 +1,7 @@
 #include "MainWindow.h"
 
 #include "CertificateTrustValidator.h"
+#include "TrustRulesDialog.h"
 
 #include <QAction>
 #include <QApplication>
@@ -93,6 +94,15 @@ void MainWindow::createInterface()
     connect(m_address, &QLineEdit::returnPressed, this, &MainWindow::navigateFromAddressBar);
 
     QMenu *fileMenu = menuBar()->addMenu(QStringLiteral("PanBrowser"));
+    QAction *editRulesAction = fileMenu->addAction(
+        QIcon(QStringLiteral(":/assets/icons/shield-check.svg")),
+        QStringLiteral("Trust Rules…")
+    );
+    editRulesAction->setMenuRole(QAction::PreferencesRole);
+    editRulesAction->setShortcut(QKeySequence::Preferences);
+    connect(editRulesAction, &QAction::triggered, this, &MainWindow::openTrustRules);
+
+    fileMenu->addSeparator();
     QAction *reloadRulesAction = fileMenu->addAction(
         QIcon(QStringLiteral(":/assets/icons/rotate-cw.svg")),
         QStringLiteral("Reload Trust Rules")
@@ -168,6 +178,19 @@ void MainWindow::navigateFromAddressBar()
         return;
     }
     m_webView->setUrl(url);
+}
+
+void MainWindow::openTrustRules()
+{
+    TrustRulesDialog dialog(m_configurationPath, this);
+    QString error;
+    if (!dialog.load(&error)) {
+        setTrustStatus(QStringLiteral("Rules error: %1").arg(error), true);
+        return;
+    }
+
+    if (dialog.exec() == QDialog::Accepted)
+        reloadRules();
 }
 
 void MainWindow::reloadRules()

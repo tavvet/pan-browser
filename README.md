@@ -39,9 +39,14 @@ On first launch PanBrowser creates:
 └── Certificates/
 ```
 
-Use **PanBrowser → Show Configuration Folder** to reveal it in Finder. After
-editing `rules.json`, select **PanBrowser → Reload Trust Rules** or press
-<kbd>⇧⌘R</kbd>.
+Open **PanBrowser → Trust Rules…** or press <kbd>⌘,</kbd> to manage rules. The
+editor imports certificates into the application data directory, validates the
+complete configuration, saves it atomically, and reloads the active policy.
+The previous file is retained as `rules.json.backup`.
+
+For advanced troubleshooting, use **PanBrowser → Show Configuration Folder**
+to reveal the files in Finder. After editing `rules.json` manually, select
+**PanBrowser → Reload Trust Rules** or press <kbd>⇧⌘R</kbd>.
 
 ## Trust rules
 

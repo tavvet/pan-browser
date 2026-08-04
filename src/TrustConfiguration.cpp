@@ -110,6 +110,10 @@ bool TrustRule::matches(const QString &host) const
 
 bool TrustPolicy::load(const QString &path, QString *error)
 {
+    m_rules.clear();
+    m_startPage = QUrl(QStringLiteral("https://example.com"));
+    m_sourcePath.clear();
+
     QFile file(path);
     if (!file.open(QIODevice::ReadOnly))
         return fail(error, QStringLiteral("Cannot open %1: %2").arg(path, file.errorString()));

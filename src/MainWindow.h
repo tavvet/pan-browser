@@ -21,6 +21,7 @@ private:
     void createInterface();
     void connectBrowserSignals();
     void navigateFromAddressBar();
+    void openTrustRules();
     void reloadRules();
     void handleCertificateError(const QWebEngineCertificateError &error);
     void setTrustStatus(const QString &text, bool error = false);

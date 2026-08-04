@@ -39,6 +39,10 @@ set(PANBROWSER_APP_SOURCES
     src/MainWindow.h
     src/TrustConfiguration.cpp
     src/TrustConfiguration.h
+    src/TrustRulesDialog.cpp
+    src/TrustRulesDialog.h
+    src/TrustSettings.cpp
+    src/TrustSettings.h
     src/CertificateTrustValidator.h
     src/resources.qrc
 )
@@ -85,6 +89,8 @@ qt_add_executable(PanBrowserTests
     tests/TrustConfigurationTests.cpp
     src/TrustConfiguration.cpp
     src/TrustConfiguration.h
+    src/TrustSettings.cpp
+    src/TrustSettings.h
 )
 target_include_directories(PanBrowserTests PRIVATE src)
 target_link_libraries(PanBrowserTests PRIVATE
