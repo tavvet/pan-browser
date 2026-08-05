@@ -4,6 +4,8 @@
 #include "CertificateTrustValidator.h"
 #include "DownloadManager.h"
 #include "DownloadsPanel.h"
+#include "PermissionController.h"
+#include "PermissionPrompt.h"
 #include "SettingsDialog.h"
 #include "WindowPlacement.h"
 
@@ -63,6 +65,7 @@ MainWindow::MainWindow(QWidget *parent)
         this
     );
     createInterface();
+    m_permissionController = new PermissionController(m_permissionPrompt, this);
     restoreWindowPlacement();
     reloadRules();
     restoreInitialTabs();
@@ -70,6 +73,8 @@ MainWindow::MainWindow(QWidget *parent)
 
 MainWindow::~MainWindow()
 {
+    delete m_permissionController;
+    m_permissionController = nullptr;
     delete takeCentralWidget();
     m_tabStack = nullptr;
     m_tabStates.clear();
@@ -177,6 +182,16 @@ void MainWindow::createInterface()
     toolbar->addWidget(m_downloadButton);
     addToolBar(Qt::TopToolBarArea, toolbar);
 
+    addToolBarBreak(Qt::TopToolBarArea);
+    QToolBar *permissionToolbar = new QToolBar(QStringLiteral("Permission request"), this);
+    permissionToolbar->setObjectName(QStringLiteral("permissionBar"));
+    permissionToolbar->setMovable(false);
+    permissionToolbar->setFloatable(false);
+    m_permissionPrompt = new PermissionPrompt(permissionToolbar);
+    permissionToolbar->addWidget(m_permissionPrompt);
+    addToolBar(Qt::TopToolBarArea, permissionToolbar);
+    permissionToolbar->hide();
+
     m_downloadsPanel = new DownloadsPanel(m_downloadManager, this);
     m_downloadButton->setActiveCount(m_downloadManager->activeCount());
     connect(m_downloadButton, &QToolButton::clicked, this, [this] {
@@ -204,6 +219,8 @@ void MainWindow::createInterface()
             if (!m_restoringSession)
                 activatePendingTab(currentWebView());
         }
+        if (m_permissionController)
+            m_permissionController->currentViewChanged(currentWebView());
         updateCurrentTabUi();
         scheduleSessionSave();
     });
@@ -350,6 +367,7 @@ void MainWindow::closeTab(int index)
     if (!webView)
         return;
 
+    m_permissionController->cancelForView(webView);
     disconnect(webView, nullptr, this, nullptr);
     disconnect(webView->page(), nullptr, this, nullptr);
     webView->stop();
@@ -421,6 +439,7 @@ void MainWindow::connectBrowserSignals(QWebEngineView *webView)
             m_tabBar->setTabIcon(index, icon);
     });
     connect(webView, &QWebEngineView::loadStarted, this, [this, webView] {
+        m_permissionController->cancelForView(webView);
         BrowserTabState &state = m_tabStates[webView];
         state.lastAcceptedRule.clear();
         state.loading = true;
@@ -457,6 +476,14 @@ void MainWindow::connectBrowserSignals(QWebEngineView *webView)
         this,
         [this, webView](const QWebEngineCertificateError &error) {
             handleCertificateError(webView, error);
+        }
+    );
+    connect(
+        webView->page(),
+        &QWebEnginePage::permissionRequested,
+        this,
+        [this, webView](const QWebEnginePermission &permission) {
+            m_permissionController->request(webView, permission);
         }
     );
     connect(

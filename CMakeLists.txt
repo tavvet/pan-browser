@@ -46,6 +46,12 @@ set(PANBROWSER_APP_SOURCES
     src/DownloadManager.h
     src/DownloadsPanel.cpp
     src/DownloadsPanel.h
+    src/PermissionController.cpp
+    src/PermissionController.h
+    src/PermissionPolicy.cpp
+    src/PermissionPolicy.h
+    src/PermissionPrompt.cpp
+    src/PermissionPrompt.h
     src/main.cpp
     src/MainWindow.cpp
     src/MainWindow.h
@@ -98,6 +104,9 @@ target_link_libraries(PanBrowser PRIVATE
 )
 
 if(APPLE)
+    set_target_properties(PanBrowser PROPERTIES
+        MACOSX_BUNDLE_INFO_PLIST ${CMAKE_CURRENT_SOURCE_DIR}/src/Info.plist.in
+    )
     find_library(SECURITY_FRAMEWORK Security REQUIRED)
     target_link_libraries(PanBrowser PRIVATE ${SECURITY_FRAMEWORK})
 endif()
@@ -111,6 +120,8 @@ qt_add_executable(PanBrowserTests
     src/BrowserPreferences.h
     src/DownloadHistoryStore.cpp
     src/DownloadHistoryStore.h
+    src/PermissionPolicy.cpp
+    src/PermissionPolicy.h
     src/SessionStore.cpp
     src/SessionStore.h
     src/TrustConfiguration.cpp

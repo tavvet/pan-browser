@@ -13,11 +13,11 @@
 - [x] Optional session-cookie and tab restoration with lazy background tabs.
 - [x] Browsing data controls for cookies, site storage, and HTTP cache.
 - [x] Download manager with progress controls and persistent history.
+- [x] One-time permission prompts for camera, microphone, and location.
 
 ## Browser essentials
 
 - [ ] Popup handling in a new PanBrowser window with the same profile and trust policy.
-- [ ] Explicit permission prompts for camera, microphone, location, and notifications.
 - [ ] Safe handling of external URL schemes such as `mailto:` and application deep links.
 
 ## Cross-platform

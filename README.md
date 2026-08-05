@@ -75,6 +75,13 @@ local path and source hostname, but not the complete source URL, and is limited
 to the 200 most recent records. Clearing history does not delete downloaded
 files.
 
+Camera, microphone, and location requests are shown in a browser-owned prompt
+only for the active tab on a secure HTTPS origin. Access is granted for the
+current request only and permission decisions are never stored. Requests from
+HTTP pages or background tabs are denied, as are notifications and unsupported
+sensitive permissions. macOS may show its own system prompt after PanBrowser's
+**Allow once** action.
+
 Open **PanBrowser → Trust Rules…** to jump directly to the Trust Rules section
 of the same settings window. The editor imports certificates into the
 application data directory, validates the complete configuration, saves it

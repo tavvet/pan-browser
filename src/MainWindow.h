@@ -19,6 +19,8 @@ class BrowserProfile;
 class DownloadButton;
 class DownloadManager;
 class DownloadsPanel;
+class PermissionController;
+class PermissionPrompt;
 class QCloseEvent;
 class QWebEngineCertificateError;
 class QWebEngineView;
@@ -76,6 +78,8 @@ private:
     DownloadManager *m_downloadManager = nullptr;
     DownloadsPanel *m_downloadsPanel = nullptr;
     DownloadButton *m_downloadButton = nullptr;
+    PermissionController *m_permissionController = nullptr;
+    PermissionPrompt *m_permissionPrompt = nullptr;
     QTabBar *m_tabBar = nullptr;
     QStackedWidget *m_tabStack = nullptr;
     QLineEdit *m_address = nullptr;

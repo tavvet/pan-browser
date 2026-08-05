@@ -57,6 +57,7 @@ BrowserProfile::BrowserProfile(bool persistSessionCookies, QObject *parent)
     setPersistentStoragePath(storagePath);
     setCachePath(cachePath);
     setHttpCacheType(QWebEngineProfile::DiskHttpCache);
+    setPersistentPermissionsPolicy(QWebEngineProfile::PersistentPermissionsPolicy::AskEveryTime);
     setPersistSessionCookies(persistSessionCookies);
 }
 

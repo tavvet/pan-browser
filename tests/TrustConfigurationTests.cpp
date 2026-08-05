@@ -1,6 +1,7 @@
 #include "BrowserPreferences.h"
 #include "BrowserDataCleanup.h"
 #include "DownloadHistoryStore.h"
+#include "PermissionPolicy.h"
 #include "SessionStore.h"
 #include "TrustConfiguration.h"
 #include "TrustSettings.h"
@@ -31,6 +32,8 @@ private slots:
     void invalidSessionFileFailsClosed();
     void managedDataCleanupStaysInsideRoot();
     void downloadHistoryRoundTripAndLimit();
+    void sensitivePermissionsRequireSecureOrigin();
+    void unsupportedPermissionsAreDenied();
 };
 
 void TrustConfigurationTests::exactDomainIsCaseInsensitive()
@@ -302,6 +305,49 @@ void TrustConfigurationTests::downloadHistoryRoundTripAndLimit()
     QCOMPARE(restored.at(5).sourceHost, QStringLiteral("files.example"));
     QCOMPARE(restored.at(5).status, DownloadStatus::Completed);
     QCOMPARE(restored.at(5).receivedBytes, 500);
+}
+
+void TrustConfigurationTests::sensitivePermissionsRequireSecureOrigin()
+{
+    const QUrl secureOrigin(QStringLiteral("https://bank.example"));
+    const QUrl insecureOrigin(QStringLiteral("http://bank.example"));
+
+    QCOMPARE(
+        permissionDisposition(secureOrigin, BrowserPermissionKind::Camera),
+        PermissionDisposition::Prompt
+    );
+    QCOMPARE(
+        permissionDisposition(secureOrigin, BrowserPermissionKind::Microphone),
+        PermissionDisposition::Prompt
+    );
+    QCOMPARE(
+        permissionDisposition(secureOrigin, BrowserPermissionKind::CameraAndMicrophone),
+        PermissionDisposition::Prompt
+    );
+    QCOMPARE(
+        permissionDisposition(secureOrigin, BrowserPermissionKind::Location),
+        PermissionDisposition::Prompt
+    );
+    QCOMPARE(
+        permissionDisposition(insecureOrigin, BrowserPermissionKind::Camera),
+        PermissionDisposition::Deny
+    );
+}
+
+void TrustConfigurationTests::unsupportedPermissionsAreDenied()
+{
+    const QUrl secureOrigin(QStringLiteral("https://bank.example"));
+
+    QCOMPARE(
+        permissionDisposition(secureOrigin, BrowserPermissionKind::Notifications),
+        PermissionDisposition::Deny
+    );
+    QCOMPARE(
+        permissionDisposition(secureOrigin, BrowserPermissionKind::Other),
+        PermissionDisposition::Deny
+    );
+    QVERIFY(!permissionTitle(BrowserPermissionKind::Location).isEmpty());
+    QVERIFY(!permissionDescription(BrowserPermissionKind::Location).isEmpty());
 }
 
 QTEST_MAIN(TrustConfigurationTests)
