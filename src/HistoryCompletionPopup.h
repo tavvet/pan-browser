@@ -6,6 +6,7 @@
 
 class QLineEdit;
 class QListWidget;
+class QHideEvent;
 
 class HistoryCompletionPopup final : public QFrame {
     Q_OBJECT
@@ -21,10 +22,12 @@ signals:
 
 protected:
     bool eventFilter(QObject *watched, QEvent *event) override;
+    void hideEvent(QHideEvent *event) override;
 
 private:
     void activateCurrent();
     void positionBelowAddressBar();
+    void updatePlacementStyle(const QString &placement);
 
     QLineEdit *m_addressBar = nullptr;
     QListWidget *m_list = nullptr;

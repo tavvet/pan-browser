@@ -161,6 +161,16 @@ QLineEdit#addressBar:focus {
     border: 1px solid #5b8def;
 }
 
+QLineEdit#addressBar[completionPlacement="below"] {
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+}
+
+QLineEdit#addressBar[completionPlacement="above"] {
+    border-top-left-radius: 0;
+    border-top-right-radius: 0;
+}
+
 QLineEdit#addressBar QToolButton {
     min-width: 20px;
     max-width: 20px;
@@ -180,7 +190,17 @@ QLineEdit#addressBar QToolButton:hover {
 QFrame#historyCompletionPopup {
     background: #181b21;
     border: 1px solid #3a414d;
-    border-radius: 10px;
+    border-radius: 0;
+}
+
+QFrame#historyCompletionPopup[placement="below"] {
+    border-bottom-left-radius: 10px;
+    border-bottom-right-radius: 10px;
+}
+
+QFrame#historyCompletionPopup[placement="above"] {
+    border-top-left-radius: 10px;
+    border-top-right-radius: 10px;
 }
 
 QListWidget#historyCompletionList {

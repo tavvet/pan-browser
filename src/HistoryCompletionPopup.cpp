@@ -3,11 +3,13 @@
 #include <QApplication>
 #include <QDate>
 #include <QGuiApplication>
+#include <QHideEvent>
 #include <QKeyEvent>
 #include <QLineEdit>
 #include <QListWidget>
 #include <QLocale>
 #include <QScreen>
+#include <QStyle>
 #include <QVBoxLayout>
 
 #include <algorithm>
@@ -157,6 +159,12 @@ bool HistoryCompletionPopup::eventFilter(QObject *watched, QEvent *event)
     return QFrame::eventFilter(watched, event);
 }
 
+void HistoryCompletionPopup::hideEvent(QHideEvent *event)
+{
+    updatePlacementStyle(QString());
+    QFrame::hideEvent(event);
+}
+
 void HistoryCompletionPopup::activateCurrent()
 {
     const QListWidgetItem *item = m_list->currentItem();
@@ -171,21 +179,40 @@ void HistoryCompletionPopup::activateCurrent()
 
 void HistoryCompletionPopup::positionBelowAddressBar()
 {
-    const QPoint below = m_addressBar->mapToGlobal(QPoint(0, m_addressBar->height() + 3));
+    const QPoint below = m_addressBar->mapToGlobal(QPoint(0, m_addressBar->height() - 1));
     const int width = m_addressBar->width();
     const int height = std::min(m_list->count() * 52 + 10, 430);
     QRect geometry(below, QSize(width, height));
+    bool placedBelow = true;
     const QScreen *screen = QGuiApplication::screenAt(below);
     if (screen) {
         const QRect available = screen->availableGeometry();
         if (geometry.bottom() > available.bottom()) {
-            const QPoint above = m_addressBar->mapToGlobal(QPoint(0, -height - 3));
+            const QPoint above = m_addressBar->mapToGlobal(QPoint(0, -height + 1));
             geometry.moveTopLeft(above);
+            placedBelow = false;
         }
         if (geometry.right() > available.right())
             geometry.moveRight(available.right());
         if (geometry.left() < available.left())
             geometry.moveLeft(available.left());
     }
+    updatePlacementStyle(placedBelow ? QStringLiteral("below") : QStringLiteral("above"));
     setGeometry(geometry);
+}
+
+void HistoryCompletionPopup::updatePlacementStyle(const QString &placement)
+{
+    if (property("placement").toString() == placement
+        && m_addressBar->property("completionPlacement").toString() == placement) {
+        return;
+    }
+    setProperty("placement", placement);
+    m_addressBar->setProperty("completionPlacement", placement);
+    style()->unpolish(this);
+    style()->polish(this);
+    update();
+    m_addressBar->style()->unpolish(m_addressBar);
+    m_addressBar->style()->polish(m_addressBar);
+    m_addressBar->update();
 }
