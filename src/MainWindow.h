@@ -20,6 +20,7 @@ class QStackedWidget;
 class QTabBar;
 class QTimer;
 class QAction;
+class BookmarkStore;
 class BrowserProfile;
 class DownloadButton;
 class DownloadManager;
@@ -67,6 +68,7 @@ private:
         BrowserProfile *sharedProfile,
         DownloadManager *sharedDownloadManager,
         HistoryStore *sharedHistoryStore,
+        BookmarkStore *sharedBookmarkStore,
         MainWindow *primaryWindow,
         WindowRole role,
         QWidget *parent
@@ -87,10 +89,13 @@ private:
     void connectBrowserSignals(QWebEngineView *webView);
     void updateCurrentTabUi();
     void updateNavigationActions();
+    void updateBookmarkAction();
     void updateAddressPlaceholder();
     void navigateFromAddressBar();
     void showHistorySuggestions();
     void openSettings();
+    void editCurrentBookmark();
+    void openBookmarks();
     void reloadRules();
     void reloadRulesLocal();
     void restoreInitialTabs();
@@ -112,6 +117,7 @@ private:
     BrowserProfile *m_profile = nullptr;
     DownloadManager *m_downloadManager = nullptr;
     HistoryStore *m_historyStore = nullptr;
+    BookmarkStore *m_bookmarkStore = nullptr;
     DownloadsPanel *m_downloadsPanel = nullptr;
     DownloadButton *m_downloadButton = nullptr;
     HistoryCompletionPopup *m_historyCompletionPopup = nullptr;
@@ -126,6 +132,7 @@ private:
     QAction *m_forwardAction = nullptr;
     QAction *m_reloadAction = nullptr;
     QAction *m_securityIndicator = nullptr;
+    QAction *m_bookmarkAction = nullptr;
     QLabel *m_trustStatus = nullptr;
     QLabel *m_ruleCount = nullptr;
     QProgressBar *m_progress = nullptr;
@@ -139,6 +146,7 @@ private:
     QString m_configurationPath;
     QString m_searchConfigurationPath;
     QString m_historyError;
+    QString m_bookmarkError;
     MainWindow *m_primaryWindow = nullptr;
     QList<QPointer<MainWindow>> m_popupWindows;
     bool m_ownsBrowserResources = true;

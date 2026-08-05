@@ -39,6 +39,10 @@ set(PANBROWSER_APP_SOURCES
     src/AddressLineEdit.h
     src/BookmarkStore.cpp
     src/BookmarkStore.h
+    src/BookmarkDialog.cpp
+    src/BookmarkDialog.h
+    src/BookmarksDialog.cpp
+    src/BookmarksDialog.h
     src/BrowserDataCleanup.cpp
     src/BrowserDataCleanup.h
     src/BrowserProfile.cpp

@@ -1,6 +1,9 @@
 #include "MainWindow.h"
 
 #include "AddressLineEdit.h"
+#include "BookmarkDialog.h"
+#include "BookmarkStore.h"
+#include "BookmarksDialog.h"
 #include "BrowserPage.h"
 #include "BrowserProfile.h"
 #include "CertificateTrustValidator.h"
@@ -77,7 +80,7 @@ bool isSameWebOrigin(const QUrl &left, const QUrl &right)
 } // namespace
 
 MainWindow::MainWindow(QWidget *parent)
-    : MainWindow(nullptr, nullptr, nullptr, nullptr, WindowRole::Primary, parent)
+    : MainWindow(nullptr, nullptr, nullptr, nullptr, nullptr, WindowRole::Primary, parent)
 {
 }
 
@@ -85,6 +88,7 @@ MainWindow::MainWindow(
     BrowserProfile *sharedProfile,
     DownloadManager *sharedDownloadManager,
     HistoryStore *sharedHistoryStore,
+    BookmarkStore *sharedBookmarkStore,
     MainWindow *primaryWindow,
     WindowRole role,
     QWidget *parent
@@ -121,14 +125,23 @@ MainWindow::MainWindow(
         );
         if (!m_historyStore->open(&m_historyError))
             qWarning().noquote() << "[PanBrowser history]" << m_historyError;
+        m_bookmarkStore = new BookmarkStore(
+            QDir(QStandardPaths::writableLocation(QStandardPaths::AppDataLocation))
+                .filePath(QStringLiteral("bookmarks.sqlite")),
+            this
+        );
+        if (!m_bookmarkStore->open(&m_bookmarkError))
+            qWarning().noquote() << "[PanBrowser bookmarks]" << m_bookmarkError;
     } else {
         Q_ASSERT(sharedProfile);
         Q_ASSERT(sharedDownloadManager);
         Q_ASSERT(sharedHistoryStore);
+        Q_ASSERT(sharedBookmarkStore);
         Q_ASSERT(primaryWindow);
         m_profile = sharedProfile;
         m_downloadManager = sharedDownloadManager;
         m_historyStore = sharedHistoryStore;
+        m_bookmarkStore = sharedBookmarkStore;
         m_configurationPath = primaryWindow->m_configurationPath;
         m_searchConfigurationPath = primaryWindow->m_searchConfigurationPath;
         m_trustPolicy = primaryWindow->m_trustPolicy;
@@ -172,6 +185,7 @@ MainWindow::~MainWindow()
     }
     m_downloadManager = nullptr;
     m_historyStore = nullptr;
+    m_bookmarkStore = nullptr;
     m_profile = nullptr;
 }
 
@@ -267,6 +281,12 @@ void MainWindow::createInterface()
         QIcon(),
         QLineEdit::LeadingPosition
     );
+    m_bookmarkAction = m_address->addAction(
+        QIcon(QStringLiteral(":/assets/icons/star.svg")),
+        QLineEdit::TrailingPosition
+    );
+    m_bookmarkAction->setEnabled(false);
+    m_bookmarkAction->setToolTip(QStringLiteral("Add Bookmark (⌘D)"));
     m_historyCompletionPopup = new HistoryCompletionPopup(m_address, this);
     m_historySuggestionTimer = new QTimer(this);
     m_historySuggestionTimer->setSingleShot(true);
@@ -351,6 +371,7 @@ void MainWindow::createInterface()
             webView->reload();
     });
     connect(go, &QAction::triggered, this, &MainWindow::navigateFromAddressBar);
+    connect(m_bookmarkAction, &QAction::triggered, this, &MainWindow::editCurrentBookmark);
     connect(m_address, &QLineEdit::returnPressed, this, &MainWindow::navigateFromAddressBar);
     connect(m_address, &QLineEdit::textEdited, this, [this] {
         m_address->clearGhostCompletion();
@@ -372,6 +393,7 @@ void MainWindow::createInterface()
             navigateFromAddressBar();
         }
     );
+    connect(m_bookmarkStore, &BookmarkStore::bookmarksChanged, this, &MainWindow::updateBookmarkAction);
 
     QMenu *fileMenu = menuBar()->addMenu(QStringLiteral("PanBrowser"));
     QAction *newTabAction = fileMenu->addAction(
@@ -388,6 +410,20 @@ void MainWindow::createInterface()
     connect(closeTabAction, &QAction::triggered, this, [this] {
         closeTab(m_tabBar->currentIndex());
     });
+
+    fileMenu->addSeparator();
+    QAction *addBookmarkAction = fileMenu->addAction(
+        QIcon(QStringLiteral(":/assets/icons/star.svg")),
+        QStringLiteral("Add Bookmark…")
+    );
+    addBookmarkAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_D));
+    connect(addBookmarkAction, &QAction::triggered, this, &MainWindow::editCurrentBookmark);
+    QAction *bookmarksAction = fileMenu->addAction(
+        QIcon(QStringLiteral(":/assets/icons/star-filled.svg")),
+        QStringLiteral("Bookmarks…")
+    );
+    bookmarksAction->setShortcut(QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_B));
+    connect(bookmarksAction, &QAction::triggered, this, &MainWindow::openBookmarks);
 
     fileMenu->addSeparator();
     QAction *settingsAction = fileMenu->addAction(
@@ -449,6 +485,7 @@ MainWindow *MainWindow::createPopupWindow(
         m_profile,
         m_downloadManager,
         m_historyStore,
+        m_bookmarkStore,
         primary,
         role,
         primary
@@ -576,6 +613,8 @@ void MainWindow::connectBrowserSignals(QWebEngineView *webView)
         }
         if (webView == currentWebView())
             m_address->setText(url.toString());
+        if (webView == currentWebView())
+            updateBookmarkAction();
         if (m_historySuggestionTimer)
             m_historySuggestionTimer->stop();
         if (m_historyCompletionPopup)
@@ -847,6 +886,7 @@ void MainWindow::updateCurrentTabUi()
         setWindowTitle(QStringLiteral("PanBrowser"));
         m_progress->hide();
         updateNavigationActions();
+        updateBookmarkAction();
         return;
     }
 
@@ -861,6 +901,7 @@ void MainWindow::updateCurrentTabUi()
     m_progress->setValue(state.progress);
     m_progress->setVisible(state.loading);
     updateNavigationActions();
+    updateBookmarkAction();
 }
 
 void MainWindow::updateNavigationActions()
@@ -869,6 +910,34 @@ void MainWindow::updateNavigationActions()
     m_backAction->setEnabled(webView && webView->history()->canGoBack());
     m_forwardAction->setEnabled(webView && webView->history()->canGoForward());
     m_reloadAction->setEnabled(webView != nullptr);
+}
+
+void MainWindow::updateBookmarkAction()
+{
+    if (!m_bookmarkAction)
+        return;
+    QWebEngineView *webView = currentWebView();
+    const QUrl url = webView ? BookmarkStore::normalizedUrl(webView->url()) : QUrl();
+    const bool available = m_bookmarkStore && m_bookmarkStore->isOpen() && url.isValid();
+    m_bookmarkAction->setEnabled(available);
+    if (!available) {
+        m_bookmarkAction->setIcon(QIcon(QStringLiteral(":/assets/icons/star.svg")));
+        m_bookmarkAction->setToolTip(QStringLiteral("Only web pages can be bookmarked"));
+        return;
+    }
+
+    QString error;
+    const bool bookmarked = m_bookmarkStore->bookmarkForUrl(url, &error).has_value();
+    if (!error.isEmpty())
+        qWarning().noquote() << "[PanBrowser bookmarks]" << error;
+    m_bookmarkAction->setIcon(QIcon(
+        bookmarked ? QStringLiteral(":/assets/icons/star-filled.svg")
+                   : QStringLiteral(":/assets/icons/star.svg")
+    ));
+    m_bookmarkAction->setToolTip(
+        bookmarked ? QStringLiteral("Edit Bookmark (⌘D)")
+                   : QStringLiteral("Add Bookmark (⌘D)")
+    );
 }
 
 void MainWindow::updateAddressPlaceholder()
@@ -923,6 +992,60 @@ void MainWindow::showHistorySuggestions()
         return;
     }
     m_historyCompletionPopup->showSuggestions(suggestions);
+}
+
+void MainWindow::editCurrentBookmark()
+{
+    QWebEngineView *webView = currentWebView();
+    if (!webView || !m_bookmarkStore || !m_bookmarkStore->isOpen()) {
+        statusBar()->showMessage(
+            m_bookmarkError.isEmpty() ? QStringLiteral("Bookmarks are unavailable")
+                                      : m_bookmarkError,
+            5000
+        );
+        return;
+    }
+    const QUrl url = BookmarkStore::normalizedUrl(webView->url());
+    if (!url.isValid()) {
+        statusBar()->showMessage(QStringLiteral("Only web pages can be bookmarked"), 4000);
+        return;
+    }
+
+    QString error;
+    const std::optional<Bookmark> existing = m_bookmarkStore->bookmarkForUrl(url, &error);
+    if (!error.isEmpty()) {
+        QMessageBox::warning(this, QStringLiteral("Bookmarks unavailable"), error);
+        return;
+    }
+    const QString title = webView->title().trimmed().isEmpty()
+        ? url.host()
+        : webView->title().trimmed();
+    BookmarkDialog dialog(m_bookmarkStore, url, title, existing, this);
+    dialog.exec();
+}
+
+void MainWindow::openBookmarks()
+{
+    if (!m_ownsBrowserResources && m_primaryWindow) {
+        m_primaryWindow->show();
+        m_primaryWindow->raise();
+        m_primaryWindow->activateWindow();
+        m_primaryWindow->openBookmarks();
+        return;
+    }
+
+    BookmarksDialog dialog(m_bookmarkStore, this);
+    connect(&dialog, &BookmarksDialog::openRequested, this, [this](const QUrl &url, bool newTab) {
+        if (newTab || !currentWebView()) {
+            createTab(url, true);
+            return;
+        }
+        BrowserTabState &state = m_tabStates[currentWebView()];
+        state.pendingHistoryTransition = HistoryTransition::Other;
+        state.suppressNextHistoryVisit = false;
+        currentWebView()->setUrl(url);
+    });
+    dialog.exec();
 }
 
 void MainWindow::openSettings()

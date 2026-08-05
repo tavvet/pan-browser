@@ -75,7 +75,7 @@ void AddressLineEdit::paintEvent(QPaintEvent *event)
     const QRect caret = cursorRect();
     const int x = caret.left() + 1;
     const int baseline = (height() - metrics.height()) / 2 + metrics.ascent();
-    const QRect clip = rect().adjusted(x, 1, -27, -1);
+    const QRect clip = rect().adjusted(x, 1, -50, -1);
     if (clip.width() <= 0)
         return;
     painter.setClipRect(clip);

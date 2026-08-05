@@ -52,6 +52,7 @@ public:
         QString *error = nullptr
     );
     bool remove(qint64 id, QString *error = nullptr);
+    bool remove(const QList<qint64> &ids, QString *error = nullptr);
     bool removeUrl(const QUrl &url, QString *error = nullptr);
     bool clear(QString *error = nullptr);
 

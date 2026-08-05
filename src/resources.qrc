@@ -16,5 +16,7 @@
         <file>assets/icons/search.svg</file>
         <file>assets/icons/history.svg</file>
         <file>assets/icons/info.svg</file>
+        <file>assets/icons/star.svg</file>
+        <file>assets/icons/star-filled.svg</file>
     </qresource>
 </RCC>

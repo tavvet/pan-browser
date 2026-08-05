@@ -831,3 +831,96 @@ QDialog#downloadsPanel QPushButton#subtleButton:hover {
     color: #edf0f6;
     background: #292e37;
 }
+
+QDialog#bookmarkDialog,
+QDialog#bookmarksDialog {
+    background: #15181e;
+    color: #dce1e9;
+}
+
+QDialog#bookmarkDialog QLabel#dialogTitle,
+QDialog#bookmarksDialog QLabel#dialogTitle {
+    color: #f5f7fb;
+    font-size: 22px;
+    font-weight: 700;
+}
+
+QDialog#bookmarksDialog QLabel#dialogSubtitle,
+QDialog#bookmarksDialog QLabel#fieldHint {
+    color: #929baa;
+}
+
+QDialog#bookmarkDialog QLineEdit,
+QDialog#bookmarksDialog QLineEdit {
+    min-height: 34px;
+    color: #edf0f6;
+    background: #20242c;
+    border: 1px solid #373e4a;
+    border-radius: 8px;
+    padding: 0 10px;
+    selection-background-color: #3d72d9;
+}
+
+QDialog#bookmarkDialog QLineEdit:focus,
+QDialog#bookmarksDialog QLineEdit:focus {
+    border-color: #5b8def;
+    background: #242932;
+}
+
+QDialog#bookmarksDialog QListWidget#bookmarksList {
+    color: #dce1e9;
+    background: #181b21;
+    border: 1px solid #303641;
+    border-radius: 9px;
+    outline: none;
+    padding: 4px;
+}
+
+QDialog#bookmarksDialog QListWidget#bookmarksList::item {
+    border-radius: 7px;
+    padding: 6px 9px;
+}
+
+QDialog#bookmarksDialog QListWidget#bookmarksList::item:hover {
+    background: #252a33;
+}
+
+QDialog#bookmarksDialog QListWidget#bookmarksList::item:selected {
+    color: #ffffff;
+    background: #315ea8;
+}
+
+QDialog#bookmarkDialog QPushButton,
+QDialog#bookmarksDialog QPushButton {
+    min-height: 30px;
+    color: #e9edf5;
+    background: #2a303a;
+    border: 1px solid #3a424f;
+    border-radius: 7px;
+    padding: 2px 13px;
+}
+
+QDialog#bookmarkDialog QPushButton:hover,
+QDialog#bookmarksDialog QPushButton:hover {
+    background: #343c48;
+    border-color: #4a5564;
+}
+
+QDialog#bookmarkDialog QPushButton:default,
+QDialog#bookmarksDialog QPushButton:default {
+    color: #ffffff;
+    background: #3d72d9;
+    border-color: #5689ea;
+}
+
+QDialog#bookmarkDialog QPushButton#dangerButton,
+QDialog#bookmarksDialog QPushButton#dangerButton {
+    color: #ff9aaa;
+}
+
+QDialog#bookmarkDialog QPushButton:disabled,
+QDialog#bookmarksDialog QPushButton:disabled {
+    color: #626b79;
+    background: #1b1e24;
+    border-color: #292e37;
+}

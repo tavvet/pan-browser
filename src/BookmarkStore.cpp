@@ -250,14 +250,33 @@ bool BookmarkStore::update(
 
 bool BookmarkStore::remove(qint64 id, QString *error)
 {
+    return remove(QList<qint64>{id}, error);
+}
+
+bool BookmarkStore::remove(const QList<qint64> &ids, QString *error)
+{
+    if (ids.isEmpty())
+        return true;
     if (!isOpen())
         return fail(error, QStringLiteral("Bookmarks are unavailable"));
+    if (!m_database.transaction())
+        return fail(error, QStringLiteral("Cannot start bookmark deletion"));
     QSqlQuery query(m_database);
     query.prepare(QStringLiteral("DELETE FROM bookmarks WHERE id = ?"));
-    query.addBindValue(id);
-    if (!query.exec())
-        return fail(error, databaseError(QStringLiteral("Cannot remove bookmark"), query));
-    if (query.numRowsAffected() > 0)
+    bool changed = false;
+    for (qint64 id : ids) {
+        if (id <= 0)
+            continue;
+        query.bindValue(0, id);
+        if (!query.exec()) {
+            m_database.rollback();
+            return fail(error, databaseError(QStringLiteral("Cannot remove bookmark"), query));
+        }
+        changed = changed || query.numRowsAffected() > 0;
+    }
+    if (!m_database.commit())
+        return fail(error, QStringLiteral("Cannot commit bookmark deletion"));
+    if (changed)
         emit bookmarksChanged();
     return true;
 }
