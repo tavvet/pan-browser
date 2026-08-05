@@ -26,6 +26,8 @@ private:
     bool m_valid = false;
 };
 
+[[nodiscard]] bool domainPatternsOverlap(const QString &left, const QString &right);
+
 struct TrustRule {
     QString name;
     TrustMode mode = TrustMode::SystemOnly;

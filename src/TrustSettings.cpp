@@ -19,38 +19,6 @@ bool fail(QString *error, const QString &message)
     return false;
 }
 
-QString normalizedDomain(QString domain)
-{
-    domain = domain.trimmed().toLower();
-    while (domain.startsWith(QLatin1Char('.')))
-        domain.removeFirst();
-    while (domain.endsWith(QLatin1Char('.')))
-        domain.chop(1);
-    return domain;
-}
-
-bool domainsOverlap(const QString &leftSource, const QString &rightSource)
-{
-    QString left = normalizedDomain(leftSource);
-    QString right = normalizedDomain(rightSource);
-    const bool leftWildcard = left.startsWith(QStringLiteral("*."));
-    const bool rightWildcard = right.startsWith(QStringLiteral("*."));
-    if (leftWildcard)
-        left.remove(0, 2);
-    if (rightWildcard)
-        right.remove(0, 2);
-
-    if (!leftWildcard && !rightWildcard)
-        return left == right;
-    if (leftWildcard && !rightWildcard)
-        return right.endsWith(QLatin1Char('.') + left);
-    if (!leftWildcard && rightWildcard)
-        return left.endsWith(QLatin1Char('.') + right);
-    return left == right
-        || left.endsWith(QLatin1Char('.') + right)
-        || right.endsWith(QLatin1Char('.') + left);
-}
-
 bool certificateFileIsValid(const QString &path)
 {
     QFile file(path);
@@ -245,7 +213,7 @@ bool TrustSettings::validate(const QString &path, QString *error) const
                 return fail(error, domainError);
 
             for (const auto &[configuredDomain, configuredRule] : configuredDomains) {
-                if (domainsOverlap(domain, configuredDomain)) {
+                if (domainPatternsOverlap(domain, configuredDomain)) {
                     return fail(
                         error,
                         QStringLiteral("Domain %1 overlaps rule %2").arg(domain, configuredRule)

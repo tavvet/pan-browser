@@ -25,6 +25,7 @@ private slots:
     void malformedWildcardsAreRejected();
     void settingsRoundTripAndCreateBackup();
     void overlappingEnabledDomainsAreRejected();
+    void runtimeRejectsOverlappingEnabledDomains();
     void customModeRequiresCertificate();
     void disabledDraftMayBeIncomplete();
     void visibleWindowPlacementIsPreserved();
@@ -134,6 +135,40 @@ void TrustConfigurationTests::overlappingEnabledDomainsAreRejected()
     QString error;
     QVERIFY(!settings.validate(directory.filePath(QStringLiteral("rules.json")), &error));
     QVERIFY(error.contains(QStringLiteral("overlaps rule First")));
+}
+
+void TrustConfigurationTests::runtimeRejectsOverlappingEnabledDomains()
+{
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+    const QString path = directory.filePath(QStringLiteral("rules.json"));
+    QFile file(path);
+    QVERIFY(file.open(QIODevice::WriteOnly));
+    const QByteArray contents = R"({
+        "version": 1,
+        "rules": [
+            {
+                "name": "Broad",
+                "domains": ["*.example.com"],
+                "mode": "system-only",
+                "anchors": []
+            },
+            {
+                "name": "Narrow",
+                "domains": ["login.example.com"],
+                "mode": "system-only",
+                "anchors": []
+            }
+        ]
+    })";
+    QCOMPARE(file.write(contents), contents.size());
+    file.close();
+
+    TrustPolicy policy;
+    QString error;
+    QVERIFY(!policy.load(path, &error));
+    QVERIFY(error.contains(QStringLiteral("overlaps rule Broad")));
+    QCOMPARE(policy.ruleCount(), 0);
 }
 
 void TrustConfigurationTests::customModeRequiresCertificate()

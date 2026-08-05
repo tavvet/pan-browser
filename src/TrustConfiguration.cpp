@@ -7,6 +7,7 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QSet>
 
 namespace {
 
@@ -54,6 +55,28 @@ bool parseMode(const QString &source, TrustMode *mode)
 }
 
 } // namespace
+
+bool domainPatternsOverlap(const QString &leftSource, const QString &rightSource)
+{
+    QString left = normalizeHost(leftSource);
+    QString right = normalizeHost(rightSource);
+    const bool leftWildcard = left.startsWith(QStringLiteral("*."));
+    const bool rightWildcard = right.startsWith(QStringLiteral("*."));
+    if (leftWildcard)
+        left.remove(0, 2);
+    if (rightWildcard)
+        right.remove(0, 2);
+
+    if (!leftWildcard && !rightWildcard)
+        return left == right;
+    if (leftWildcard && !rightWildcard)
+        return right.endsWith(QLatin1Char('.') + left);
+    if (!leftWildcard && rightWildcard)
+        return left.endsWith(QLatin1Char('.') + right);
+    return left == right
+        || left.endsWith(QLatin1Char('.') + right)
+        || right.endsWith(QLatin1Char('.') + left);
+}
 
 DomainPattern DomainPattern::parse(const QString &source, QString *error)
 {
@@ -140,6 +163,8 @@ bool TrustPolicy::load(const QString &path, QString *error)
     const QFileInfo configurationFile(path);
     const QDir baseDirectory = configurationFile.absoluteDir();
     QList<TrustRule> rules;
+    QList<QPair<QString, QString>> configuredDomains;
+    QSet<QString> configuredNames;
 
     const QJsonArray jsonRules = root.value(QStringLiteral("rules")).toArray();
     for (const QJsonValue &value : jsonRules) {
@@ -154,6 +179,10 @@ bool TrustPolicy::load(const QString &path, QString *error)
         rule.name = object.value(QStringLiteral("name")).toString().trimmed();
         if (rule.name.isEmpty())
             return fail(error, QStringLiteral("Rule name cannot be empty"));
+        const QString normalizedName = rule.name.toCaseFolded();
+        if (configuredNames.contains(normalizedName))
+            return fail(error, QStringLiteral("Duplicate rule name: %1").arg(rule.name));
+        configuredNames.insert(normalizedName);
 
         if (!parseMode(object.value(QStringLiteral("mode")).toString(), &rule.mode)) {
             return fail(error, QStringLiteral("Rule %1 has an invalid mode").arg(rule.name));
@@ -168,6 +197,16 @@ bool TrustPolicy::load(const QString &path, QString *error)
             const DomainPattern pattern = DomainPattern::parse(domainValue.toString(), &domainError);
             if (!pattern.isValid())
                 return fail(error, domainError);
+            for (const auto &[configuredDomain, configuredRule] : configuredDomains) {
+                if (domainPatternsOverlap(domainValue.toString(), configuredDomain)) {
+                    return fail(
+                        error,
+                        QStringLiteral("Domain %1 overlaps rule %2")
+                            .arg(domainValue.toString(), configuredRule)
+                    );
+                }
+            }
+            configuredDomains.append({domainValue.toString(), rule.name});
             rule.domains.append(pattern);
         }
 
