@@ -2,6 +2,8 @@ cmake_minimum_required(VERSION 3.24)
 
 project(PanBrowser VERSION 0.2.0 LANGUAGES CXX)
 
+include(GNUInstallDirs)
+
 if(APPLE)
     enable_language(OBJCXX)
 endif()
@@ -159,6 +161,20 @@ endif()
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     find_package(OpenSSL 1.1.1 REQUIRED COMPONENTS Crypto)
     target_link_libraries(PanBrowser PRIVATE OpenSSL::Crypto)
+endif()
+
+if(WIN32 OR CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    install(TARGETS PanBrowser
+        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+    )
+    install(FILES README.md THIRD_PARTY_NOTICES.md
+        DESTINATION ${CMAKE_INSTALL_DATADIR}/doc/PanBrowser
+    )
+    qt_generate_deploy_app_script(
+        TARGET PanBrowser
+        OUTPUT_SCRIPT PANBROWSER_DEPLOY_SCRIPT
+    )
+    install(SCRIPT ${PANBROWSER_DEPLOY_SCRIPT})
 endif()
 
 enable_testing()

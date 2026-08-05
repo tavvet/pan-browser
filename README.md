@@ -10,7 +10,7 @@ The current implementation uses Qt 6.11 or newer, Security.framework on macOS,
 Windows CryptoAPI on Windows 10 or newer, and OpenSSL 1.1.1 or newer on Linux.
 Unsupported platforms retain an explicit fail-closed validator boundary.
 
-## Run
+## Build and package
 
 Requirements: macOS, Xcode command-line tools, Homebrew, and Qt 6.11 or newer.
 
@@ -20,21 +20,40 @@ brew install qtwebengine cmake ninja
 open dist/PanBrowser.app
 ```
 
+On Windows, run the packaging script from an x64 Visual Studio 2022 developer
+shell with Qt 6.11 MSVC, CMake, and Ninja available. Set `QT_ROOT` when Qt is not
+already discoverable:
+
+```powershell
+$env:QT_ROOT = "C:\Qt\6.11.0\msvc2022_64"
+.\scripts\build-windows.ps1
+```
+
+It produces `dist\PanBrowser-windows-x64.zip`. The archive includes the
+application, compiler runtime selected by Qt, plugins, `QtWebEngineProcess`,
+Chromium resources, and locales.
+
+On Linux, install Qt WebEngine 6.11 development files, OpenSSL development
+files, CMake, Ninja, and a C++20 compiler, then run:
+
+```sh
+./scripts/build-linux.sh
+```
+
+Set `QT_ROOT=/path/to/Qt/6.11.0/gcc_64` if Qt is outside the normal CMake search
+path. The output is `dist/PanBrowser-linux-<architecture>.tar.gz`, containing a
+relocatable Qt deployment directory. Build and distribution packages should be
+created on the oldest supported Linux distribution because glibc remains a
+host compatibility boundary.
+
+The scripts use `build-linux`, `build-windows`, and `dist` by default. Override
+Linux paths with `PANBROWSER_BUILD_DIR` and `PANBROWSER_DIST_DIR`, or Windows
+paths with the `-BuildDir` and `-DistDir` parameters.
+
 For a development build:
 
 ```sh
 cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug
-cmake --build build --parallel
-ctest --test-dir build --output-on-failure
-```
-
-On Windows, use a Qt 6.11 MSVC installation and a matching Visual Studio 2022
-toolchain. Configure `CMAKE_PREFIX_PATH` if Qt is not already discoverable:
-
-```powershell
-cmake -S . -B build -G Ninja `
-  -DCMAKE_BUILD_TYPE=Debug `
-  -DCMAKE_PREFIX_PATH=C:\Qt\6.11.0\msvc2022_64
 cmake --build build --parallel
 ctest --test-dir build --output-on-failure
 ```
@@ -50,7 +69,7 @@ an in-memory store for configured anchors; it does not modify distro CA files.
 Custom recovery validation does not fetch CRLs or OCSP responses: Chromium-known
 revocations remain blocked, while otherwise unavailable status is soft-fail.
 
-The deploy script creates a self-contained, ad-hoc signed application at
+The macOS deploy script creates a self-contained, ad-hoc signed application at
 `dist/PanBrowser.app`. Qt WebEngine makes the bundle approximately 300 MB.
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the technical design,

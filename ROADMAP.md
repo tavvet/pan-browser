@@ -31,7 +31,7 @@
 - [x] Windows certificate validator using the platform trust APIs.
 - [x] Linux certificate validator with an explicit OpenSSL trust backend.
 - [ ] Freshness-checked revocation cache for custom trust anchors.
-- [ ] Platform-specific build and packaging scripts.
+- [x] Platform-specific build and packaging scripts.
 
 ## Packaging and maintenance
 

@@ -438,12 +438,26 @@ cmake --build build --parallel
 ctest --test-dir build --output-on-failure
 ```
 
-`scripts/build-app.sh` performs a release build, runs tests, executes
+`scripts/build-app.sh` performs a macOS release build, runs tests, executes
 `macdeployqt` twice so the nested `QtWebEngineProcess` helper is fixed up,
-copies the result to `dist/PanBrowser.app`, ad-hoc signs the complete bundle, and
-verifies the signature. The output is suitable for local testing, not public
-distribution; Developer ID signing and notarization remain separate roadmap
-items.
+copies the result to `dist/PanBrowser.app`, ad-hoc signs the complete bundle,
+and verifies the signature.
+
+Windows and Linux use CMake's Qt deployment API during `cmake --install`.
+Qt's deployment hooks collect linked libraries, plugins, translations,
+`QtWebEngineProcess`, Chromium data files, and locales. The platform scripts
+run a release build and tests, install into a clean staging directory, verify
+the essential WebEngine artifacts, and create a ZIP on Windows or tar.gz on
+Linux:
+
+```text
+scripts/build-windows.ps1 -> dist/PanBrowser-windows-x64.zip
+scripts/build-linux.sh    -> dist/PanBrowser-linux-<architecture>.tar.gz
+```
+
+These outputs are suitable for local and cross-machine testing. Public
+distribution still requires platform signing, a supported oldest Linux build
+host, license review, and the release work tracked in the roadmap.
 
 The Diagnostics settings page reports application, Qt WebEngine, Chromium,
 security-patch, graphics, sandbox, runtime-flag, and profile-path information.
