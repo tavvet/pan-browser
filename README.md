@@ -39,6 +39,7 @@ On first launch PanBrowser creates:
 ~/Library/Application Support/PanBrowser/
 ├── WebEngine/
 ├── session.json        # when tab restoration is enabled
+├── downloads.json      # download history
 ├── rules.json
 └── Certificates/
 ```
@@ -66,6 +67,13 @@ WebEngine profile can be removed before Chromium opens it. This reset removes
 cookies, local storage, IndexedDB, service workers, and cache while preserving
 settings, trust rules, certificates, and saved tabs; a scheduled reset can be
 cancelled before restarting.
+
+Downloads always use a system destination picker and never open files
+automatically. The toolbar download button shows active progress and persistent
+history with pause, resume, cancel, open, and reveal actions. History stores the
+local path and source hostname, but not the complete source URL, and is limited
+to the 200 most recent records. Clearing history does not delete downloaded
+files.
 
 Open **PanBrowser → Trust Rules…** to jump directly to the Trust Rules section
 of the same settings window. The editor imports certificates into the

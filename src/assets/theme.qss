@@ -537,3 +537,84 @@ QDialog#certificateDetailsDialog QPushButton:hover {
     background: #343c48;
     border-color: #4a5564;
 }
+
+QDialog#downloadsPanel {
+    background: #171a20;
+    color: #e6e9ef;
+    border: 1px solid #343a45;
+    border-radius: 11px;
+}
+
+QDialog#downloadsPanel QLabel#downloadsTitle {
+    color: #f5f7fb;
+    font-size: 18px;
+    font-weight: 700;
+}
+
+QDialog#downloadsPanel QFrame#downloadsSeparator {
+    color: #303641;
+    background: #303641;
+    border: none;
+    max-height: 1px;
+}
+
+QDialog#downloadsPanel QScrollArea#downloadsScroll,
+QDialog#downloadsPanel QWidget#downloadsItems,
+QDialog#downloadsPanel QScrollArea#downloadsScroll > QWidget > QWidget {
+    background: transparent;
+    border: none;
+}
+
+QDialog#downloadsPanel QFrame#downloadItem {
+    background: #1f232b;
+    border: 1px solid #303641;
+    border-radius: 9px;
+}
+
+QDialog#downloadsPanel QLabel#downloadName {
+    color: #edf0f6;
+    font-weight: 600;
+}
+
+QDialog#downloadsPanel QLabel#downloadDetails,
+QDialog#downloadsPanel QLabel#downloadsEmpty {
+    color: #929baa;
+}
+
+QDialog#downloadsPanel QProgressBar#downloadProgress {
+    min-height: 4px;
+    max-height: 4px;
+    background: #303641;
+    border: none;
+    border-radius: 2px;
+}
+
+QDialog#downloadsPanel QProgressBar#downloadProgress::chunk {
+    background: #5b8def;
+    border-radius: 2px;
+}
+
+QDialog#downloadsPanel QPushButton {
+    min-height: 27px;
+    color: #e9edf5;
+    background: #2a303a;
+    border: 1px solid #3a424f;
+    border-radius: 6px;
+    padding: 1px 10px;
+}
+
+QDialog#downloadsPanel QPushButton:hover {
+    background: #343c48;
+    border-color: #4a5564;
+}
+
+QDialog#downloadsPanel QPushButton#subtleButton {
+    color: #aeb5c2;
+    background: transparent;
+    border-color: transparent;
+}
+
+QDialog#downloadsPanel QPushButton#subtleButton:hover {
+    color: #edf0f6;
+    background: #292e37;
+}

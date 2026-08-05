@@ -2,6 +2,8 @@
 
 #include "BrowserProfile.h"
 #include "CertificateTrustValidator.h"
+#include "DownloadManager.h"
+#include "DownloadsPanel.h"
 #include "SettingsDialog.h"
 #include "WindowPlacement.h"
 
@@ -53,6 +55,13 @@ MainWindow::MainWindow(QWidget *parent)
     if (!BrowserProfile::applyPendingDataReset(&dataResetError))
         qWarning().noquote() << "[PanBrowser data reset]" << dataResetError;
     m_profile = new BrowserProfile(m_preferences.persistSessionCookies());
+    m_downloadManager = new DownloadManager(
+        m_profile,
+        this,
+        QDir(QStandardPaths::writableLocation(QStandardPaths::AppDataLocation))
+            .filePath(QStringLiteral("downloads.json")),
+        this
+    );
     createInterface();
     restoreWindowPlacement();
     reloadRules();
@@ -64,6 +73,10 @@ MainWindow::~MainWindow()
     delete takeCentralWidget();
     m_tabStack = nullptr;
     m_tabStates.clear();
+    delete m_downloadsPanel;
+    m_downloadsPanel = nullptr;
+    delete m_downloadManager;
+    m_downloadManager = nullptr;
     delete m_profile;
     m_profile = nullptr;
 }
@@ -157,7 +170,30 @@ void MainWindow::createInterface()
         QIcon(QStringLiteral(":/assets/icons/arrow-right.svg")),
         QStringLiteral("Go")
     );
+    m_downloadButton = new DownloadButton(toolbar);
+    m_downloadButton->setObjectName(QStringLiteral("downloadsButton"));
+    m_downloadButton->setIcon(QIcon(QStringLiteral(":/assets/icons/download.svg")));
+    m_downloadButton->setToolTip(QStringLiteral("Downloads"));
+    toolbar->addWidget(m_downloadButton);
     addToolBar(Qt::TopToolBarArea, toolbar);
+
+    m_downloadsPanel = new DownloadsPanel(m_downloadManager, this);
+    m_downloadButton->setActiveCount(m_downloadManager->activeCount());
+    connect(m_downloadButton, &QToolButton::clicked, this, [this] {
+        if (m_downloadsPanel->isVisible())
+            m_downloadsPanel->hide();
+        else
+            m_downloadsPanel->showBelow(m_downloadButton);
+    });
+    connect(
+        m_downloadManager,
+        &DownloadManager::activeCountChanged,
+        m_downloadButton,
+        &DownloadButton::setActiveCount
+    );
+    connect(m_downloadManager, &DownloadManager::recordAdded, this, [this] {
+        m_downloadsPanel->showBelow(m_downloadButton);
+    });
 
     connect(newTabButton, &QToolButton::clicked, this, [this] {
         createTab(m_preferences.startPage());

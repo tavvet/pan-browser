@@ -1,5 +1,6 @@
 #include "BrowserPreferences.h"
 #include "BrowserDataCleanup.h"
+#include "DownloadHistoryStore.h"
 #include "SessionStore.h"
 #include "TrustConfiguration.h"
 #include "TrustSettings.h"
@@ -8,6 +9,7 @@
 #include <QFile>
 #include <QTemporaryDir>
 #include <QTest>
+#include <QTimeZone>
 
 class TrustConfigurationTests final : public QObject {
     Q_OBJECT
@@ -28,6 +30,7 @@ private slots:
     void sessionRoundTripFiltersInvalidUrls();
     void invalidSessionFileFailsClosed();
     void managedDataCleanupStaysInsideRoot();
+    void downloadHistoryRoundTripAndLimit();
 };
 
 void TrustConfigurationTests::exactDomainIsCaseInsensitive()
@@ -266,6 +269,39 @@ void TrustConfigurationTests::managedDataCleanupStaysInsideRoot()
         managedRoot,
         &error
     ));
+}
+
+void TrustConfigurationTests::downloadHistoryRoundTripAndLimit()
+{
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+    DownloadHistoryStore store(directory.filePath(QStringLiteral("downloads.json")));
+
+    QList<DownloadRecord> records;
+    for (int index = 0; index < DownloadHistoryStore::maximumRecords + 5; ++index) {
+        DownloadRecord record;
+        record.id = QString::number(index);
+        record.filePath = directory.filePath(QStringLiteral("file-%1.pdf").arg(index));
+        record.fileName = QStringLiteral("file-%1.pdf").arg(index);
+        record.sourceHost = QStringLiteral("files.example");
+        record.startedAt = QDateTime::fromSecsSinceEpoch(1000 + index, QTimeZone::UTC);
+        record.finishedAt = QDateTime::fromSecsSinceEpoch(1100 + index, QTimeZone::UTC);
+        record.receivedBytes = index * 100;
+        record.totalBytes = index * 100;
+        record.status = DownloadStatus::Completed;
+        records.append(record);
+    }
+
+    QString error;
+    QVERIFY2(store.save(records, &error), qPrintable(error));
+    const QList<DownloadRecord> restored = store.load(&error);
+    QVERIFY2(error.isEmpty(), qPrintable(error));
+    QCOMPARE(restored.size(), DownloadHistoryStore::maximumRecords);
+    QCOMPARE(restored.first().id, QStringLiteral("0"));
+    QCOMPARE(restored.last().id, QString::number(DownloadHistoryStore::maximumRecords - 1));
+    QCOMPARE(restored.at(5).sourceHost, QStringLiteral("files.example"));
+    QCOMPARE(restored.at(5).status, DownloadStatus::Completed);
+    QCOMPARE(restored.at(5).receivedBytes, 500);
 }
 
 QTEST_MAIN(TrustConfigurationTests)

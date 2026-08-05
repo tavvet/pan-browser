@@ -16,6 +16,9 @@ class QTabBar;
 class QTimer;
 class QAction;
 class BrowserProfile;
+class DownloadButton;
+class DownloadManager;
+class DownloadsPanel;
 class QCloseEvent;
 class QWebEngineCertificateError;
 class QWebEngineView;
@@ -70,6 +73,9 @@ private:
     QString ensureConfiguration();
 
     BrowserProfile *m_profile = nullptr;
+    DownloadManager *m_downloadManager = nullptr;
+    DownloadsPanel *m_downloadsPanel = nullptr;
+    DownloadButton *m_downloadButton = nullptr;
     QTabBar *m_tabBar = nullptr;
     QStackedWidget *m_tabStack = nullptr;
     QLineEdit *m_address = nullptr;

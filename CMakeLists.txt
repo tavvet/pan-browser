@@ -40,6 +40,12 @@ set(PANBROWSER_APP_SOURCES
     src/BrowserProfile.h
     src/BrowserPreferences.cpp
     src/BrowserPreferences.h
+    src/DownloadHistoryStore.cpp
+    src/DownloadHistoryStore.h
+    src/DownloadManager.cpp
+    src/DownloadManager.h
+    src/DownloadsPanel.cpp
+    src/DownloadsPanel.h
     src/main.cpp
     src/MainWindow.cpp
     src/MainWindow.h
@@ -103,6 +109,8 @@ qt_add_executable(PanBrowserTests
     src/BrowserDataCleanup.h
     src/BrowserPreferences.cpp
     src/BrowserPreferences.h
+    src/DownloadHistoryStore.cpp
+    src/DownloadHistoryStore.h
     src/SessionStore.cpp
     src/SessionStore.h
     src/TrustConfiguration.cpp

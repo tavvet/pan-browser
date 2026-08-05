@@ -12,11 +12,11 @@
 - [x] Configurable start page and startup behavior.
 - [x] Optional session-cookie and tab restoration with lazy background tabs.
 - [x] Browsing data controls for cookies, site storage, and HTTP cache.
+- [x] Download manager with progress controls and persistent history.
 
 ## Browser essentials
 
 - [ ] Popup handling in a new PanBrowser window with the same profile and trust policy.
-- [ ] Downloads: destination picker, progress, completion, and error reporting.
 - [ ] Explicit permission prompts for camera, microphone, location, and notifications.
 - [ ] Safe handling of external URL schemes such as `mailto:` and application deep links.
 
