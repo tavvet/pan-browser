@@ -31,7 +31,9 @@ ctest --test-dir build --output-on-failure
 The deploy script creates a self-contained, ad-hoc signed application at
 `dist/PanBrowser.app`. Qt WebEngine makes the bundle approximately 300 MB.
 
-See [ROADMAP.md](ROADMAP.md) for completed work and planned browser features.
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the technical design,
+security boundaries, data ownership, and maintenance invariants. See
+[ROADMAP.md](ROADMAP.md) for completed work and planned browser features.
 
 On first launch PanBrowser creates:
 
