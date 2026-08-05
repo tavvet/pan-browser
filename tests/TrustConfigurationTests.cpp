@@ -1,4 +1,5 @@
 #include "AddressLineEdit.h"
+#include "BookmarkStore.h"
 #include "BrowserPreferences.h"
 #include "BrowserDataCleanup.h"
 #include "DownloadHistoryStore.h"
@@ -33,6 +34,9 @@ private slots:
     void inaccessibleTitleAreaIsRecentered();
     void oversizedWindowFitsSmallerResolution();
     void browserPreferencesValidateStartPage();
+    void bookmarksRoundTripNormalizeAndSearch();
+    void bookmarksCanBeEditedAndRemoved();
+    void corruptBookmarksArePreservedAndDisabled();
     void sessionRoundTripFiltersInvalidUrls();
     void invalidSessionFileFailsClosed();
     void managedDataCleanupStaysInsideRoot();
@@ -260,6 +264,110 @@ void TrustConfigurationTests::browserPreferencesValidateStartPage()
 
     preferences.setStartPage(QUrl(QStringLiteral("https://example.com/start")));
     QVERIFY2(preferences.validate(&error), qPrintable(error));
+}
+
+void TrustConfigurationTests::bookmarksRoundTripNormalizeAndSearch()
+{
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+    BookmarkStore store(directory.filePath(QStringLiteral("bookmarks.sqlite")));
+    QString error;
+    QVERIFY2(store.open(&error), qPrintable(error));
+
+    const QUrl source(
+        QStringLiteral("https://user:secret@Example.COM:443/docs?q=one#section")
+    );
+    QVERIFY2(store.addOrUpdate(
+        source,
+        QStringLiteral("Documentation"),
+        QDateTime::fromSecsSinceEpoch(1000, QTimeZone::UTC),
+        &error
+    ), qPrintable(error));
+
+    const std::optional<Bookmark> saved = store.bookmarkForUrl(source, &error);
+    QVERIFY2(error.isEmpty(), qPrintable(error));
+    QVERIFY(saved.has_value());
+    QCOMPARE(saved->url.scheme(), QStringLiteral("https"));
+    QCOMPARE(saved->url.host(), QStringLiteral("example.com"));
+    QCOMPARE(saved->url.port(), -1);
+    QCOMPARE(saved->url.userName(), QString());
+    QCOMPARE(saved->url.password(), QString());
+    QCOMPARE(saved->url.query(), QStringLiteral("q=one"));
+    QCOMPARE(saved->url.fragment(), QStringLiteral("section"));
+    QCOMPARE(saved->title, QStringLiteral("Documentation"));
+
+    QVERIFY2(store.addOrUpdate(
+        saved->url,
+        QStringLiteral("Updated documentation"),
+        QDateTime::fromSecsSinceEpoch(2000, QTimeZone::UTC),
+        &error
+    ), qPrintable(error));
+    const QList<Bookmark> matches = store.bookmarks(QStringLiteral("updated"), &error);
+    QVERIFY2(error.isEmpty(), qPrintable(error));
+    QCOMPARE(matches.size(), 1);
+    QCOMPARE(matches.first().title, QStringLiteral("Updated documentation"));
+    QCOMPARE(matches.first().createdAt, QDateTime::fromSecsSinceEpoch(1000, QTimeZone::UTC));
+    QCOMPARE(matches.first().updatedAt, QDateTime::fromSecsSinceEpoch(2000, QTimeZone::UTC));
+}
+
+void TrustConfigurationTests::bookmarksCanBeEditedAndRemoved()
+{
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+    BookmarkStore store(directory.filePath(QStringLiteral("bookmarks.sqlite")));
+    QString error;
+    QVERIFY2(store.open(&error), qPrintable(error));
+    QVERIFY2(store.addOrUpdate(
+        QUrl(QStringLiteral("https://one.example")),
+        QStringLiteral("One"),
+        QDateTime::fromSecsSinceEpoch(1000, QTimeZone::UTC),
+        &error
+    ), qPrintable(error));
+    QVERIFY2(store.addOrUpdate(
+        QUrl(QStringLiteral("https://two.example")),
+        QStringLiteral("Two"),
+        QDateTime::fromSecsSinceEpoch(2000, QTimeZone::UTC),
+        &error
+    ), qPrintable(error));
+
+    const std::optional<Bookmark> first = store.bookmarkForUrl(
+        QUrl(QStringLiteral("https://one.example/")),
+        &error
+    );
+    QVERIFY(first.has_value());
+    QVERIFY2(store.update(
+        first->id,
+        QUrl(QStringLiteral("https://renamed.example/path#part")),
+        QStringLiteral("Renamed"),
+        QDateTime::fromSecsSinceEpoch(3000, QTimeZone::UTC),
+        &error
+    ), qPrintable(error));
+    QVERIFY(!store.bookmarkForUrl(QUrl(QStringLiteral("https://one.example")), &error));
+    QVERIFY(store.bookmarkForUrl(QUrl(QStringLiteral("https://renamed.example/path#part")), &error));
+
+    QVERIFY2(store.removeUrl(QUrl(QStringLiteral("https://two.example")), &error), qPrintable(error));
+    QCOMPARE(store.bookmarks({}, &error).size(), 1);
+    QVERIFY2(store.clear(&error), qPrintable(error));
+    QVERIFY(store.bookmarks({}, &error).isEmpty());
+}
+
+void TrustConfigurationTests::corruptBookmarksArePreservedAndDisabled()
+{
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+    const QString path = directory.filePath(QStringLiteral("bookmarks.sqlite"));
+    QFile file(path);
+    QVERIFY(file.open(QIODevice::WriteOnly));
+    QCOMPARE(file.write("not a sqlite database"), 21);
+    file.close();
+
+    BookmarkStore store(path);
+    QString error;
+    QVERIFY(!store.open(&error));
+    QVERIFY(!error.isEmpty());
+    QVERIFY(!store.isOpen());
+    QVERIFY(QFile::exists(path));
+    QCOMPARE(QFileInfo(path).size(), 21);
 }
 
 void TrustConfigurationTests::sessionRoundTripFiltersInvalidUrls()

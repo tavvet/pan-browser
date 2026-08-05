@@ -37,6 +37,8 @@ find_package(Qt6WebEngineWidgets 6.11 REQUIRED)
 set(PANBROWSER_APP_SOURCES
     src/AddressLineEdit.cpp
     src/AddressLineEdit.h
+    src/BookmarkStore.cpp
+    src/BookmarkStore.h
     src/BrowserDataCleanup.cpp
     src/BrowserDataCleanup.h
     src/BrowserProfile.cpp
@@ -136,6 +138,8 @@ qt_add_executable(PanBrowserTests
     tests/TrustConfigurationTests.cpp
     src/AddressLineEdit.cpp
     src/AddressLineEdit.h
+    src/BookmarkStore.cpp
+    src/BookmarkStore.h
     src/BrowserDataCleanup.cpp
     src/BrowserDataCleanup.h
     src/BrowserPreferences.cpp
