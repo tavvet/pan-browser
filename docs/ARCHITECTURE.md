@@ -155,8 +155,9 @@ The recovery path has several mandatory checks:
 6. `custom-only` permits only configured anchors for this recovery evaluation;
    `system-plus-custom` also permits native system anchors.
 
-All other certificate failures remain rejected, including hostname mismatch,
-expiration, revocation, certificate transparency, and pinning failures.
+All other certificate error types reported by Chromium remain rejected,
+including hostname mismatch, expiration, known revocation, certificate
+transparency, and pinning failures.
 
 On macOS, the backend uses `SecTrust` with explicit anchors. On Windows, it
 converts the Qt DER chain into temporary `CERT_STORE_PROV_MEMORY` stores and
@@ -174,6 +175,23 @@ A positive cached revoked result fails validation, while unavailable revocation
 data remains unknown. Servers must therefore send required intermediates in the
 TLS chain. Chromium still controls the original connection and PanBrowser only
 enters this path for an overridable unknown-CA error.
+
+On Linux, the backend uses OpenSSL `X509_STORE` and `X509_verify_cert` directly.
+`custom-only` starts with an empty in-memory store; `system-plus-custom` first
+loads OpenSSL's configured default CA file and hashed directory. Configured
+anchors are then added in memory. `X509_V_FLAG_PARTIAL_CHAIN` permits an
+explicit intermediate CA to terminate the chain, matching the other native
+backends. Verification uses the SSL server purpose, authentication level 2,
+strict X.509 processing, IDNA-aware DNS matching, and IP SAN matching. It does
+not perform network AIA, CRL, or OCSP retrieval, so required intermediates must
+be supplied by the server. Revocation is explicitly soft-fail for chains
+accepted through this recovery path: a `CertificateRevoked` error already
+reported by Chromium is never overridden, but PanBrowser cannot independently
+establish the revocation status of a chain that Chromium could not build to a
+trusted CA. Performing blocking network revocation requests inside the
+certificate-error callback would stall the UI and introduce a second network
+validation path; a future implementation should use a freshness-checked,
+asynchronously maintained revocation cache instead.
 
 ### 4.3 Important limitation
 
@@ -408,8 +426,9 @@ only then destroys shared browser resources.
 
 The project requires CMake, Ninja, Qt 6.11 or newer, and C++20. macOS adds the
 Objective-C++ validator and links Security.framework. Windows 10 or newer adds
-the CryptoAPI validator and links Crypt32. Linux compiles a fail-closed
-validator stub until its native backend is implemented.
+the CryptoAPI validator and links Crypt32. Linux links OpenSSL Crypto 1.1.1 or
+newer for its explicit in-memory and distro-default trust stores. Unsupported
+platforms compile the fail-closed validator.
 
 Development verification:
 
@@ -439,7 +458,7 @@ window placement, sessions, cleanup boundaries, downloads, permissions,
 external navigation, popup geometry, search parsing, history ranking/deletion,
 bookmark CRUD and normalization, combined suggestion ranking,
 corrupt-database behavior, ghost completion, find-bar keyboard behavior, and
-native custom-anchor/hostname validation on Windows.
+native custom-anchor/hostname/weak-key validation on Windows and Linux.
 
 The test target deliberately excludes `MainWindow` and a live WebEngine process,
 so signal wiring and visual state still need a short manual smoke test after
@@ -491,9 +510,9 @@ Before merging a change, verify the relevant invariants:
 
 Implement the `CertificateTrustValidator::evaluate()` contract using the
 platform trust API, keep hostname verification inside that evaluation, wire the
-source in CMake, and add platform tests. Windows and macOS provide the reference
-implementations; the Linux fallback must continue to reject, never accept by
-assumption.
+source in CMake, and add platform tests. Windows, macOS, and Linux provide the
+reference implementations; any fallback must continue to reject, never accept
+by assumption.
 
 ### Adding a preference
 

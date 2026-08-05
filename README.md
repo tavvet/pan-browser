@@ -7,8 +7,8 @@ against CA certificates selected by a matching domain rule. It never installs
 those certificates in the macOS Keychain or Windows certificate stores.
 
 The current implementation uses Qt 6.11 or newer, Security.framework on macOS,
-and Windows CryptoAPI on Windows 10 or newer. Linux retains an explicit
-fail-closed platform boundary until its native validator is implemented.
+Windows CryptoAPI on Windows 10 or newer, and OpenSSL 1.1.1 or newer on Linux.
+Unsupported platforms retain an explicit fail-closed validator boundary.
 
 ## Run
 
@@ -42,6 +42,13 @@ ctest --test-dir build --output-on-failure
 The Windows build evaluates configured anchors in temporary memory stores. It
 does not require administrator rights and does not modify the user or machine
 certificate stores.
+
+On Linux, install the Qt WebEngine development package for Qt 6.11 or newer,
+CMake, Ninja, a C++20 compiler, and the OpenSSL development package. The build
+uses OpenSSL's configured default CA file/directory for `system-plus-custom` and
+an in-memory store for configured anchors; it does not modify distro CA files.
+Custom recovery validation does not fetch CRLs or OCSP responses: Chromium-known
+revocations remain blocked, while otherwise unavailable status is soft-fail.
 
 The deploy script creates a self-contained, ad-hoc signed application at
 `dist/PanBrowser.app`. Qt WebEngine makes the bundle approximately 300 MB.

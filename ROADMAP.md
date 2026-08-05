@@ -29,7 +29,8 @@
 ## Cross-platform
 
 - [x] Windows certificate validator using the platform trust APIs.
-- [ ] Linux certificate validator with an explicit trust backend.
+- [x] Linux certificate validator with an explicit OpenSSL trust backend.
+- [ ] Freshness-checked revocation cache for custom trust anchors.
 - [ ] Platform-specific build and packaging scripts.
 
 ## Packaging and maintenance

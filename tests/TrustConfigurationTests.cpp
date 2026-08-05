@@ -67,14 +67,20 @@ private slots:
     void ghostCompletionAcceptsOnlyAddressPrefixes();
     void addressSuggestionsPreferRelevanceThenBookmarks();
     void findBarSupportsKeyboardNavigationAndCounts();
-#if defined(Q_OS_WIN)
+#if defined(Q_OS_WIN) || defined(Q_OS_LINUX)
     void nativeCertificateValidatorTrustsConfiguredAnchor();
     void nativeCertificateValidatorRejectsWrongHostname();
     void nativeCertificateValidatorRejectsWeakKey();
 #endif
+#if defined(Q_OS_LINUX)
+    void linuxCertificateValidatorSupportsSystemPlusCustom();
+    void linuxCertificateValidatorBuildsIntermediateChain();
+    void linuxCertificateValidatorTrustsIntermediateAnchor();
+    void linuxCertificateValidatorMatchesIpSan();
+#endif
 };
 
-#if defined(Q_OS_WIN)
+#if defined(Q_OS_WIN) || defined(Q_OS_LINUX)
 namespace {
 
 const QByteArray validatorRootCertificate = QByteArrayLiteral(R"CERT(
@@ -139,6 +145,77 @@ Dn48apJHhbEOUgUhjTB5MSNfZYy0xl4ihVs5vHBYGpVFURm/G5nfsfaQciv8iAoe
 /w==
 -----END CERTIFICATE-----
 )CERT");
+
+#if defined(Q_OS_LINUX)
+const QByteArray linuxValidatorRootCertificate = QByteArrayLiteral(R"CERT(
+-----BEGIN CERTIFICATE-----
+MIIDLDCCAhSgAwIBAgICIAEwDQYJKoZIhvcNAQELBQAwJTEjMCEGA1UEAwwaUGFu
+QnJvd3NlciBMaW51eCBUZXN0IFJvb3QwHhcNMjYwODA1MTIzMzI0WhcNMzYwODAy
+MTIzMzI0WjAlMSMwIQYDVQQDDBpQYW5Ccm93c2VyIExpbnV4IFRlc3QgUm9vdDCC
+ASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBAJ8wStjdor/CZc/eg6c935WB
+rq4H2WXnBjzt5kdwkYCU5kW0XVfsjb0AAXP+7U/T5yuR8ovyko+gu4uULc82LFzv
+Aavn3RJ5J+1imqYOS5vrH2Vc1M7FLsyxqRJ71L5ADony52z0XTtyalb5EpCVyEDr
+4j7SF5riAz17RUwd41yG7M73yHVk1W1KcZOvy7o6UBXUz0Ym1fdIsu6FcLDSYZro
+4NdJaOv8Wd3Q4fkfsq3yVtow/N6wvmIwg68xyaSqYOzkZrcdZp5ib383wVeu5e/j
+I9xstWdDchXJAuwRs2sovOYUejnu2VRacbyaggDpUCX7szGGMvUszcxRKwtTOusC
+AwEAAaNmMGQwHwYDVR0jBBgwFoAUS3gv7xIYfOOg6I/rqF2DyHilX8kwEgYDVR0T
+AQH/BAgwBgEB/wIBATAOBgNVHQ8BAf8EBAMCAQYwHQYDVR0OBBYEFEt4L+8SGHzj
+oOiP66hdg8h4pV/JMA0GCSqGSIb3DQEBCwUAA4IBAQA8J2+v2WwNS+Ml7Qpvloyl
+lGj1uY8UXeKfsyCvxLHxgJGJKMPiv01HPpxZI2ZmXUUD0sfhGjnm80KjV6Q44N/Z
+KVogOmdg2GBxO+QFAl8itO4vai2J6xELRpaT0ZdYyKe43Hz7GpJef0xQuvjCiAb/
+mpQJ3vo0TJStaJ8y8nd+d2ZOhK+sofy0kQEiD8OX344jwM7v0SAK/D3MRVA2KlbO
+xRT1kF+r5Mx6BcMG/k/NQtcbUUILPPcDgXoaAJp1xveYwIg7jrFZ+VKHX3Umf1ST
+dvu+oZGnNI+bGHF4AUdnXt5W+Xv4URKNJoQdQ9CkSrgUs0EdwALosGJ5wtRKnkGX
+-----END CERTIFICATE-----
+)CERT");
+
+const QByteArray linuxValidatorIntermediateCertificate = QByteArrayLiteral(R"CERT(
+-----BEGIN CERTIFICATE-----
+MIIDNDCCAhygAwIBAgICIAIwDQYJKoZIhvcNAQELBQAwJTEjMCEGA1UEAwwaUGFu
+QnJvd3NlciBMaW51eCBUZXN0IFJvb3QwHhcNMjYwODA1MTIzNDQyWhcNMzQxMDIy
+MTIzNDQyWjAtMSswKQYDVQQDDCJQYW5Ccm93c2VyIExpbnV4IFRlc3QgSW50ZXJt
+ZWRpYXRlMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA27/grCU2+ozw
+NBwtWhnm8jxbvLhZIqcnvPD+ldMgFbWDtWFUFoFLGXngFLtk1k5Y/dHPIMztylws
+xvH4b0XzgD6GftAJhgSAeG7WyWDi0L50z2tfBYMWLVzMNAiHrVzEnA+EnoWhGpIx
+JKhrddkbgtaY+z0as9wH9byYVU70Fhx918/ts2UeeovuvrCsoT99z/fxPtF5yQPh
+EYd2HlsyRTWPcA+KPIzZnPCgapWdfuZMdUxHsiVeveZolKUl6iL1lLtZiy+o+q98
+2p7LUScO7rBpbxC/48J3tfI0cbnlveyyJVdNhSYPSVULUClgJBMpJNrVjhfwNnkd
+UVDBCo1klwIDAQABo2YwZDASBgNVHRMBAf8ECDAGAQH/AgEAMA4GA1UdDwEB/wQE
+AwIBBjAdBgNVHQ4EFgQUDyYPmkoSffZwRB9xqjB/MdW0l3gwHwYDVR0jBBgwFoAU
+S3gv7xIYfOOg6I/rqF2DyHilX8kwDQYJKoZIhvcNAQELBQADggEBADlQAH8rbjht
+A1dcptPP3rDQUXC2ZrBoPVtpW/D9VEDbnJ8Uk7q5jxTlWF9jx3xOmK0HlOfeinDb
+5Oo/Qg4/FY3u2t+zwxafXY6O/HQHCLrZOBehOoioPuJtuEeVJpOdVa0KbA1mxHyD
+FRLSXI8NSh2g57jLVeG+yqNmjPSn70unuloOOaaxLLOKWUlT6qtAOk8/x1mQ+y4o
+aMgnTyJJToym6bgMSDoV8ziWBeOxB7KHfZjgmJ11CyXKBsfDFVA8DjM3c4NERSco
+tRtxck4Tcf2H1d9JRhPFdjv7DypJgKWDGiO1eKCiEn+sSPtBUQk0gAfSqo4S1kz/
+XI98279ho9E=
+-----END CERTIFICATE-----
+)CERT");
+
+const QByteArray linuxValidatorLeafCertificate = QByteArrayLiteral(R"CERT(
+-----BEGIN CERTIFICATE-----
+MIIDfDCCAmSgAwIBAgICIAMwDQYJKoZIhvcNAQELBQAwLTErMCkGA1UEAwwiUGFu
+QnJvd3NlciBMaW51eCBUZXN0IEludGVybWVkaWF0ZTAeFw0yNjA4MDUxMjM5MDda
+Fw0zNDEwMjIxMjM5MDdaMCoxKDAmBgNVBAMMH2xpbnV4LXZhbGlkYXRvci5wYW5i
+cm93c2VyLnRlc3QwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQDcXzOE
+AkP5T7hw12bM5+jjGMlDEl4ofZKBUKw9bYYdxwNqVYNmbub5G0C1nOJFHcQiyQMA
+Vc2ltLrEa6IKC40KLJlfxwGCnnLueFDc9oQkyyQA5KeIUxu5StJeiieKxt7hMAzi
+o1DNdak52b/BKJC/RtjI+eVs5CdIuCbuFJ6iNnwhliPWjg6CCBimPFC/W3+zMDtQ
+HbPdnoDeDU68hc6K74YUc6eRNj1dvtn3AM0ZuAP6AVoWGC1uDQQ6AewTwV6/EvXW
+T63ytMRR3PPtgyeemTGr0qY9jUO21HIcCkLcJPA+Xl+ll6+pun+jh8jdOwWnJvkm
+dElQw4JLZXluP1mlAgMBAAGjgagwgaUwDAYDVR0TAQH/BAIwADAOBgNVHQ8BAf8E
+BAMCBaAwEwYDVR0lBAwwCgYIKwYBBQUHAwEwMAYDVR0RBCkwJ4IfbGludXgtdmFs
+aWRhdG9yLnBhbmJyb3dzZXIudGVzdIcEwAACKjAdBgNVHQ4EFgQUdBhLlHYhoghw
+mLRLK1TrjCStZ4MwHwYDVR0jBBgwFoAUDyYPmkoSffZwRB9xqjB/MdW0l3gwDQYJ
+KoZIhvcNAQELBQADggEBAFYWwgTYKplZs6DgYAvydglyeeZx8DNCUOOJsQ2NkFDj
+QoZ7EinV405dHBVr3FTcNYRjD8AKj0/mW4ogsc89KhWj7HCC2X2iSUiinRnl2Q/U
+nKPRcqok6oOEwylkqzsDV+J3aIFBD71FGIWT5Twy5WJz3OdgJ4mKqVivsxJsjXmy
+GU12WV1Rbhb9H/DfDaogjSmDDeNg6M65/piB4MdCK9IFJEckMcxWBeY8bRVv/vkI
+4lvwt0wtoxFTtBZ72sfkgulyTCyCUcZXWxwsWvg6Ti33OZegi5vx1YAKfRR6ydmK
+/WsSy4nkA81p29BVJ4uTnvPOIuQtD6Yldr6lJBe+PLw=
+-----END CERTIFICATE-----
+)CERT");
+#endif
 
 QList<QSslCertificate> testCertificates(const QByteArray &pem)
 {
@@ -1084,7 +1161,7 @@ void TrustConfigurationTests::findBarSupportsKeyboardNavigationAndCounts()
     QCOMPARE(result->text(), QStringLiteral("No matches"));
 }
 
-#if defined(Q_OS_WIN)
+#if defined(Q_OS_WIN) || defined(Q_OS_LINUX)
 void TrustConfigurationTests::nativeCertificateValidatorTrustsConfiguredAnchor()
 {
     const QList<QSslCertificate> chain = testCertificates(validatorLeafCertificate);
@@ -1123,6 +1200,74 @@ void TrustConfigurationTests::nativeCertificateValidatorRejectsWeakKey()
     );
     QVERIFY(!result.trusted);
     QVERIFY(!result.explanation.isEmpty());
+}
+#endif
+
+#if defined(Q_OS_LINUX)
+void TrustConfigurationTests::linuxCertificateValidatorSupportsSystemPlusCustom()
+{
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+    QFile systemCaFile(directory.filePath(QStringLiteral("system-ca.pem")));
+    QVERIFY(systemCaFile.open(QIODevice::WriteOnly));
+    QCOMPARE(systemCaFile.write(validatorRootCertificate), validatorRootCertificate.size());
+    systemCaFile.close();
+
+    const bool hadSystemCaOverride = qEnvironmentVariableIsSet("SSL_CERT_FILE");
+    const QByteArray previousSystemCaOverride = qgetenv("SSL_CERT_FILE");
+    QVERIFY(qputenv("SSL_CERT_FILE", systemCaFile.fileName().toUtf8()));
+    const CertificateValidationResult result = CertificateTrustValidator::evaluate(
+        testCertificates(validatorLeafCertificate),
+        testCertificates(validatorRootCertificate),
+        QStringLiteral("validator.panbrowser.test"),
+        false
+    );
+    const bool environmentRestored = hadSystemCaOverride
+        ? qputenv("SSL_CERT_FILE", previousSystemCaOverride)
+        : qunsetenv("SSL_CERT_FILE");
+
+    QVERIFY(environmentRestored);
+    QVERIFY2(result.trusted, qPrintable(result.explanation));
+}
+
+void TrustConfigurationTests::linuxCertificateValidatorBuildsIntermediateChain()
+{
+    QList<QSslCertificate> chain = testCertificates(linuxValidatorLeafCertificate);
+    chain.append(testCertificates(linuxValidatorIntermediateCertificate));
+    QCOMPARE(chain.size(), 2);
+
+    const CertificateValidationResult result = CertificateTrustValidator::evaluate(
+        chain,
+        testCertificates(linuxValidatorRootCertificate),
+        QStringLiteral("linux-validator.panbrowser.test"),
+        true
+    );
+    QVERIFY2(result.trusted, qPrintable(result.explanation));
+}
+
+void TrustConfigurationTests::linuxCertificateValidatorTrustsIntermediateAnchor()
+{
+    const CertificateValidationResult result = CertificateTrustValidator::evaluate(
+        testCertificates(linuxValidatorLeafCertificate),
+        testCertificates(linuxValidatorIntermediateCertificate),
+        QStringLiteral("linux-validator.panbrowser.test"),
+        true
+    );
+    QVERIFY2(result.trusted, qPrintable(result.explanation));
+}
+
+void TrustConfigurationTests::linuxCertificateValidatorMatchesIpSan()
+{
+    QList<QSslCertificate> chain = testCertificates(linuxValidatorLeafCertificate);
+    chain.append(testCertificates(linuxValidatorIntermediateCertificate));
+
+    const CertificateValidationResult result = CertificateTrustValidator::evaluate(
+        chain,
+        testCertificates(linuxValidatorRootCertificate),
+        QStringLiteral("192.0.2.42"),
+        true
+    );
+    QVERIFY2(result.trusted, qPrintable(result.explanation));
 }
 #endif
 
