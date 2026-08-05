@@ -2,7 +2,7 @@
 
 #include "BrowserProfile.h"
 #include "CertificateTrustValidator.h"
-#include "TrustRulesDialog.h"
+#include "SettingsDialog.h"
 #include "WindowPlacement.h"
 
 #include <QAction>
@@ -30,6 +30,7 @@
 #include <QStatusBar>
 #include <QStyle>
 #include <QTabBar>
+#include <QTimer>
 #include <QToolBar>
 #include <QToolButton>
 #include <QWebEngineCertificateError>
@@ -40,17 +41,19 @@
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
+    , m_sessionStore(QDir(
+        QStandardPaths::writableLocation(QStandardPaths::AppDataLocation)
+    ).filePath(QStringLiteral("session.json")))
 {
-    m_profile = new BrowserProfile();
+    m_configurationPath = ensureConfiguration();
+    QString bootstrapError;
+    m_trustPolicy.load(m_configurationPath, &bootstrapError);
+    m_preferences = BrowserPreferences::load(m_trustPolicy.startPage());
+    m_profile = new BrowserProfile(m_preferences.persistSessionCookies());
     createInterface();
     restoreWindowPlacement();
     reloadRules();
-
-    const QStringList arguments = QApplication::arguments();
-    const QUrl initialUrl = arguments.size() > 1
-        ? QUrl::fromUserInput(arguments.at(1))
-        : m_trustPolicy.startPage();
-    createTab(initialUrl);
+    restoreInitialTabs();
 }
 
 MainWindow::~MainWindow()
@@ -64,6 +67,7 @@ MainWindow::~MainWindow()
 
 void MainWindow::closeEvent(QCloseEvent *event)
 {
+    saveSession();
     QSettings settings(QStringLiteral("PanBrowser"), QStringLiteral("PanBrowser"));
     settings.beginGroup(QStringLiteral("MainWindow"));
     settings.setValue(QStringLiteral("geometry"), saveGeometry());
@@ -153,12 +157,16 @@ void MainWindow::createInterface()
     addToolBar(Qt::TopToolBarArea, toolbar);
 
     connect(newTabButton, &QToolButton::clicked, this, [this] {
-        createTab(m_trustPolicy.startPage());
+        createTab(m_preferences.startPage());
     });
     connect(m_tabBar, &QTabBar::currentChanged, this, [this](int index) {
-        if (index >= 0)
+        if (index >= 0) {
             m_tabStack->setCurrentIndex(index);
+            if (!m_restoringSession)
+                activatePendingTab(currentWebView());
+        }
         updateCurrentTabUi();
+        scheduleSessionSave();
     });
     connect(m_tabBar, &QTabBar::tabCloseRequested, this, &MainWindow::closeTab);
     connect(m_tabBar, &QTabBar::tabMoved, this, [this](int from, int to) {
@@ -168,6 +176,7 @@ void MainWindow::createInterface()
         m_tabStack->removeWidget(webView);
         m_tabStack->insertWidget(to, webView);
         m_tabStack->setCurrentIndex(m_tabBar->currentIndex());
+        scheduleSessionSave();
     });
     connect(m_backAction, &QAction::triggered, this, [this] {
         if (QWebEngineView *webView = currentWebView())
@@ -191,7 +200,7 @@ void MainWindow::createInterface()
     );
     newTabAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_T));
     connect(newTabAction, &QAction::triggered, this, [this] {
-        createTab(m_trustPolicy.startPage());
+        createTab(m_preferences.startPage());
     });
 
     QAction *closeTabAction = fileMenu->addAction(QStringLiteral("Close Tab"));
@@ -201,13 +210,24 @@ void MainWindow::createInterface()
     });
 
     fileMenu->addSeparator();
+    QAction *settingsAction = fileMenu->addAction(
+        QIcon(QStringLiteral(":/assets/icons/settings.svg")),
+        QStringLiteral("Settings…")
+    );
+    settingsAction->setMenuRole(QAction::PreferencesRole);
+    settingsAction->setShortcut(QKeySequence::Preferences);
+    connect(settingsAction, &QAction::triggered, this, [this] {
+        openSettings(false);
+    });
+
     QAction *editRulesAction = fileMenu->addAction(
         QIcon(QStringLiteral(":/assets/icons/shield-check.svg")),
         QStringLiteral("Trust Rules…")
     );
-    editRulesAction->setMenuRole(QAction::PreferencesRole);
-    editRulesAction->setShortcut(QKeySequence::Preferences);
-    connect(editRulesAction, &QAction::triggered, this, &MainWindow::openTrustRules);
+    editRulesAction->setMenuRole(QAction::NoRole);
+    connect(editRulesAction, &QAction::triggered, this, [this] {
+        openSettings(true);
+    });
 
     fileMenu->addSeparator();
     QAction *reloadRulesAction = fileMenu->addAction(
@@ -242,24 +262,42 @@ void MainWindow::createInterface()
     statusBar()->addWidget(m_trustStatus, 1);
     statusBar()->addPermanentWidget(m_progress);
     statusBar()->addPermanentWidget(m_ruleCount);
+
+    m_sessionSaveTimer = new QTimer(this);
+    m_sessionSaveTimer->setSingleShot(true);
+    m_sessionSaveTimer->setInterval(750);
+    connect(m_sessionSaveTimer, &QTimer::timeout, this, &MainWindow::saveSession);
 }
 
-QWebEngineView *MainWindow::createTab(const QUrl &url, bool activate)
+QWebEngineView *MainWindow::createTab(
+    const QUrl &url,
+    bool activate,
+    bool deferred,
+    const QString &restoredTitle
+)
 {
     QWebEngineView *webView = new QWebEngineView(m_tabStack);
     webView->setPage(new QWebEnginePage(m_profile, webView));
-    m_tabStates.insert(webView, BrowserTabState());
+    BrowserTabState state;
+    if (deferred)
+        state.pendingUrl = url;
+    m_tabStates.insert(webView, state);
     connectBrowserSignals(webView);
 
     const int stackIndex = m_tabStack->addWidget(webView);
-    const int tabIndex = m_tabBar->addTab(QStringLiteral("New Tab"));
+    const QString initialTitle = restoredTitle.isEmpty()
+        ? (url.host().isEmpty() ? QStringLiteral("New Tab") : url.host())
+        : restoredTitle;
+    const int tabIndex = m_tabBar->addTab(initialTitle);
     Q_ASSERT(stackIndex == tabIndex);
-    m_tabBar->setTabToolTip(tabIndex, QStringLiteral("New Tab"));
+    m_tabBar->setTabToolTip(tabIndex, url.isEmpty() ? initialTitle : url.toString());
 
     if (activate)
         m_tabBar->setCurrentIndex(tabIndex);
-    if (url.isValid() && !url.isEmpty())
+    if (!deferred && url.isValid() && !url.isEmpty())
         webView->setUrl(url);
+    if (!m_restoringSession)
+        scheduleSessionSave();
 
     return webView;
 }
@@ -282,12 +320,15 @@ void MainWindow::closeTab(int index)
     webView->deleteLater();
 
     if (m_tabBar->count() == 0) {
+        m_discardSessionOnClose = true;
+        m_sessionStore.clear();
         close();
         return;
     }
 
     m_tabStack->setCurrentIndex(m_tabBar->currentIndex());
     updateCurrentTabUi();
+    scheduleSessionSave();
 }
 
 QWebEngineView *MainWindow::currentWebView() const
@@ -295,9 +336,22 @@ QWebEngineView *MainWindow::currentWebView() const
     return qobject_cast<QWebEngineView *>(m_tabStack->currentWidget());
 }
 
+void MainWindow::activatePendingTab(QWebEngineView *webView)
+{
+    if (!webView || !m_tabStates.contains(webView))
+        return;
+    BrowserTabState &state = m_tabStates[webView];
+    if (state.pendingUrl.isEmpty())
+        return;
+    const QUrl url = state.pendingUrl;
+    state.pendingUrl.clear();
+    webView->setUrl(url);
+}
+
 void MainWindow::connectBrowserSignals(QWebEngineView *webView)
 {
     connect(webView, &QWebEngineView::urlChanged, this, [this, webView](const QUrl &url) {
+        m_tabStates[webView].pendingUrl.clear();
         const int index = m_tabStack->indexOf(webView);
         if (index >= 0 && webView->title().isEmpty()) {
             const QString label = url.host().isEmpty() ? QStringLiteral("New Tab") : url.host();
@@ -307,6 +361,7 @@ void MainWindow::connectBrowserSignals(QWebEngineView *webView)
         if (webView == currentWebView())
             m_address->setText(url.toString());
         updateNavigationActions();
+        scheduleSessionSave();
     });
     connect(webView, &QWebEngineView::titleChanged, this, [this, webView](const QString &title) {
         const int index = m_tabStack->indexOf(webView);
@@ -319,6 +374,7 @@ void MainWindow::connectBrowserSignals(QWebEngineView *webView)
         }
         if (webView == currentWebView())
             setWindowTitle(title.isEmpty() ? QStringLiteral("PanBrowser") : title + QStringLiteral(" — PanBrowser"));
+        scheduleSessionSave();
     });
     connect(webView, &QWebEngineView::iconChanged, this, [this, webView](const QIcon &icon) {
         const int index = m_tabStack->indexOf(webView);
@@ -392,6 +448,8 @@ void MainWindow::updateCurrentTabUi()
     }
 
     m_address->setText(webView->url().toString());
+    if (webView->url().isEmpty() && !m_tabStates.value(webView).pendingUrl.isEmpty())
+        m_address->setText(m_tabStates.value(webView).pendingUrl.toString());
     const QString title = webView->title();
     setWindowTitle(title.isEmpty() ? QStringLiteral("PanBrowser") : title + QStringLiteral(" — PanBrowser"));
 
@@ -423,17 +481,103 @@ void MainWindow::navigateFromAddressBar()
         webView->setUrl(url);
 }
 
-void MainWindow::openTrustRules()
+void MainWindow::openSettings(bool trustRules)
 {
-    TrustRulesDialog dialog(m_configurationPath, this);
+    SettingsDialog dialog(
+        m_configurationPath,
+        m_preferences,
+        currentWebView() ? currentWebView()->url() : QUrl(),
+        trustRules ? SettingsDialog::Page::TrustRules : SettingsDialog::Page::General,
+        this
+    );
     QString error;
     if (!dialog.load(&error)) {
         setTrustStatus(QStringLiteral("Rules error: %1").arg(error), true);
         return;
     }
 
-    if (dialog.exec() == QDialog::Accepted)
+    if (dialog.exec() == QDialog::Accepted) {
+        m_preferences = dialog.preferences();
+        m_profile->setPersistSessionCookies(m_preferences.persistSessionCookies());
+        if (m_preferences.startupMode() == StartupMode::RestoreTabs)
+            scheduleSessionSave();
+        else
+            m_sessionStore.clear();
         reloadRules();
+    }
+}
+
+void MainWindow::restoreInitialTabs()
+{
+    const QStringList arguments = QApplication::arguments();
+    if (arguments.size() > 1) {
+        createTab(QUrl::fromUserInput(arguments.at(1)));
+        return;
+    }
+
+    if (m_preferences.startupMode() != StartupMode::RestoreTabs) {
+        createTab(m_preferences.startPage());
+        return;
+    }
+
+    QString error;
+    const BrowserSession session = m_sessionStore.load(&error);
+    if (!error.isEmpty())
+        qWarning().noquote() << "[PanBrowser session]" << error;
+    if (session.tabs.isEmpty()) {
+        createTab(m_preferences.startPage());
+        return;
+    }
+
+    m_restoringSession = true;
+    for (const SessionTab &tab : session.tabs)
+        createTab(tab.url, false, true, tab.title);
+    m_tabBar->setCurrentIndex(session.activeIndex);
+    m_tabStack->setCurrentIndex(session.activeIndex);
+    m_restoringSession = false;
+    activatePendingTab(currentWebView());
+    updateCurrentTabUi();
+}
+
+void MainWindow::scheduleSessionSave()
+{
+    if (m_restoringSession || !m_sessionSaveTimer)
+        return;
+    if (m_preferences.startupMode() == StartupMode::RestoreTabs)
+        m_sessionSaveTimer->start();
+}
+
+void MainWindow::saveSession()
+{
+    if (m_sessionSaveTimer)
+        m_sessionSaveTimer->stop();
+    if (m_discardSessionOnClose
+        || m_preferences.startupMode() != StartupMode::RestoreTabs) {
+        m_sessionStore.clear();
+        return;
+    }
+
+    QString error;
+    if (!m_sessionStore.save(currentSession(), &error))
+        qWarning().noquote() << "[PanBrowser session]" << error;
+}
+
+BrowserSession MainWindow::currentSession() const
+{
+    BrowserSession session;
+    session.activeIndex = m_tabBar ? m_tabBar->currentIndex() : 0;
+    if (!m_tabStack)
+        return session;
+
+    for (int index = 0; index < m_tabStack->count(); ++index) {
+        QWebEngineView *webView = qobject_cast<QWebEngineView *>(m_tabStack->widget(index));
+        if (!webView)
+            continue;
+        const BrowserTabState state = m_tabStates.value(webView);
+        const QUrl url = state.pendingUrl.isEmpty() ? webView->url() : state.pendingUrl;
+        session.tabs.append({url, m_tabBar->tabText(index)});
+    }
+    return session;
 }
 
 void MainWindow::reloadRules()

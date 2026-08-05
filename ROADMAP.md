@@ -8,6 +8,9 @@
 - [x] Safe restoration of window size and position.
 - [x] Dedicated persistent WebEngine profile for cookies, site data, and cache.
 - [x] Movable browser tabs with per-tab navigation and TLS status.
+- [x] Unified settings window with General and Trust Rules sections.
+- [x] Configurable start page and startup behavior.
+- [x] Optional session-cookie and tab restoration with lazy background tabs.
 
 ## Browser essentials
 

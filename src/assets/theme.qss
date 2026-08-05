@@ -195,6 +195,115 @@ QMenu::item:selected {
     background: #315ea8;
 }
 
+QDialog#settingsDialog {
+    background: #15181e;
+    color: #e6e9ef;
+}
+
+QDialog#settingsDialog QListWidget#settingsSidebar {
+    background: #111318;
+    color: #b7beca;
+    border: none;
+    border-right: 1px solid #292e37;
+    border-radius: 0;
+    outline: none;
+    padding: 18px 10px;
+}
+
+QDialog#settingsDialog QListWidget#settingsSidebar::item {
+    min-height: 38px;
+    border-radius: 8px;
+    padding: 4px 9px;
+    margin-bottom: 3px;
+}
+
+QDialog#settingsDialog QListWidget#settingsSidebar::item:hover {
+    color: #edf0f6;
+    background: #20242b;
+}
+
+QDialog#settingsDialog QListWidget#settingsSidebar::item:selected {
+    color: #ffffff;
+    background: #315ea8;
+}
+
+QDialog#settingsDialog QWidget#generalSettingsPage,
+QDialog#settingsDialog QStackedWidget#settingsPages {
+    background: #15181e;
+}
+
+QDialog#settingsDialog QLabel#dialogTitle {
+    color: #f5f7fb;
+    font-size: 22px;
+    font-weight: 700;
+}
+
+QDialog#settingsDialog QLabel#dialogSubtitle,
+QDialog#settingsDialog QLabel#fieldHint {
+    color: #929baa;
+}
+
+QDialog#settingsDialog QLabel#sectionLabel {
+    color: #778295;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1px;
+}
+
+QDialog#settingsDialog QFrame#settingsCard {
+    background: #1b1f26;
+    border: 1px solid #303641;
+    border-radius: 10px;
+}
+
+QDialog#settingsDialog QFrame#settingsSeparator {
+    color: #292e37;
+    background: #292e37;
+    border: none;
+    max-height: 1px;
+}
+
+QDialog#settingsDialog QLineEdit,
+QDialog#settingsDialog QComboBox {
+    min-height: 30px;
+    background: #20242c;
+    color: #edf0f6;
+    border: 1px solid #373e4a;
+    border-radius: 7px;
+    padding: 2px 9px;
+    selection-background-color: #3d72d9;
+}
+
+QDialog#settingsDialog QLineEdit:focus,
+QDialog#settingsDialog QComboBox:focus {
+    border-color: #5b8def;
+}
+
+QDialog#settingsDialog QCheckBox {
+    color: #dce1e9;
+    spacing: 8px;
+}
+
+QDialog#settingsDialog QPushButton {
+    min-height: 30px;
+    color: #e9edf5;
+    background: #2a303a;
+    border: 1px solid #3a424f;
+    border-radius: 7px;
+    padding: 2px 13px;
+}
+
+QDialog#settingsDialog QPushButton:hover {
+    background: #343c48;
+    border-color: #4a5564;
+}
+
+QDialog#settingsDialog QPushButton:default {
+    background: #3d72d9;
+    border-color: #5689ea;
+    color: #ffffff;
+}
+
 QDialog#trustRulesDialog {
     background: #15181e;
     color: #e6e9ef;

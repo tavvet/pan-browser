@@ -1,3 +1,5 @@
+#include "BrowserPreferences.h"
+#include "SessionStore.h"
 #include "TrustConfiguration.h"
 #include "TrustSettings.h"
 #include "WindowPlacement.h"
@@ -21,6 +23,9 @@ private slots:
     void disconnectedScreenFallsBackToPrimary();
     void inaccessibleTitleAreaIsRecentered();
     void oversizedWindowFitsSmallerResolution();
+    void browserPreferencesValidateStartPage();
+    void sessionRoundTripFiltersInvalidUrls();
+    void invalidSessionFileFailsClosed();
 };
 
 void TrustConfigurationTests::exactDomainIsCaseInsensitive()
@@ -181,6 +186,60 @@ void TrustConfigurationTests::oversizedWindowFitsSmallerResolution()
     const QRect restored = adjustedWindowGeometry(largeWindow, {smallerScreen}, smallerScreen);
 
     QCOMPARE(restored, smallerScreen);
+}
+
+void TrustConfigurationTests::browserPreferencesValidateStartPage()
+{
+    BrowserPreferences preferences;
+    QString error;
+    preferences.setStartPage(QUrl(QStringLiteral("file:///tmp/private")));
+    QVERIFY(!preferences.validate(&error));
+    QVERIFY(error.contains(QStringLiteral("HTTP or HTTPS")));
+
+    preferences.setStartPage(QUrl(QStringLiteral("https://example.com/start")));
+    QVERIFY2(preferences.validate(&error), qPrintable(error));
+}
+
+void TrustConfigurationTests::sessionRoundTripFiltersInvalidUrls()
+{
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+    const QString path = directory.filePath(QStringLiteral("session.json"));
+    SessionStore store(path);
+
+    BrowserSession source;
+    source.activeIndex = 8;
+    source.tabs = {
+        {QUrl(QStringLiteral("https://one.example/path")), QStringLiteral("One")},
+        {QUrl(QStringLiteral("file:///tmp/private")), QStringLiteral("Private")},
+        {QUrl(QStringLiteral("http://two.example")), QStringLiteral("Two")},
+    };
+
+    QString error;
+    QVERIFY2(store.save(source, &error), qPrintable(error));
+    const BrowserSession restored = store.load(&error);
+    QVERIFY2(error.isEmpty(), qPrintable(error));
+    QCOMPARE(restored.tabs.size(), 2);
+    QCOMPARE(restored.tabs.at(0).title, QStringLiteral("One"));
+    QCOMPARE(restored.tabs.at(1).url, QUrl(QStringLiteral("http://two.example")));
+    QCOMPARE(restored.activeIndex, 1);
+}
+
+void TrustConfigurationTests::invalidSessionFileFailsClosed()
+{
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+    const QString path = directory.filePath(QStringLiteral("session.json"));
+    QFile file(path);
+    QVERIFY(file.open(QIODevice::WriteOnly));
+    file.write("not json");
+    file.close();
+
+    SessionStore store(path);
+    QString error;
+    const BrowserSession restored = store.load(&error);
+    QVERIFY(restored.tabs.isEmpty());
+    QVERIFY(!error.isEmpty());
 }
 
 QTEST_MAIN(TrustConfigurationTests)

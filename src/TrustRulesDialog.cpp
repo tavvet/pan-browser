@@ -110,11 +110,17 @@ void repolish(QWidget *widget)
 
 } // namespace
 
-TrustRulesDialog::TrustRulesDialog(const QString &configurationPath, QWidget *parent)
+TrustRulesDialog::TrustRulesDialog(
+    const QString &configurationPath,
+    QWidget *parent,
+    bool embedded
+)
     : QDialog(parent)
     , m_configurationPath(configurationPath)
 {
-    createInterface();
+    if (embedded)
+        setWindowFlags(Qt::Widget);
+    createInterface(embedded);
 }
 
 TrustRulesDialog::~TrustRulesDialog()
@@ -136,7 +142,24 @@ bool TrustRulesDialog::load(QString *error)
     return true;
 }
 
-void TrustRulesDialog::createInterface()
+bool TrustRulesDialog::validate(QString *error)
+{
+    storeCurrentRule();
+    return m_settings.validate(m_configurationPath, error);
+}
+
+bool TrustRulesDialog::save(QString *error)
+{
+    storeCurrentRule();
+    if (!m_settings.save(m_configurationPath, error))
+        return false;
+
+    cleanupPendingCertificates(true);
+    m_saved = true;
+    return true;
+}
+
+void TrustRulesDialog::createInterface(bool embedded)
 {
     setObjectName(QStringLiteral("trustRulesDialog"));
     setWindowTitle(QStringLiteral("Trust Rules"));
@@ -297,13 +320,16 @@ void TrustRulesDialog::createInterface()
     splitter->setStretchFactor(1, 1);
     splitter->setSizes({260, 660});
 
-    auto *buttons = new QDialogButtonBox(
-        QDialogButtonBox::Save | QDialogButtonBox::Cancel,
-        Qt::Horizontal,
-        this
-    );
-    buttons->button(QDialogButtonBox::Save)->setText(QStringLiteral("Save rules"));
-    rootLayout->addWidget(buttons);
+    QDialogButtonBox *buttons = nullptr;
+    if (!embedded) {
+        buttons = new QDialogButtonBox(
+            QDialogButtonBox::Save | QDialogButtonBox::Cancel,
+            Qt::Horizontal,
+            this
+        );
+        buttons->button(QDialogButtonBox::Save)->setText(QStringLiteral("Save rules"));
+        rootLayout->addWidget(buttons);
+    }
 
     connect(m_ruleList, &QListWidget::currentRowChanged, this, &TrustRulesDialog::selectRule);
     connect(addButton, &QPushButton::clicked, this, &TrustRulesDialog::addRule);
@@ -316,8 +342,10 @@ void TrustRulesDialog::createInterface()
     });
     connect(testButton, &QPushButton::clicked, this, &TrustRulesDialog::testDomain);
     connect(m_testDomain, &QLineEdit::returnPressed, this, &TrustRulesDialog::testDomain);
-    connect(buttons, &QDialogButtonBox::accepted, this, &TrustRulesDialog::saveAndClose);
-    connect(buttons, &QDialogButtonBox::rejected, this, &QDialog::reject);
+    if (buttons) {
+        connect(buttons, &QDialogButtonBox::accepted, this, &TrustRulesDialog::saveAndClose);
+        connect(buttons, &QDialogButtonBox::rejected, this, &QDialog::reject);
+    }
     connect(m_certificates, &QListWidget::currentRowChanged, this, [this](int row) {
         m_viewCertificate->setEnabled(row >= 0 && m_currentRule >= 0);
         m_removeCertificate->setEnabled(row >= 0 && m_currentRule >= 0);
@@ -823,15 +851,11 @@ void TrustRulesDialog::testDomain()
 
 void TrustRulesDialog::saveAndClose()
 {
-    storeCurrentRule();
     QString error;
-    if (!m_settings.save(m_configurationPath, &error)) {
+    if (!save(&error)) {
         QMessageBox::warning(this, QStringLiteral("Cannot save trust rules"), error);
         return;
     }
-
-    cleanupPendingCertificates(true);
-    m_saved = true;
     accept();
 }
 

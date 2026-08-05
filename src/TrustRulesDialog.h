@@ -17,13 +17,19 @@ class TrustRulesDialog final : public QDialog {
     Q_OBJECT
 
 public:
-    explicit TrustRulesDialog(const QString &configurationPath, QWidget *parent = nullptr);
+    explicit TrustRulesDialog(
+        const QString &configurationPath,
+        QWidget *parent = nullptr,
+        bool embedded = false
+    );
     ~TrustRulesDialog() override;
 
     bool load(QString *error = nullptr);
+    bool validate(QString *error = nullptr);
+    bool save(QString *error = nullptr);
 
 private:
-    void createInterface();
+    void createInterface(bool embedded);
     void rebuildRuleList();
     void selectRule(int row);
     void loadCurrentRule();

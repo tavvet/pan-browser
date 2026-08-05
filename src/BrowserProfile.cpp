@@ -3,7 +3,7 @@
 #include <QDir>
 #include <QStandardPaths>
 
-BrowserProfile::BrowserProfile(QObject *parent)
+BrowserProfile::BrowserProfile(bool persistSessionCookies, QObject *parent)
     : QWebEngineProfile(QStringLiteral("PanBrowser"), parent)
 {
     const QString applicationData = QStandardPaths::writableLocation(
@@ -25,5 +25,13 @@ BrowserProfile::BrowserProfile(QObject *parent)
     setPersistentStoragePath(storagePath);
     setCachePath(cachePath);
     setHttpCacheType(QWebEngineProfile::DiskHttpCache);
-    setPersistentCookiesPolicy(QWebEngineProfile::OnlyPersistentCookies);
+    setPersistSessionCookies(persistSessionCookies);
+}
+
+void BrowserProfile::setPersistSessionCookies(bool persist)
+{
+    setPersistentCookiesPolicy(
+        persist ? QWebEngineProfile::ForcePersistentCookies
+                : QWebEngineProfile::OnlyPersistentCookies
+    );
 }

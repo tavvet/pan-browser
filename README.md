@@ -38,13 +38,15 @@ On first launch PanBrowser creates:
 ```text
 ~/Library/Application Support/PanBrowser/
 ├── WebEngine/
+├── session.json        # when tab restoration is enabled
 ├── rules.json
 └── Certificates/
 ```
 
 Web content uses a dedicated disk-backed profile. Persistent cookies and site
-storage are kept under `WebEngine/Profile`; session cookies are discarded when
-the application exits. The HTTP cache is isolated at
+storage are kept under `WebEngine/Profile`. By default, session cookies are
+discarded when the application exits; they can be retained from Settings when
+the user explicitly chooses to keep sign-ins. The HTTP cache is isolated at
 `~/Library/Caches/PanBrowser/WebEngine/`.
 
 Tabs share that profile while keeping their own navigation history, loading
@@ -52,10 +54,17 @@ progress, and TLS status. Press <kbd>⌘T</kbd> to open a tab and <kbd>⌘W</kbd
 close the current tab. User-initiated links that request a new tab are opened
 inside the same PanBrowser window; automatic popups remain blocked.
 
-Open **PanBrowser → Trust Rules…** or press <kbd>⌘,</kbd> to manage rules. The
-editor imports certificates into the application data directory, validates the
-complete configuration, saves it atomically, and reloads the active policy.
-The previous file is retained as `rules.json.backup`.
+Open **PanBrowser → Settings…** or press <kbd>⌘,</kbd> to choose the start page,
+restore previous tabs, or retain session-cookie sign-ins. Restored background
+tabs are loaded only when selected. Tab URLs and titles are stored atomically in
+`session.json`; form contents, scroll position, and navigation history are not
+restored.
+
+Open **PanBrowser → Trust Rules…** to jump directly to the Trust Rules section
+of the same settings window. The editor imports certificates into the
+application data directory, validates the complete configuration, saves it
+atomically, and reloads the active policy. The previous file is retained as
+`rules.json.backup`.
 
 For advanced troubleshooting, use **PanBrowser → Show Configuration Folder**
 to reveal the files in Finder. After editing `rules.json` manually, select
@@ -86,6 +95,10 @@ Place DER (`.cer`, `.der`) or PEM (`.pem`) CA certificates in the
   ]
 }
 ```
+
+For compatibility, version 1 trust files still contain `startPage`. PanBrowser
+imports it into the application preferences on first launch; the value selected
+in Settings is authoritative afterwards.
 
 Modes:
 

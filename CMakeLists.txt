@@ -36,9 +36,15 @@ find_package(Qt6WebEngineWidgets 6.11 REQUIRED)
 set(PANBROWSER_APP_SOURCES
     src/BrowserProfile.cpp
     src/BrowserProfile.h
+    src/BrowserPreferences.cpp
+    src/BrowserPreferences.h
     src/main.cpp
     src/MainWindow.cpp
     src/MainWindow.h
+    src/SessionStore.cpp
+    src/SessionStore.h
+    src/SettingsDialog.cpp
+    src/SettingsDialog.h
     src/TrustConfiguration.cpp
     src/TrustConfiguration.h
     src/TrustRulesDialog.cpp
@@ -91,6 +97,10 @@ endif()
 enable_testing()
 qt_add_executable(PanBrowserTests
     tests/TrustConfigurationTests.cpp
+    src/BrowserPreferences.cpp
+    src/BrowserPreferences.h
+    src/SessionStore.cpp
+    src/SessionStore.h
     src/TrustConfiguration.cpp
     src/TrustConfiguration.h
     src/TrustSettings.cpp
