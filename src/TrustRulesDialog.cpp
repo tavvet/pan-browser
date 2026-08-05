@@ -177,7 +177,7 @@ void TrustRulesDialog::createInterface(bool embedded)
     rootLayout->addWidget(title);
 
     auto *subtitle = new QLabel(
-        QStringLiteral("Choose exactly which domains may use additional certificate authorities."),
+        QStringLiteral("Control which domains may use certificate authorities added to PanBrowser."),
         this
     );
     subtitle->setObjectName(QStringLiteral("dialogSubtitle"));
@@ -194,7 +194,7 @@ void TrustRulesDialog::createInterface(bool embedded)
     sidebarLayout->setContentsMargins(0, 0, 12, 0);
     sidebarLayout->setSpacing(10);
 
-    auto *rulesLabel = new QLabel(QStringLiteral("SERVICES"), sidebar);
+    auto *rulesLabel = new QLabel(QStringLiteral("DOMAIN RULES"), sidebar);
     rulesLabel->setObjectName(QStringLiteral("sectionLabel"));
     sidebarLayout->addWidget(rulesLabel);
 
@@ -206,7 +206,7 @@ void TrustRulesDialog::createInterface(bool embedded)
     auto *ruleButtons = new QHBoxLayout();
     auto *addButton = new QPushButton(QStringLiteral("Add rule"), sidebar);
     addButton->setObjectName(QStringLiteral("secondaryButton"));
-    m_deleteRule = new QPushButton(QStringLiteral("Remove"), sidebar);
+    m_deleteRule = new QPushButton(QStringLiteral("Remove rule"), sidebar);
     m_deleteRule->setObjectName(QStringLiteral("dangerButton"));
     ruleButtons->addWidget(addButton);
     ruleButtons->addWidget(m_deleteRule);
@@ -244,11 +244,11 @@ void TrustRulesDialog::createInterface(bool embedded)
     m_mode = new QComboBox(m_editor);
     m_mode->addItem(QStringLiteral("System trust only"), static_cast<int>(TrustMode::SystemOnly));
     m_mode->addItem(
-        QStringLiteral("System + configured certificates"),
+        QStringLiteral("System trust or added certificates"),
         static_cast<int>(TrustMode::SystemPlusCustom)
     );
     m_mode->addItem(
-        QStringLiteral("Configured certificates only"),
+        QStringLiteral("Added certificates only"),
         static_cast<int>(TrustMode::CustomOnly)
     );
     form->addRow(QStringLiteral("Trust mode"), m_mode);
@@ -277,7 +277,7 @@ void TrustRulesDialog::createInterface(bool embedded)
     domainsHint->setWordWrap(true);
     editorLayout->addWidget(domainsHint);
 
-    auto *certificatesLabel = new QLabel(QStringLiteral("CERTIFICATES"), m_editor);
+    auto *certificatesLabel = new QLabel(QStringLiteral("ADDED CERTIFICATES"), m_editor);
     certificatesLabel->setObjectName(QStringLiteral("sectionLabel"));
     editorLayout->addWidget(certificatesLabel);
 
@@ -287,7 +287,7 @@ void TrustRulesDialog::createInterface(bool embedded)
     editorLayout->addWidget(m_certificates, 1);
 
     auto *certificateButtons = new QHBoxLayout();
-    auto *importButton = new QPushButton(QStringLiteral("Import certificate…"), m_editor);
+    auto *importButton = new QPushButton(QStringLiteral("Add certificates…"), m_editor);
     importButton->setObjectName(QStringLiteral("secondaryButton"));
     m_viewCertificate = new QPushButton(QStringLiteral("View details…"), m_editor);
     m_viewCertificate->setObjectName(QStringLiteral("secondaryButton"));
@@ -301,8 +301,8 @@ void TrustRulesDialog::createInterface(bool embedded)
 
     auto *testLayout = new QHBoxLayout();
     m_testDomain = new QLineEdit(m_editor);
-    m_testDomain->setPlaceholderText(QStringLiteral("Check which rule matches a domain"));
-    auto *testButton = new QPushButton(QStringLiteral("Test domain"), m_editor);
+    m_testDomain->setPlaceholderText(QStringLiteral("Enter a domain to see which rule applies"));
+    auto *testButton = new QPushButton(QStringLiteral("Check domain"), m_editor);
     testButton->setObjectName(QStringLiteral("secondaryButton"));
     testLayout->addWidget(m_testDomain, 1);
     testLayout->addWidget(testButton);
@@ -475,17 +475,17 @@ void TrustRulesDialog::updateModeDescription()
     switch (mode) {
     case TrustMode::SystemOnly:
         m_modeDescription->setText(
-            QStringLiteral("Chromium must accept the certificate normally; configured certificates are not used.")
+            QStringLiteral("Use Chromium’s normal certificate validation. Certificates added below are ignored.")
         );
         break;
     case TrustMode::SystemPlusCustom:
         m_modeDescription->setText(
-            QStringLiteral("Recover an unknown-CA error when the chain validates against a configured certificate.")
+            QStringLiteral("Use normal system trust. If the certificate authority is unknown, also try the certificates added below.")
         );
         break;
     case TrustMode::CustomOnly:
         m_modeDescription->setText(
-            QStringLiteral("For recovered connections, require a configured certificate. Connections Chromium already accepts remain valid.")
+            QStringLiteral("For an unknown certificate authority, accept only chains ending at a certificate added below. Sites Chromium already trusts are unaffected.")
         );
         break;
     }
