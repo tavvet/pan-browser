@@ -5,6 +5,7 @@
 #include "TrustConfiguration.h"
 
 #include <QHash>
+#include <QList>
 #include <QMainWindow>
 #include <QPointer>
 #include <QString>
@@ -38,6 +39,11 @@ protected:
     void closeEvent(QCloseEvent *event) override;
 
 private:
+    enum class WindowRole {
+        Primary,
+        Popup,
+    };
+
     struct BrowserTabState {
         QString lastAcceptedRule;
         QString trustStatus = QStringLiteral("Ready");
@@ -51,7 +57,17 @@ private:
         QUrl pendingUrl;
     };
 
+    MainWindow(
+        BrowserProfile *sharedProfile,
+        DownloadManager *sharedDownloadManager,
+        MainWindow *primaryWindow,
+        WindowRole role,
+        QWidget *parent
+    );
+
     void createInterface();
+    MainWindow *createPopupWindow(WindowRole role, const QRect &requestedGeometry);
+    void applyPopupGeometry(const QRect &requestedGeometry);
     QWebEngineView *createTab(
         const QUrl &url,
         bool activate = true,
@@ -67,6 +83,7 @@ private:
     void navigateFromAddressBar();
     void openSettings(bool trustRules = false);
     void reloadRules();
+    void reloadRulesLocal();
     void restoreInitialTabs();
     void scheduleSessionSave();
     void saveSession();
@@ -106,6 +123,9 @@ private:
     SessionStore m_sessionStore;
     TrustPolicy m_trustPolicy;
     QString m_configurationPath;
+    MainWindow *m_primaryWindow = nullptr;
+    QList<QPointer<MainWindow>> m_popupWindows;
+    bool m_ownsBrowserResources = true;
     bool m_restoringSession = false;
     bool m_discardSessionOnClose = false;
 };

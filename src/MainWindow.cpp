@@ -47,36 +47,76 @@
 #include <QWebEnginePage>
 #include <QWebEngineView>
 
+#include <utility>
+
 MainWindow::MainWindow(QWidget *parent)
-    : QMainWindow(parent)
+    : MainWindow(nullptr, nullptr, nullptr, WindowRole::Primary, parent)
+{
+}
+
+MainWindow::MainWindow(
+    BrowserProfile *sharedProfile,
+    DownloadManager *sharedDownloadManager,
+    MainWindow *primaryWindow,
+    WindowRole role,
+    QWidget *parent
+)
+    : QMainWindow(parent, role == WindowRole::Primary ? Qt::WindowFlags() : Qt::Window)
     , m_sessionStore(QDir(
         QStandardPaths::writableLocation(QStandardPaths::AppDataLocation)
     ).filePath(QStringLiteral("session.json")))
 {
-    m_configurationPath = ensureConfiguration();
-    QString bootstrapError;
-    m_trustPolicy.load(m_configurationPath, &bootstrapError);
-    m_preferences = BrowserPreferences::load(m_trustPolicy.startPage());
-    QString dataResetError;
-    if (!BrowserProfile::applyPendingDataReset(&dataResetError))
-        qWarning().noquote() << "[PanBrowser data reset]" << dataResetError;
-    m_profile = new BrowserProfile(m_preferences.persistSessionCookies());
-    m_downloadManager = new DownloadManager(
-        m_profile,
-        this,
-        QDir(QStandardPaths::writableLocation(QStandardPaths::AppDataLocation))
-            .filePath(QStringLiteral("downloads.json")),
-        this
-    );
+    m_primaryWindow = primaryWindow ? primaryWindow : this;
+    m_ownsBrowserResources = role == WindowRole::Primary;
+
+    if (m_ownsBrowserResources) {
+        m_configurationPath = ensureConfiguration();
+        QString bootstrapError;
+        m_trustPolicy.load(m_configurationPath, &bootstrapError);
+        m_preferences = BrowserPreferences::load(m_trustPolicy.startPage());
+        QString dataResetError;
+        if (!BrowserProfile::applyPendingDataReset(&dataResetError))
+            qWarning().noquote() << "[PanBrowser data reset]" << dataResetError;
+        m_profile = new BrowserProfile(m_preferences.persistSessionCookies());
+        m_downloadManager = new DownloadManager(
+            m_profile,
+            this,
+            QDir(QStandardPaths::writableLocation(QStandardPaths::AppDataLocation))
+                .filePath(QStringLiteral("downloads.json")),
+            this
+        );
+    } else {
+        Q_ASSERT(sharedProfile);
+        Q_ASSERT(sharedDownloadManager);
+        Q_ASSERT(primaryWindow);
+        m_profile = sharedProfile;
+        m_downloadManager = sharedDownloadManager;
+        m_configurationPath = primaryWindow->m_configurationPath;
+        m_trustPolicy = primaryWindow->m_trustPolicy;
+        m_preferences = primaryWindow->m_preferences;
+        setAttribute(Qt::WA_DeleteOnClose);
+    }
+
     createInterface();
     m_permissionController = new PermissionController(m_permissionPrompt, this);
-    restoreWindowPlacement();
-    reloadRules();
-    restoreInitialTabs();
+    if (m_ownsBrowserResources) {
+        restoreWindowPlacement();
+        reloadRules();
+        restoreInitialTabs();
+    } else {
+        reloadRulesLocal();
+        createTab(QUrl());
+    }
 }
 
 MainWindow::~MainWindow()
 {
+    if (m_ownsBrowserResources) {
+        while (!m_popupWindows.isEmpty()) {
+            if (MainWindow *popup = m_popupWindows.takeLast())
+                delete popup;
+        }
+    }
     delete m_permissionController;
     m_permissionController = nullptr;
     delete takeCentralWidget();
@@ -84,21 +124,31 @@ MainWindow::~MainWindow()
     m_tabStates.clear();
     delete m_downloadsPanel;
     m_downloadsPanel = nullptr;
-    delete m_downloadManager;
+    if (m_ownsBrowserResources) {
+        delete m_downloadManager;
+        delete m_profile;
+    }
     m_downloadManager = nullptr;
-    delete m_profile;
     m_profile = nullptr;
 }
 
 void MainWindow::closeEvent(QCloseEvent *event)
 {
-    saveSession();
-    QSettings settings(QStringLiteral("PanBrowser"), QStringLiteral("PanBrowser"));
-    settings.beginGroup(QStringLiteral("MainWindow"));
-    settings.setValue(QStringLiteral("geometry"), saveGeometry());
-    settings.setValue(QStringLiteral("state"), saveState(1));
-    settings.endGroup();
-    settings.sync();
+    if (m_ownsBrowserResources) {
+        saveSession();
+        QSettings settings(QStringLiteral("PanBrowser"), QStringLiteral("PanBrowser"));
+        settings.beginGroup(QStringLiteral("MainWindow"));
+        settings.setValue(QStringLiteral("geometry"), saveGeometry());
+        settings.setValue(QStringLiteral("state"), saveState(1));
+        settings.endGroup();
+        settings.sync();
+
+        const QList<QPointer<MainWindow>> popups = m_popupWindows;
+        for (MainWindow *popup : popups) {
+            if (popup)
+                popup->close();
+        }
+    }
     QMainWindow::closeEvent(event);
 }
 
@@ -211,7 +261,8 @@ void MainWindow::createInterface()
         &DownloadButton::setActiveCount
     );
     connect(m_downloadManager, &DownloadManager::recordAdded, this, [this] {
-        m_downloadsPanel->showBelow(m_downloadButton);
+        if (isActiveWindow())
+            m_downloadsPanel->showBelow(m_downloadButton);
     });
 
     connect(newTabButton, &QToolButton::clicked, this, [this] {
@@ -329,6 +380,44 @@ void MainWindow::createInterface()
     m_sessionSaveTimer->setSingleShot(true);
     m_sessionSaveTimer->setInterval(750);
     connect(m_sessionSaveTimer, &QTimer::timeout, this, &MainWindow::saveSession);
+
+}
+
+MainWindow *MainWindow::createPopupWindow(
+    WindowRole role,
+    const QRect &requestedGeometry
+)
+{
+    MainWindow *primary = m_primaryWindow ? m_primaryWindow : this;
+    auto *popup = new MainWindow(
+        m_profile,
+        m_downloadManager,
+        primary,
+        role,
+        primary
+    );
+    primary->m_popupWindows.append(popup);
+    connect(popup, &QObject::destroyed, primary, [primary, popup] {
+        primary->m_popupWindows.removeAll(popup);
+    });
+    popup->applyPopupGeometry(requestedGeometry);
+    return popup;
+}
+
+void MainWindow::applyPopupGeometry(const QRect &requestedGeometry)
+{
+    QList<QRect> availableScreens;
+    for (const QScreen *screen : QGuiApplication::screens())
+        availableScreens.append(screen->availableGeometry());
+    const QScreen *fallbackScreen = m_primaryWindow ? m_primaryWindow->screen()
+                                                     : QGuiApplication::primaryScreen();
+    const QRect fallback = fallbackScreen ? fallbackScreen->availableGeometry() : QRect();
+    setGeometry(popupWindowGeometry(
+        requestedGeometry,
+        m_primaryWindow ? m_primaryWindow->geometry() : QRect(),
+        availableScreens,
+        fallback
+    ));
 }
 
 QWebEngineView *MainWindow::createTab(
@@ -384,8 +473,10 @@ void MainWindow::closeTab(int index)
     webView->deleteLater();
 
     if (m_tabBar->count() == 0) {
-        m_discardSessionOnClose = true;
-        m_sessionStore.clear();
+        if (m_ownsBrowserResources) {
+            m_discardSessionOnClose = true;
+            m_sessionStore.clear();
+        }
         close();
         return;
     }
@@ -535,6 +626,21 @@ void MainWindow::connectBrowserSignals(QWebEngineView *webView)
                 }
             }
 
+            const bool separateWindow = request.destination()
+                    == QWebEngineNewWindowRequest::InNewWindow
+                || request.destination() == QWebEngineNewWindowRequest::InNewDialog;
+            if (separateWindow) {
+                MainWindow *popup = createPopupWindow(
+                    WindowRole::Popup,
+                    request.requestedGeometry()
+                );
+                request.openIn(popup->currentWebView()->page());
+                popup->show();
+                popup->raise();
+                popup->activateWindow();
+                return;
+            }
+
             const bool activate = request.destination()
                 != QWebEngineNewWindowRequest::InNewBackgroundTab;
             QWebEngineView *newView = createTab(QUrl(), activate);
@@ -656,6 +762,14 @@ void MainWindow::navigateFromAddressBar()
 
 void MainWindow::openSettings(bool trustRules)
 {
+    if (!m_ownsBrowserResources && m_primaryWindow) {
+        m_primaryWindow->show();
+        m_primaryWindow->raise();
+        m_primaryWindow->activateWindow();
+        m_primaryWindow->openSettings(trustRules);
+        return;
+    }
+
     SettingsDialog dialog(
         m_configurationPath,
         m_preferences,
@@ -677,6 +791,10 @@ void MainWindow::openSettings(bool trustRules)
             scheduleSessionSave();
         else
             m_sessionStore.clear();
+        for (MainWindow *popup : std::as_const(m_popupWindows)) {
+            if (popup)
+                popup->m_preferences = m_preferences;
+        }
         reloadRules();
     }
 }
@@ -715,7 +833,7 @@ void MainWindow::restoreInitialTabs()
 
 void MainWindow::scheduleSessionSave()
 {
-    if (m_restoringSession || !m_sessionSaveTimer)
+    if (!m_ownsBrowserResources || m_restoringSession || !m_sessionSaveTimer)
         return;
     if (m_preferences.startupMode() == StartupMode::RestoreTabs)
         m_sessionSaveTimer->start();
@@ -723,6 +841,8 @@ void MainWindow::scheduleSessionSave()
 
 void MainWindow::saveSession()
 {
+    if (!m_ownsBrowserResources)
+        return;
     if (m_sessionSaveTimer)
         m_sessionSaveTimer->stop();
     if (m_discardSessionOnClose
@@ -756,7 +876,22 @@ BrowserSession MainWindow::currentSession() const
 
 void MainWindow::reloadRules()
 {
-    m_configurationPath = ensureConfiguration();
+    if (!m_ownsBrowserResources && m_primaryWindow) {
+        m_primaryWindow->reloadRules();
+        return;
+    }
+
+    reloadRulesLocal();
+    for (MainWindow *popup : std::as_const(m_popupWindows)) {
+        if (popup)
+            popup->reloadRulesLocal();
+    }
+}
+
+void MainWindow::reloadRulesLocal()
+{
+    if (m_ownsBrowserResources)
+        m_configurationPath = ensureConfiguration();
     QString error;
     if (!m_trustPolicy.load(m_configurationPath, &error)) {
         m_ruleCount->setText(QStringLiteral("Rules unavailable"));

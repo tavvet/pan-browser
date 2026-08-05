@@ -53,7 +53,11 @@ the user explicitly chooses to keep sign-ins. The HTTP cache is isolated at
 Tabs share that profile while keeping their own navigation history, loading
 progress, and TLS status. Press <kbd>⌘T</kbd> to open a tab and <kbd>⌘W</kbd> to
 close the current tab. User-initiated links that request a new tab are opened
-inside the same PanBrowser window; automatic popups remain blocked.
+inside the same PanBrowser window. User-initiated requests for a separate
+window open a full PanBrowser window with visible URL and TLS status, even when
+the site asks for a chromeless dialog. Popup windows share cookies, cache,
+downloads, permissions, and trust rules with the primary window, but are not
+saved in the restored tab session. Automatic popups remain blocked.
 
 Open **PanBrowser → Settings…** or press <kbd>⌘,</kbd> to choose the start page,
 restore previous tabs, or retain session-cookie sign-ins. Restored background

@@ -2,6 +2,7 @@
 
 #include "BrowserProfile.h"
 
+#include <QApplication>
 #include <QDesktopServices>
 #include <QDir>
 #include <QFileDialog>
@@ -174,8 +175,11 @@ void DownloadManager::handleDownload(QWebEngineDownloadRequest *download)
         return;
 
     const QString suggestedName = safeFileName(download->suggestedFileName());
+    QWidget *dialogParent = QApplication::activeWindow();
+    if (!dialogParent)
+        dialogParent = m_dialogParent;
     const QString selectedPath = QFileDialog::getSaveFileName(
-        m_dialogParent,
+        dialogParent,
         QStringLiteral("Save download"),
         QDir(downloadsDirectory()).filePath(suggestedName)
     );

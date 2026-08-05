@@ -15,10 +15,10 @@
 - [x] Download manager with progress controls and persistent history.
 - [x] One-time permission prompts for camera, microphone, and location.
 - [x] Safe confirmation for external URL schemes and application deep links.
+- [x] User-initiated popup windows with shared profile and trust policy.
 
 ## Browser essentials
 
-- [ ] Popup handling in a new PanBrowser window with the same profile and trust policy.
 
 ## Cross-platform
 

@@ -81,3 +81,22 @@ QRect adjustedWindowGeometry(
         target = availableScreens.first();
     return fittedGeometry(restoredGeometry, target, true);
 }
+
+QRect popupWindowGeometry(
+    const QRect &requestedGeometry,
+    const QRect &ownerGeometry,
+    const QList<QRect> &availableScreens,
+    const QRect &fallbackScreen,
+    const QSize &minimumSize
+)
+{
+    QRect candidate = requestedGeometry;
+    if (!candidate.isValid()) {
+        QSize defaultSize = ownerGeometry.size().boundedTo(QSize(1100, 760));
+        defaultSize = defaultSize.expandedTo(minimumSize);
+        candidate = QRect(ownerGeometry.topLeft() + QPoint(32, 32), defaultSize);
+    } else {
+        candidate.setSize(candidate.size().expandedTo(minimumSize));
+    }
+    return adjustedWindowGeometry(candidate, availableScreens, fallbackScreen);
+}

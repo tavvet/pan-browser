@@ -8,3 +8,11 @@
     const QList<QRect> &availableScreens,
     const QRect &fallbackScreen
 );
+
+[[nodiscard]] QRect popupWindowGeometry(
+    const QRect &requestedGeometry,
+    const QRect &ownerGeometry,
+    const QList<QRect> &availableScreens,
+    const QRect &fallbackScreen,
+    const QSize &minimumSize = QSize(720, 520)
+);

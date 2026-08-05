@@ -38,6 +38,7 @@ private slots:
     void webSchemesStayInsideBrowser();
     void externalSchemesRequireMainFrameConfirmation();
     void dangerousLocalSchemesAreBlocked();
+    void popupGeometryIsVisibleAndUsable();
 };
 
 void TrustConfigurationTests::exactDomainIsCaseInsensitive()
@@ -399,6 +400,21 @@ void TrustConfigurationTests::dangerousLocalSchemesAreBlocked()
     QCOMPARE(
         externalNavigationDisposition(QUrl(), true),
         ExternalNavigationDisposition::Block
+    );
+}
+
+void TrustConfigurationTests::popupGeometryIsVisibleAndUsable()
+{
+    const QRect screen(0, 0, 1440, 900);
+    const QRect owner(120, 80, 1180, 760);
+
+    QCOMPARE(
+        popupWindowGeometry(QRect(), owner, {screen}, screen),
+        QRect(152, 112, 1100, 760)
+    );
+    QCOMPARE(
+        popupWindowGeometry(QRect(2000, 100, 200, 100), owner, {screen}, screen),
+        QRect(360, 190, 720, 520)
     );
 }
 
