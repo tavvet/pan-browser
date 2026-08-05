@@ -187,23 +187,23 @@ QLineEdit#addressBar QToolButton:hover {
     background: #343a45;
 }
 
-QFrame#historyCompletionPopup {
+QFrame#addressCompletionPopup {
     background: #181b21;
     border: 1px solid #3a414d;
     border-radius: 0;
 }
 
-QFrame#historyCompletionPopup[placement="below"] {
+QFrame#addressCompletionPopup[placement="below"] {
     border-bottom-left-radius: 10px;
     border-bottom-right-radius: 10px;
 }
 
-QFrame#historyCompletionPopup[placement="above"] {
+QFrame#addressCompletionPopup[placement="above"] {
     border-top-left-radius: 10px;
     border-top-right-radius: 10px;
 }
 
-QListWidget#historyCompletionList {
+QListWidget#addressCompletionList {
     background: transparent;
     color: #e7eaf0;
     border: none;
@@ -211,13 +211,13 @@ QListWidget#historyCompletionList {
     padding: 0;
 }
 
-QListWidget#historyCompletionList::item {
+QListWidget#addressCompletionList::item {
     border-radius: 7px;
     padding: 4px 10px;
 }
 
-QListWidget#historyCompletionList::item:hover,
-QListWidget#historyCompletionList::item:selected {
+QListWidget#addressCompletionList::item:hover,
+QListWidget#addressCompletionList::item:selected {
     color: #ffffff;
     background: #315ea8;
 }

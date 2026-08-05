@@ -25,7 +25,7 @@ class BrowserProfile;
 class DownloadButton;
 class DownloadManager;
 class DownloadsPanel;
-class HistoryCompletionPopup;
+class AddressCompletionPopup;
 class PermissionController;
 class PermissionPrompt;
 class QCloseEvent;
@@ -92,7 +92,7 @@ private:
     void updateBookmarkAction();
     void updateAddressPlaceholder();
     void navigateFromAddressBar();
-    void showHistorySuggestions();
+    void showAddressSuggestions();
     void openSettings();
     void editCurrentBookmark();
     void openBookmarks();
@@ -120,7 +120,7 @@ private:
     BookmarkStore *m_bookmarkStore = nullptr;
     DownloadsPanel *m_downloadsPanel = nullptr;
     DownloadButton *m_downloadButton = nullptr;
-    HistoryCompletionPopup *m_historyCompletionPopup = nullptr;
+    AddressCompletionPopup *m_addressCompletionPopup = nullptr;
     PermissionController *m_permissionController = nullptr;
     PermissionPrompt *m_permissionPrompt = nullptr;
     QPointer<QMessageBox> m_externalUrlDialog;
@@ -137,7 +137,7 @@ private:
     QLabel *m_ruleCount = nullptr;
     QProgressBar *m_progress = nullptr;
     QTimer *m_sessionSaveTimer = nullptr;
-    QTimer *m_historySuggestionTimer = nullptr;
+    QTimer *m_addressSuggestionTimer = nullptr;
     QHash<QWebEngineView *, BrowserTabState> m_tabStates;
     BrowserPreferences m_preferences;
     SearchSettings m_searchSettings;

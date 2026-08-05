@@ -1,6 +1,6 @@
 #pragma once
 
-#include "HistoryStore.h"
+#include "AddressSuggestion.h"
 
 #include <QFrame>
 
@@ -8,14 +8,14 @@ class AddressLineEdit;
 class QListWidget;
 class QHideEvent;
 
-class HistoryCompletionPopup final : public QFrame {
+class AddressCompletionPopup final : public QFrame {
     Q_OBJECT
 
 public:
-    explicit HistoryCompletionPopup(AddressLineEdit *addressBar, QWidget *parent = nullptr);
-    ~HistoryCompletionPopup() override;
+    explicit AddressCompletionPopup(AddressLineEdit *addressBar, QWidget *parent = nullptr);
+    ~AddressCompletionPopup() override;
 
-    void showSuggestions(const QList<HistorySuggestion> &suggestions);
+    void showSuggestions(const QList<AddressSuggestion> &suggestions);
 
 signals:
     void urlActivated(const QUrl &url);

@@ -1,5 +1,7 @@
 #include "HistoryStore.h"
 
+#include "AddressSuggestion.h"
+
 #include <QDir>
 #include <QFileInfo>
 #include <QRegularExpression>
@@ -49,46 +51,6 @@ HistoryTransition transitionFromValue(int value)
         return HistoryTransition::Other;
     }
     return static_cast<HistoryTransition>(value);
-}
-
-bool beginsWord(const QString &text, const QString &query)
-{
-    if (text.startsWith(query))
-        return true;
-    qsizetype position = text.indexOf(query);
-    while (position > 0) {
-        if (!text.at(position - 1).isLetterOrNumber())
-            return true;
-        position = text.indexOf(query, position + 1);
-    }
-    return false;
-}
-
-int matchClass(const HistorySuggestion &suggestion, const QString &query)
-{
-    const QString host = suggestion.url.host().toCaseFolded();
-    const QString url = suggestion.url.toDisplayString(QUrl::PrettyDecoded).toCaseFolded();
-    QString withoutScheme = url;
-    const qsizetype schemeEnd = withoutScheme.indexOf(QStringLiteral("://"));
-    if (schemeEnd >= 0)
-        withoutScheme.remove(0, schemeEnd + 3);
-    const QString title = suggestion.title.toCaseFolded();
-
-    if (host == query)
-        return 7;
-    if (host.startsWith(query))
-        return 6;
-    if (withoutScheme.startsWith(query) || url.startsWith(query))
-        return 5;
-    if (beginsWord(title, query))
-        return 4;
-    if (host.contains(query))
-        return 3;
-    if (url.contains(query))
-        return 2;
-    if (title.contains(query))
-        return 1;
-    return 0;
 }
 
 struct RankedHistorySuggestion {
@@ -348,7 +310,10 @@ QList<HistorySuggestion> HistoryStore::suggestions(
         );
         suggestion.visitCount = query.value(4).toInt();
         suggestion.typedCount = query.value(5).toInt();
-        candidates.append({suggestion, matchClass(suggestion, input)});
+        candidates.append({
+            suggestion,
+            addressMatchClass(suggestion.url, suggestion.title, input),
+        });
     }
 
     std::stable_sort(candidates.begin(), candidates.end(), [](

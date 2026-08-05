@@ -1,6 +1,7 @@
 #include "MainWindow.h"
 
 #include "AddressLineEdit.h"
+#include "AddressSuggestion.h"
 #include "BookmarkDialog.h"
 #include "BookmarkStore.h"
 #include "BookmarksDialog.h"
@@ -10,7 +11,7 @@
 #include "DownloadManager.h"
 #include "DownloadsPanel.h"
 #include "ExternalNavigationPolicy.h"
-#include "HistoryCompletionPopup.h"
+#include "AddressCompletionPopup.h"
 #include "PermissionController.h"
 #include "PermissionPrompt.h"
 #include "SettingsDialog.h"
@@ -287,10 +288,10 @@ void MainWindow::createInterface()
     );
     m_bookmarkAction->setEnabled(false);
     m_bookmarkAction->setToolTip(QStringLiteral("Add Bookmark (⌘D)"));
-    m_historyCompletionPopup = new HistoryCompletionPopup(m_address, this);
-    m_historySuggestionTimer = new QTimer(this);
-    m_historySuggestionTimer->setSingleShot(true);
-    m_historySuggestionTimer->setInterval(100);
+    m_addressCompletionPopup = new AddressCompletionPopup(m_address, this);
+    m_addressSuggestionTimer = new QTimer(this);
+    m_addressSuggestionTimer->setSingleShot(true);
+    m_addressSuggestionTimer->setInterval(100);
     toolbar->addWidget(m_address);
     QAction *go = toolbar->addAction(
         QIcon(QStringLiteral(":/assets/icons/arrow-right.svg")),
@@ -375,18 +376,20 @@ void MainWindow::createInterface()
     connect(m_address, &QLineEdit::returnPressed, this, &MainWindow::navigateFromAddressBar);
     connect(m_address, &QLineEdit::textEdited, this, [this] {
         m_address->clearGhostCompletion();
-        if (!m_preferences.saveBrowsingHistory()
-            || !m_historyStore
-            || !m_historyStore->isOpen()) {
-            m_historyCompletionPopup->hide();
+        const bool historyAvailable = m_preferences.saveBrowsingHistory()
+            && m_historyStore
+            && m_historyStore->isOpen();
+        const bool bookmarksAvailable = m_bookmarkStore && m_bookmarkStore->isOpen();
+        if (!historyAvailable && !bookmarksAvailable) {
+            m_addressCompletionPopup->hide();
             return;
         }
-        m_historySuggestionTimer->start();
+        m_addressSuggestionTimer->start();
     });
-    connect(m_historySuggestionTimer, &QTimer::timeout, this, &MainWindow::showHistorySuggestions);
+    connect(m_addressSuggestionTimer, &QTimer::timeout, this, &MainWindow::showAddressSuggestions);
     connect(
-        m_historyCompletionPopup,
-        &HistoryCompletionPopup::urlActivated,
+        m_addressCompletionPopup,
+        &AddressCompletionPopup::urlActivated,
         this,
         [this](const QUrl &url) {
             m_address->setText(url.toString());
@@ -615,10 +618,10 @@ void MainWindow::connectBrowserSignals(QWebEngineView *webView)
             m_address->setText(url.toString());
         if (webView == currentWebView())
             updateBookmarkAction();
-        if (m_historySuggestionTimer)
-            m_historySuggestionTimer->stop();
-        if (m_historyCompletionPopup)
-            m_historyCompletionPopup->hide();
+        if (m_addressSuggestionTimer)
+            m_addressSuggestionTimer->stop();
+        if (m_addressCompletionPopup)
+            m_addressCompletionPopup->hide();
         updateNavigationActions();
         scheduleSessionSave();
     });
@@ -953,10 +956,10 @@ void MainWindow::updateAddressPlaceholder()
 
 void MainWindow::navigateFromAddressBar()
 {
-    if (m_historySuggestionTimer)
-        m_historySuggestionTimer->stop();
-    if (m_historyCompletionPopup)
-        m_historyCompletionPopup->hide();
+    if (m_addressSuggestionTimer)
+        m_addressSuggestionTimer->stop();
+    if (m_addressCompletionPopup)
+        m_addressCompletionPopup->hide();
     const ResolvedAddressInput result = resolveAddressInput(m_address->text(), m_searchSettings);
     if (result.kind == AddressInputKind::Error) {
         setTrustStatus(result.error, true);
@@ -969,29 +972,57 @@ void MainWindow::navigateFromAddressBar()
     }
 }
 
-void MainWindow::showHistorySuggestions()
+void MainWindow::showAddressSuggestions()
 {
-    if (!m_historyCompletionPopup
-        || !m_preferences.saveBrowsingHistory()
-        || !m_historyStore
-        || !m_historyStore->isOpen()) {
+    if (!m_addressCompletionPopup) {
         return;
     }
     const QString input = m_address->text().trimmed();
     if (input.isEmpty()
         || input.startsWith(QLatin1Char('?'))
         || input.startsWith(QLatin1Char('@'))) {
-        m_historyCompletionPopup->hide();
+        m_addressCompletionPopup->hide();
         return;
     }
-    QString error;
-    const QList<HistorySuggestion> suggestions = m_historyStore->suggestions(input, 8, &error);
-    if (!error.isEmpty()) {
-        qWarning().noquote() << "[PanBrowser history]" << error;
-        m_historyCompletionPopup->hide();
-        return;
+    QList<AddressSuggestion> candidates;
+    if (m_bookmarkStore && m_bookmarkStore->isOpen()) {
+        QString error;
+        const QList<Bookmark> bookmarks = m_bookmarkStore->bookmarks(input, &error);
+        if (!error.isEmpty()) {
+            qWarning().noquote() << "[PanBrowser bookmarks]" << error;
+        } else {
+            for (const Bookmark &bookmark : bookmarks) {
+                candidates.append({
+                    bookmark.url,
+                    bookmark.title,
+                    bookmark.updatedAt,
+                    AddressSuggestionSource::Bookmark,
+                    0,
+                    0,
+                });
+            }
+        }
     }
-    m_historyCompletionPopup->showSuggestions(suggestions);
+    if (m_preferences.saveBrowsingHistory() && m_historyStore && m_historyStore->isOpen()) {
+        QString error;
+        const QList<HistorySuggestion> history = m_historyStore->suggestions(input, 8, &error);
+        if (!error.isEmpty()) {
+            qWarning().noquote() << "[PanBrowser history]" << error;
+        } else {
+            for (const HistorySuggestion &suggestion : history) {
+                candidates.append({
+                    suggestion.url,
+                    suggestion.title,
+                    suggestion.lastVisitedAt,
+                    AddressSuggestionSource::History,
+                    suggestion.typedCount,
+                    suggestion.visitCount,
+                });
+            }
+        }
+    }
+    const QList<AddressSuggestion> suggestions = rankedAddressSuggestions(candidates, input, 8);
+    m_addressCompletionPopup->showSuggestions(suggestions);
 }
 
 void MainWindow::editCurrentBookmark()
@@ -1078,8 +1109,8 @@ void MainWindow::openSettings()
     if (dialog.exec() == QDialog::Accepted) {
         m_preferences = dialog.preferences();
         m_searchSettings = dialog.searchSettings();
-        if (!m_preferences.saveBrowsingHistory() && m_historyCompletionPopup)
-            m_historyCompletionPopup->hide();
+        if (!m_preferences.saveBrowsingHistory() && m_addressCompletionPopup)
+            m_addressCompletionPopup->hide();
         updateAddressPlaceholder();
         m_profile->setPersistSessionCookies(m_preferences.persistSessionCookies());
         if (m_preferences.startupMode() == StartupMode::RestoreTabs)
@@ -1092,8 +1123,8 @@ void MainWindow::openSettings()
                 popup->m_searchSettings = m_searchSettings;
                 popup->updateAddressPlaceholder();
                 if (!m_preferences.saveBrowsingHistory()
-                    && popup->m_historyCompletionPopup) {
-                    popup->m_historyCompletionPopup->hide();
+                    && popup->m_addressCompletionPopup) {
+                    popup->m_addressCompletionPopup->hide();
                 }
             }
         }

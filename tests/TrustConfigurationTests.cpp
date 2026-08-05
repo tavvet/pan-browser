@@ -1,4 +1,5 @@
 #include "AddressLineEdit.h"
+#include "AddressSuggestion.h"
 #include "BookmarkStore.h"
 #include "BrowserPreferences.h"
 #include "BrowserDataCleanup.h"
@@ -58,6 +59,7 @@ private slots:
     void historyCanDeleteIndividualVisitsAndClearAll();
     void corruptHistoryIsPreservedAndDisabled();
     void ghostCompletionAcceptsOnlyAddressPrefixes();
+    void addressSuggestionsPreferRelevanceThenBookmarks();
 };
 
 void TrustConfigurationTests::exactDomainIsCaseInsensitive()
@@ -863,6 +865,60 @@ void TrustConfigurationTests::ghostCompletionAcceptsOnlyAddressPrefixes()
     QVERIFY(!address.hasGhostCompletion());
     QVERIFY(!address.acceptGhostCompletion());
     QCOMPARE(address.text(), QStringLiteral("news"));
+}
+
+void TrustConfigurationTests::addressSuggestionsPreferRelevanceThenBookmarks()
+{
+    const QDateTime old = QDateTime::fromSecsSinceEpoch(1000, QTimeZone::UTC);
+    const QDateTime recent = QDateTime::fromSecsSinceEpoch(2000, QTimeZone::UTC);
+    const QList<AddressSuggestion> candidates = {
+        {
+            QUrl(QStringLiteral("https://recent.test/?q=example.com")),
+            QStringLiteral("Recent weak bookmark"),
+            recent,
+            AddressSuggestionSource::Bookmark,
+        },
+        {
+            QUrl(QStringLiteral("https://example.com/")),
+            QStringLiteral("Exact history result"),
+            old,
+            AddressSuggestionSource::History,
+        },
+        {
+            QUrl(QStringLiteral("https://example.net/history")),
+            QStringLiteral("Prefix history"),
+            recent,
+            AddressSuggestionSource::History,
+        },
+        {
+            QUrl(QStringLiteral("https://example.net/bookmark")),
+            QStringLiteral("Prefix bookmark"),
+            old,
+            AddressSuggestionSource::Bookmark,
+        },
+        {
+            QUrl(QStringLiteral("https://example.net/bookmark")),
+            QStringLiteral("Duplicate history"),
+            recent,
+            AddressSuggestionSource::History,
+        },
+    };
+
+    const QList<AddressSuggestion> ranked = rankedAddressSuggestions(
+        candidates,
+        QStringLiteral("example.com"),
+        8
+    );
+    QCOMPARE(ranked.first().url.host(), QStringLiteral("example.com"));
+
+    const QList<AddressSuggestion> prefixRanked = rankedAddressSuggestions(
+        candidates,
+        QStringLiteral("example.net"),
+        8
+    );
+    QCOMPARE(prefixRanked.size(), 2);
+    QCOMPARE(prefixRanked.first().source, AddressSuggestionSource::Bookmark);
+    QCOMPARE(prefixRanked.first().title, QStringLiteral("Prefix bookmark"));
 }
 
 QTEST_MAIN(TrustConfigurationTests)

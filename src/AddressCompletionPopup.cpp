@@ -1,4 +1,4 @@
-#include "HistoryCompletionPopup.h"
+#include "AddressCompletionPopup.h"
 
 #include "AddressLineEdit.h"
 
@@ -6,6 +6,7 @@
 #include <QDate>
 #include <QGuiApplication>
 #include <QHideEvent>
+#include <QIcon>
 #include <QKeyEvent>
 #include <QListWidget>
 #include <QLocale>
@@ -45,7 +46,7 @@ QString inlineCompletionText(const QString &sourceInput, const QUrl &url)
 
 } // namespace
 
-HistoryCompletionPopup::HistoryCompletionPopup(
+AddressCompletionPopup::AddressCompletionPopup(
     AddressLineEdit *addressBar,
     QWidget *parent
 )
@@ -58,7 +59,7 @@ HistoryCompletionPopup::HistoryCompletionPopup(
     )
     , m_addressBar(addressBar)
 {
-    setObjectName(QStringLiteral("historyCompletionPopup"));
+    setObjectName(QStringLiteral("addressCompletionPopup"));
     setAttribute(Qt::WA_ShowWithoutActivating);
     setFocusPolicy(Qt::NoFocus);
 
@@ -66,7 +67,7 @@ HistoryCompletionPopup::HistoryCompletionPopup(
     layout->setContentsMargins(4, 4, 4, 4);
     layout->setSpacing(0);
     m_list = new QListWidget(this);
-    m_list->setObjectName(QStringLiteral("historyCompletionList"));
+    m_list->setObjectName(QStringLiteral("addressCompletionList"));
     m_list->setFocusPolicy(Qt::NoFocus);
     m_list->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     m_list->setSelectionMode(QAbstractItemView::SingleSelection);
@@ -78,14 +79,14 @@ HistoryCompletionPopup::HistoryCompletionPopup(
     });
 }
 
-HistoryCompletionPopup::~HistoryCompletionPopup()
+AddressCompletionPopup::~AddressCompletionPopup()
 {
     if (qApp)
         qApp->removeEventFilter(this);
 }
 
-void HistoryCompletionPopup::showSuggestions(
-    const QList<HistorySuggestion> &suggestions
+void AddressCompletionPopup::showSuggestions(
+    const QList<AddressSuggestion> &suggestions
 )
 {
     m_list->clear();
@@ -95,8 +96,8 @@ void HistoryCompletionPopup::showSuggestions(
     }
 
     const QDate today = QDate::currentDate();
-    for (const HistorySuggestion &suggestion : suggestions) {
-        const QDateTime localTime = suggestion.lastVisitedAt.toLocalTime();
+    for (const AddressSuggestion &suggestion : suggestions) {
+        const QDateTime localTime = suggestion.lastUsedAt.toLocalTime();
         const QString date = localTime.date() == today
             ? QLocale().toString(localTime.time(), QLocale::ShortFormat)
             : QLocale().toString(localTime, QLocale::ShortFormat);
@@ -105,15 +106,19 @@ void HistoryCompletionPopup::showSuggestions(
             : suggestion.title.trimmed();
         const QString address = suggestion.url.toDisplayString(QUrl::RemovePassword);
         auto *item = new QListWidgetItem(
-            QStringLiteral("%1\n%2   ·   %3").arg(title, address, date),
+            suggestion.source == AddressSuggestionSource::Bookmark
+                ? QStringLiteral("%1\n%2   ·   Bookmark   ·   %3").arg(title, address, date)
+                : QStringLiteral("%1\n%2   ·   %3").arg(title, address, date),
             m_list
         );
+        if (suggestion.source == AddressSuggestionSource::Bookmark)
+            item->setIcon(QIcon(QStringLiteral(":/assets/icons/star-filled.svg")));
         item->setData(Qt::UserRole, suggestion.url.toString(QUrl::FullyEncoded));
         item->setSizeHint(QSize(0, 52));
         item->setToolTip(address);
     }
     m_addressBar->clearGhostCompletion();
-    for (const HistorySuggestion &suggestion : suggestions) {
+    for (const AddressSuggestion &suggestion : suggestions) {
         const QString completion = inlineCompletionText(m_addressBar->text(), suggestion.url);
         if (completion.isEmpty())
             continue;
@@ -126,7 +131,7 @@ void HistoryCompletionPopup::showSuggestions(
     raise();
 }
 
-bool HistoryCompletionPopup::eventFilter(QObject *watched, QEvent *event)
+bool AddressCompletionPopup::eventFilter(QObject *watched, QEvent *event)
 {
     if (!isVisible())
         return QFrame::eventFilter(watched, event);
@@ -219,14 +224,14 @@ bool HistoryCompletionPopup::eventFilter(QObject *watched, QEvent *event)
     return QFrame::eventFilter(watched, event);
 }
 
-void HistoryCompletionPopup::hideEvent(QHideEvent *event)
+void AddressCompletionPopup::hideEvent(QHideEvent *event)
 {
     m_addressBar->clearGhostCompletion();
     updatePlacementStyle(QString());
     QFrame::hideEvent(event);
 }
 
-void HistoryCompletionPopup::activateCurrent()
+void AddressCompletionPopup::activateCurrent()
 {
     const QListWidgetItem *item = m_list->currentItem();
     if (!item)
@@ -238,7 +243,7 @@ void HistoryCompletionPopup::activateCurrent()
         emit urlActivated(url);
 }
 
-void HistoryCompletionPopup::positionBelowAddressBar()
+void AddressCompletionPopup::positionBelowAddressBar()
 {
     const QPoint below = m_addressBar->mapToGlobal(QPoint(0, m_addressBar->height() - 1));
     const int width = m_addressBar->width();
@@ -262,7 +267,7 @@ void HistoryCompletionPopup::positionBelowAddressBar()
     setGeometry(geometry);
 }
 
-void HistoryCompletionPopup::updatePlacementStyle(const QString &placement)
+void AddressCompletionPopup::updatePlacementStyle(const QString &placement)
 {
     if (property("placement").toString() == placement
         && m_addressBar->property("completionPlacement").toString() == placement) {

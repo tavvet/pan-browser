@@ -37,6 +37,8 @@ find_package(Qt6WebEngineWidgets 6.11 REQUIRED)
 set(PANBROWSER_APP_SOURCES
     src/AddressLineEdit.cpp
     src/AddressLineEdit.h
+    src/AddressSuggestion.cpp
+    src/AddressSuggestion.h
     src/BookmarkStore.cpp
     src/BookmarkStore.h
     src/BookmarkDialog.cpp
@@ -63,8 +65,8 @@ set(PANBROWSER_APP_SOURCES
     src/ExternalNavigationPolicy.h
     src/HistoryStore.cpp
     src/HistoryStore.h
-    src/HistoryCompletionPopup.cpp
-    src/HistoryCompletionPopup.h
+    src/AddressCompletionPopup.cpp
+    src/AddressCompletionPopup.h
     src/HistorySettingsPage.cpp
     src/HistorySettingsPage.h
     src/PermissionController.cpp
@@ -142,6 +144,8 @@ qt_add_executable(PanBrowserTests
     tests/TrustConfigurationTests.cpp
     src/AddressLineEdit.cpp
     src/AddressLineEdit.h
+    src/AddressSuggestion.cpp
+    src/AddressSuggestion.h
     src/BookmarkStore.cpp
     src/BookmarkStore.h
     src/BrowserDataCleanup.cpp
