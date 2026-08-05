@@ -156,7 +156,7 @@ MainWindow::MainWindow(
 
     createInterface();
     if (!m_historyError.isEmpty())
-        setTrustStatus(QStringLiteral("History unavailable: %1").arg(m_historyError), true);
+        setTrustStatus(tr("History unavailable: %1").arg(m_historyError), true);
     m_permissionController = new PermissionController(m_permissionPrompt, this);
     if (m_ownsBrowserResources) {
         restoreWindowPlacement();
@@ -227,7 +227,7 @@ void MainWindow::createInterface()
     m_tabStack->setObjectName(QStringLiteral("browserTabs"));
     setCentralWidget(m_tabStack);
 
-    QToolBar *tabsToolbar = new QToolBar(QStringLiteral("Tabs"), this);
+    QToolBar *tabsToolbar = new QToolBar(tr("Tabs"), this);
     tabsToolbar->setObjectName(QStringLiteral("tabsBar"));
     tabsToolbar->setMovable(false);
     tabsToolbar->setFloatable(false);
@@ -254,7 +254,7 @@ void MainWindow::createInterface()
     QToolButton *newTabButton = new QToolButton(tabsContainer);
     newTabButton->setObjectName(QStringLiteral("newTabButton"));
     newTabButton->setIcon(QIcon(QStringLiteral(":/assets/icons/plus.svg")));
-    newTabButton->setToolTip(QStringLiteral("New Tab (⌘T)"));
+    newTabButton->setToolTip(tr("New Tab (⌘T)"));
     tabsLayout->addWidget(newTabButton, 0, Qt::AlignBottom);
     tabsLayout->addStretch(1);
     tabsToolbar->addWidget(tabsContainer);
@@ -262,7 +262,7 @@ void MainWindow::createInterface()
     addToolBar(Qt::TopToolBarArea, tabsToolbar);
     addToolBarBreak(Qt::TopToolBarArea);
 
-    QToolBar *toolbar = new QToolBar(QStringLiteral("Navigation"), this);
+    QToolBar *toolbar = new QToolBar(tr("Navigation"), this);
     toolbar->setObjectName(QStringLiteral("navigationBar"));
     toolbar->setMovable(false);
     toolbar->setFloatable(false);
@@ -271,15 +271,15 @@ void MainWindow::createInterface()
 
     m_backAction = toolbar->addAction(
         QIcon(QStringLiteral(":/assets/icons/arrow-left.svg")),
-        QStringLiteral("Back")
+        tr("Back")
     );
     m_forwardAction = toolbar->addAction(
         QIcon(QStringLiteral(":/assets/icons/arrow-right.svg")),
-        QStringLiteral("Forward")
+        tr("Forward")
     );
     m_reloadAction = toolbar->addAction(
         QIcon(QStringLiteral(":/assets/icons/rotate-cw.svg")),
-        QStringLiteral("Reload")
+        tr("Reload")
     );
     m_backAction->setEnabled(false);
     m_forwardAction->setEnabled(false);
@@ -298,7 +298,7 @@ void MainWindow::createInterface()
         QLineEdit::TrailingPosition
     );
     m_bookmarkAction->setEnabled(false);
-    m_bookmarkAction->setToolTip(QStringLiteral("Add Bookmark (⌘D)"));
+    m_bookmarkAction->setToolTip(tr("Add Bookmark (⌘D)"));
     m_addressCompletionPopup = new AddressCompletionPopup(m_address, this);
     m_addressSuggestionTimer = new QTimer(this);
     m_addressSuggestionTimer->setSingleShot(true);
@@ -306,17 +306,17 @@ void MainWindow::createInterface()
     toolbar->addWidget(m_address);
     QAction *go = toolbar->addAction(
         QIcon(QStringLiteral(":/assets/icons/arrow-right.svg")),
-        QStringLiteral("Go")
+        tr("Go")
     );
     m_downloadButton = new DownloadButton(toolbar);
     m_downloadButton->setObjectName(QStringLiteral("downloadsButton"));
     m_downloadButton->setIcon(QIcon(QStringLiteral(":/assets/icons/download.svg")));
-    m_downloadButton->setToolTip(QStringLiteral("Downloads"));
+    m_downloadButton->setToolTip(tr("Downloads"));
     toolbar->addWidget(m_downloadButton);
     addToolBar(Qt::TopToolBarArea, toolbar);
 
     addToolBarBreak(Qt::TopToolBarArea);
-    m_findToolbar = new QToolBar(QStringLiteral("Find in page"), this);
+    m_findToolbar = new QToolBar(tr("Find in page"), this);
     m_findToolbar->setObjectName(QStringLiteral("findBar"));
     m_findToolbar->setMovable(false);
     m_findToolbar->setFloatable(false);
@@ -326,7 +326,7 @@ void MainWindow::createInterface()
     m_findToolbar->hide();
 
     addToolBarBreak(Qt::TopToolBarArea);
-    QToolBar *permissionToolbar = new QToolBar(QStringLiteral("Permission request"), this);
+    QToolBar *permissionToolbar = new QToolBar(tr("Permission request"), this);
     permissionToolbar->setObjectName(QStringLiteral("permissionBar"));
     permissionToolbar->setMovable(false);
     permissionToolbar->setFloatable(false);
@@ -433,17 +433,17 @@ void MainWindow::createInterface()
     );
     connect(m_bookmarkStore, &BookmarkStore::bookmarksChanged, this, &MainWindow::updateBookmarkAction);
 
-    QMenu *fileMenu = menuBar()->addMenu(QStringLiteral("PanBrowser"));
+    QMenu *fileMenu = menuBar()->addMenu(tr("PanBrowser"));
     QAction *newTabAction = fileMenu->addAction(
         QIcon(QStringLiteral(":/assets/icons/plus.svg")),
-        QStringLiteral("New Tab")
+        tr("New Tab")
     );
     newTabAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_T));
     connect(newTabAction, &QAction::triggered, this, [this] {
         createTab(m_preferences.startPage());
     });
 
-    QAction *closeTabAction = fileMenu->addAction(QStringLiteral("Close Tab"));
+    QAction *closeTabAction = fileMenu->addAction(tr("Close Tab"));
     closeTabAction->setShortcut(QKeySequence::Close);
     connect(closeTabAction, &QAction::triggered, this, [this] {
         closeTab(m_tabBar->currentIndex());
@@ -452,13 +452,13 @@ void MainWindow::createInterface()
     fileMenu->addSeparator();
     QAction *addBookmarkAction = fileMenu->addAction(
         QIcon(QStringLiteral(":/assets/icons/star.svg")),
-        QStringLiteral("Add Bookmark…")
+        tr("Add Bookmark…")
     );
     addBookmarkAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_D));
     connect(addBookmarkAction, &QAction::triggered, this, &MainWindow::editCurrentBookmark);
     QAction *bookmarksAction = fileMenu->addAction(
         QIcon(QStringLiteral(":/assets/icons/star-filled.svg")),
-        QStringLiteral("Bookmarks…")
+        tr("Bookmarks…")
     );
     bookmarksAction->setShortcut(QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_B));
     connect(bookmarksAction, &QAction::triggered, this, &MainWindow::openBookmarks);
@@ -466,11 +466,11 @@ void MainWindow::createInterface()
     fileMenu->addSeparator();
     QAction *findAction = fileMenu->addAction(
         QIcon(QStringLiteral(":/assets/icons/search.svg")),
-        QStringLiteral("Find in Page…")
+        tr("Find in Page…")
     );
     findAction->setShortcut(QKeySequence::Find);
     connect(findAction, &QAction::triggered, this, &MainWindow::openFindBar);
-    QAction *findNextAction = fileMenu->addAction(QStringLiteral("Find Next"));
+    QAction *findNextAction = fileMenu->addAction(tr("Find Next"));
     findNextAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_G));
     connect(findNextAction, &QAction::triggered, this, [this] {
         if (!m_findToolbar->isVisible())
@@ -478,7 +478,7 @@ void MainWindow::createInterface()
         else
             findInPage(false);
     });
-    QAction *findPreviousAction = fileMenu->addAction(QStringLiteral("Find Previous"));
+    QAction *findPreviousAction = fileMenu->addAction(tr("Find Previous"));
     findPreviousAction->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_G));
     connect(findPreviousAction, &QAction::triggered, this, [this] {
         if (!m_findToolbar->isVisible())
@@ -490,7 +490,7 @@ void MainWindow::createInterface()
     fileMenu->addSeparator();
     QAction *settingsAction = fileMenu->addAction(
         QIcon(QStringLiteral(":/assets/icons/settings.svg")),
-        QStringLiteral("Settings…")
+        tr("Settings…")
     );
     settingsAction->setMenuRole(QAction::NoRole);
     settingsAction->setShortcut(QKeySequence::Preferences);
@@ -499,14 +499,14 @@ void MainWindow::createInterface()
     fileMenu->addSeparator();
     QAction *reloadRulesAction = fileMenu->addAction(
         QIcon(QStringLiteral(":/assets/icons/rotate-cw.svg")),
-        QStringLiteral("Reload Trust Rules")
+        tr("Reload Trust Rules")
     );
     reloadRulesAction->setShortcut(QKeySequence(QStringLiteral("Ctrl+Shift+R")));
     connect(reloadRulesAction, &QAction::triggered, this, &MainWindow::reloadRules);
 
     QAction *showConfiguration = fileMenu->addAction(
         QIcon(QStringLiteral(":/assets/icons/folder-open.svg")),
-        QStringLiteral("Show Configuration Folder")
+        tr("Show Configuration Folder")
     );
     connect(showConfiguration, &QAction::triggered, this, [this] {
         QDesktopServices::openUrl(QUrl::fromLocalFile(
@@ -514,9 +514,9 @@ void MainWindow::createInterface()
         ));
     });
 
-    m_trustStatus = new QLabel(QStringLiteral("Ready"), this);
+    m_trustStatus = new QLabel(tr("Ready"), this);
     m_trustStatus->setObjectName(QStringLiteral("trustStatus"));
-    m_ruleCount = new QLabel(QStringLiteral("No rules loaded"), this);
+    m_ruleCount = new QLabel(tr("No rules loaded"), this);
     m_ruleCount->setObjectName(QStringLiteral("ruleCount"));
     m_progress = new QProgressBar(this);
     m_progress->setObjectName(QStringLiteral("pageProgress"));
@@ -595,7 +595,7 @@ QWebEngineView *MainWindow::createTab(
 
     const int stackIndex = m_tabStack->addWidget(webView);
     const QString initialTitle = restoredTitle.isEmpty()
-        ? (url.host().isEmpty() ? QStringLiteral("New Tab") : url.host())
+        ? (url.host().isEmpty() ? tr("New Tab") : url.host())
         : restoredTitle;
     const int tabIndex = m_tabBar->addTab(initialTitle);
     Q_ASSERT(stackIndex == tabIndex);
@@ -675,7 +675,7 @@ void MainWindow::connectBrowserSignals(QWebEngineView *webView)
         state.topLevelUrl = url;
         const int index = m_tabStack->indexOf(webView);
         if (index >= 0 && webView->title().isEmpty()) {
-            const QString label = url.host().isEmpty() ? QStringLiteral("New Tab") : url.host();
+            const QString label = url.host().isEmpty() ? tr("New Tab") : url.host();
             m_tabBar->setTabText(index, label);
             m_tabBar->setTabToolTip(index, url.toString());
         }
@@ -694,7 +694,7 @@ void MainWindow::connectBrowserSignals(QWebEngineView *webView)
         const int index = m_tabStack->indexOf(webView);
         if (index >= 0) {
             const QString label = title.isEmpty()
-                ? (webView->url().host().isEmpty() ? QStringLiteral("New Tab") : webView->url().host())
+                ? (webView->url().host().isEmpty() ? tr("New Tab") : webView->url().host())
                 : title;
             m_tabBar->setTabText(index, label);
             m_tabBar->setTabToolTip(index, title.isEmpty() ? webView->url().toString() : title);
@@ -733,7 +733,7 @@ void MainWindow::connectBrowserSignals(QWebEngineView *webView)
                 m_findBar->setSearching();
             }
         }
-        setTabTrustStatus(webView, QStringLiteral("Loading…"));
+        setTabTrustStatus(webView, tr("Loading…"));
         if (webView == currentWebView()) {
             m_progress->setValue(0);
             m_progress->show();
@@ -786,15 +786,15 @@ void MainWindow::connectBrowserSignals(QWebEngineView *webView)
             const QString scheme = webView->url().scheme().toLower();
             if (scheme == QStringLiteral("https")) {
                 if (state.lastAcceptedRule.isEmpty()) {
-                    setTabTrustStatus(webView, QStringLiteral("Secure · Chromium system trust"));
+                    setTabTrustStatus(webView, tr("Secure · Chromium system trust"));
                 }
             } else if (scheme == QStringLiteral("http")) {
-                setTabTrustStatus(webView, QStringLiteral("Not secure · HTTP connection"), true);
+                setTabTrustStatus(webView, tr("Not secure · HTTP connection"), true);
             } else {
-                setTabTrustStatus(webView, QStringLiteral("No HTTPS security information"));
+                setTabTrustStatus(webView, tr("No HTTPS security information"));
             }
         } else if (state.lastAcceptedRule.isEmpty()) {
-            setTabTrustStatus(webView, QStringLiteral("Page loading failed"), true);
+            setTabTrustStatus(webView, tr("Page loading failed"), true);
         }
         state.pendingHistoryTransition = HistoryTransition::Other;
         state.suppressNextHistoryVisit = false;
@@ -908,7 +908,7 @@ void MainWindow::handleExternalUrlRequest(QWebEngineView *webView, const QUrl &u
 
     const QUrl sourceUrl = webView->url();
     const QString source = sourceUrl.host().isEmpty()
-        ? QStringLiteral("The current page")
+        ? tr("The current page")
         : QStringLiteral("%1://%2").arg(sourceUrl.scheme(), sourceUrl.host());
     QString target = url.toDisplayString(QUrl::RemovePassword);
     constexpr qsizetype maximumDisplayedUrlLength = 700;
@@ -916,18 +916,18 @@ void MainWindow::handleExternalUrlRequest(QWebEngineView *webView, const QUrl &u
         target = target.left(maximumDisplayedUrlLength) + QStringLiteral("…");
 
     auto *dialog = new QMessageBox(this);
-    dialog->setWindowTitle(QStringLiteral("Open external application?"));
+    dialog->setWindowTitle(tr("Open external application?"));
     dialog->setIcon(QMessageBox::Question);
     dialog->setTextFormat(Qt::PlainText);
-    dialog->setText(QStringLiteral("Open this link in another application?"));
+    dialog->setText(tr("Open this link in another application?"));
     dialog->setInformativeText(
-        QStringLiteral("%1 wants to open:\n\n%2").arg(source, target)
+        tr("%1 wants to open:\n\n%2").arg(source, target)
     );
     auto *openButton = dialog->addButton(
-        QStringLiteral("Open application"),
+        tr("Open application"),
         QMessageBox::AcceptRole
     );
-    auto *cancelButton = dialog->addButton(QStringLiteral("Cancel"), QMessageBox::RejectRole);
+    auto *cancelButton = dialog->addButton(tr("Cancel"), QMessageBox::RejectRole);
     dialog->setDefaultButton(cancelButton);
     dialog->setEscapeButton(cancelButton);
     dialog->setWindowModality(Qt::WindowModal);
@@ -950,7 +950,7 @@ void MainWindow::handleExternalUrlRequest(QWebEngineView *webView, const QUrl &u
             return;
         if (!QDesktopServices::openUrl(url)) {
             statusBar()->showMessage(
-                QStringLiteral("No application is available for the %1 link").arg(url.scheme()),
+                tr("No application is available for the %1 link").arg(url.scheme()),
                 5000
             );
         }
@@ -1011,7 +1011,7 @@ void MainWindow::updateBookmarkAction()
     m_bookmarkAction->setEnabled(available);
     if (!available) {
         m_bookmarkAction->setIcon(QIcon(QStringLiteral(":/assets/icons/star.svg")));
-        m_bookmarkAction->setToolTip(QStringLiteral("Only web pages can be bookmarked"));
+        m_bookmarkAction->setToolTip(tr("Only web pages can be bookmarked"));
         return;
     }
 
@@ -1024,8 +1024,8 @@ void MainWindow::updateBookmarkAction()
                    : QStringLiteral(":/assets/icons/star.svg")
     ));
     m_bookmarkAction->setToolTip(
-        bookmarked ? QStringLiteral("Edit Bookmark (⌘D)")
-                   : QStringLiteral("Add Bookmark (⌘D)")
+        bookmarked ? tr("Edit Bookmark (⌘D)")
+                   : tr("Add Bookmark (⌘D)")
     );
 }
 
@@ -1035,8 +1035,8 @@ void MainWindow::updateAddressPlaceholder()
         return;
     const SearchEngineSettings *engine = m_searchSettings.defaultEngine();
     m_address->setPlaceholderText(
-        engine ? QStringLiteral("Search with %1 or enter an address").arg(engine->name)
-               : QStringLiteral("Enter an address")
+        engine ? tr("Search with %1 or enter an address").arg(engine->name)
+               : tr("Enter an address")
     );
 }
 
@@ -1202,7 +1202,7 @@ void MainWindow::editCurrentBookmark()
     QWebEngineView *webView = currentWebView();
     if (!webView || !m_bookmarkStore || !m_bookmarkStore->isOpen()) {
         statusBar()->showMessage(
-            m_bookmarkError.isEmpty() ? QStringLiteral("Bookmarks are unavailable")
+            m_bookmarkError.isEmpty() ? tr("Bookmarks are unavailable")
                                       : m_bookmarkError,
             5000
         );
@@ -1210,14 +1210,14 @@ void MainWindow::editCurrentBookmark()
     }
     const QUrl url = BookmarkStore::normalizedUrl(webView->url());
     if (!url.isValid()) {
-        statusBar()->showMessage(QStringLiteral("Only web pages can be bookmarked"), 4000);
+        statusBar()->showMessage(tr("Only web pages can be bookmarked"), 4000);
         return;
     }
 
     QString error;
     const std::optional<Bookmark> existing = m_bookmarkStore->bookmarkForUrl(url, &error);
     if (!error.isEmpty()) {
-        QMessageBox::warning(this, QStringLiteral("Bookmarks unavailable"), error);
+        QMessageBox::warning(this, tr("Bookmarks unavailable"), error);
         return;
     }
     const QString title = webView->title().trimmed().isEmpty()
@@ -1274,11 +1274,13 @@ void MainWindow::openSettings()
     );
     QString error;
     if (!dialog.load(&error)) {
-        setTrustStatus(QStringLiteral("Rules error: %1").arg(error), true);
+        setTrustStatus(tr("Rules error: %1").arg(error), true);
         return;
     }
 
     if (dialog.exec() == QDialog::Accepted) {
+        const bool languageChanged = m_preferences.interfaceLanguage()
+            != dialog.preferences().interfaceLanguage();
         m_preferences = dialog.preferences();
         m_searchSettings = dialog.searchSettings();
         if (!m_preferences.saveBrowsingHistory() && m_addressCompletionPopup)
@@ -1301,6 +1303,13 @@ void MainWindow::openSettings()
             }
         }
         reloadRules();
+        if (languageChanged) {
+            QMessageBox::information(
+                this,
+                tr("Restart required"),
+                tr("Restart PanBrowser to apply the new interface language.")
+            );
+        }
     }
 }
 
@@ -1399,16 +1408,16 @@ void MainWindow::reloadRulesLocal()
         m_configurationPath = ensureConfiguration();
     QString error;
     if (!m_trustPolicy.load(m_configurationPath, &error)) {
-        m_ruleCount->setText(QStringLiteral("Rules unavailable"));
-        setTrustStatus(QStringLiteral("Rules error: %1").arg(error), true);
+        m_ruleCount->setText(tr("Rules unavailable"));
+        setTrustStatus(tr("Rules error: %1").arg(error), true);
         return;
     }
 
     const qsizetype count = m_trustPolicy.ruleCount();
     m_ruleCount->setText(
-        QStringLiteral("%1 custom rule%2").arg(count).arg(count == 1 ? QString() : QStringLiteral("s"))
+        tr("%n custom rule(s)", nullptr, count)
     );
-    setTrustStatus(QStringLiteral("Trust rules loaded"));
+    setTrustStatus(tr("Trust rules loaded"));
 }
 
 void MainWindow::handleCertificateError(
@@ -1425,7 +1434,7 @@ void MainWindow::handleCertificateError(
                              << error.description();
         decision.rejectCertificate();
         setTabTrustStatus(webView,
-            QStringLiteral("Blocked %1: no matching trust rule").arg(host),
+            tr("Blocked %1: no matching trust rule").arg(host),
             true
         );
         return;
@@ -1434,7 +1443,7 @@ void MainWindow::handleCertificateError(
     if (!error.isOverridable()) {
         decision.rejectCertificate();
         setTabTrustStatus(webView,
-            QStringLiteral("Blocked %1: non-overridable certificate error").arg(host),
+            tr("Blocked %1: non-overridable certificate error").arg(host),
             true
         );
         return;
@@ -1443,7 +1452,7 @@ void MainWindow::handleCertificateError(
     if (error.type() != QWebEngineCertificateError::CertificateAuthorityInvalid) {
         decision.rejectCertificate();
         setTabTrustStatus(webView,
-            QStringLiteral("Blocked %1: only an unknown CA may be overridden").arg(host),
+            tr("Blocked %1: only an unknown CA may be overridden").arg(host),
             true
         );
         return;
@@ -1452,7 +1461,7 @@ void MainWindow::handleCertificateError(
     if (rule->mode == TrustMode::SystemOnly) {
         decision.rejectCertificate();
         setTabTrustStatus(webView,
-            QStringLiteral("Blocked %1: system validation failed").arg(host),
+            tr("Blocked %1: system validation failed").arg(host),
             true
         );
         return;
@@ -1472,14 +1481,14 @@ void MainWindow::handleCertificateError(
         if (isSameWebOrigin(error.url(), state.topLevelUrl)) {
             state.lastAcceptedRule = rule->name;
             setTabTrustStatus(webView,
-                QStringLiteral("Secure · %1 · %2").arg(rule->name, result.explanation)
+                tr("Secure · %1 · %2").arg(rule->name, result.explanation)
             );
         }
     } else {
         decision.rejectCertificate();
         qWarning().noquote() << "[PanBrowser TLS] rejected" << host << result.explanation;
         setTabTrustStatus(webView,
-            QStringLiteral("Blocked %1: %2").arg(host, result.explanation),
+            tr("Blocked %1: %2").arg(host, result.explanation),
             true
         );
     }
@@ -1500,7 +1509,7 @@ void MainWindow::setTabTrustStatus(QWebEngineView *webView, const QString &text,
 void MainWindow::setTrustStatus(const QString &text, bool error)
 {
     m_trustStatus->setText(text);
-    const bool secure = !error && text.startsWith(QStringLiteral("Secure"));
+    const bool secure = !error && text.startsWith(tr("Secure"));
     m_trustStatus->setProperty(
         "state",
         error ? QStringLiteral("error")

@@ -8,6 +8,7 @@
 #include "ExternalNavigationPolicy.h"
 #include "FindBar.h"
 #include "HistoryStore.h"
+#include "Localization.h"
 #include "PermissionPolicy.h"
 #include "SessionStore.h"
 #include "SearchSettings.h"
@@ -19,9 +20,11 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QSignalSpy>
+#include <QSettings>
 #include <QTemporaryDir>
 #include <QTest>
 #include <QTimeZone>
+#include <QTranslator>
 
 class TrustConfigurationTests final : public QObject {
     Q_OBJECT
@@ -40,6 +43,11 @@ private slots:
     void inaccessibleTitleAreaIsRecentered();
     void oversizedWindowFitsSmallerResolution();
     void browserPreferencesValidateStartPage();
+    void interfaceLanguagePreferenceRoundTrips();
+    void interfaceLanguageSettingsParsing();
+    void systemInterfaceLanguageUsesFirstSupportedLanguage();
+    void unsupportedSystemInterfaceLanguageFallsBackToEnglish();
+    void embeddedTranslationCatalogsLoad();
     void bookmarksRoundTripNormalizeAndSearch();
     void bookmarksCanBeEditedAndRemoved();
     void bookmarkEditRejectsDuplicateAddress();
@@ -429,6 +437,124 @@ void TrustConfigurationTests::browserPreferencesValidateStartPage()
 
     preferences.setStartPage(QUrl(QStringLiteral("https://example.com/start")));
     QVERIFY2(preferences.validate(&error), qPrintable(error));
+}
+
+void TrustConfigurationTests::interfaceLanguagePreferenceRoundTrips()
+{
+    BrowserPreferences preferences;
+    QCOMPARE(preferences.interfaceLanguage(), InterfaceLanguage::System);
+    preferences.setInterfaceLanguage(InterfaceLanguage::Russian);
+    QCOMPARE(preferences.interfaceLanguage(), InterfaceLanguage::Russian);
+
+    QCOMPARE(
+        LocalizationManager::resolveLanguage(InterfaceLanguage::English, {QStringLiteral("ru-RU")}),
+        QStringLiteral("en")
+    );
+    QCOMPARE(
+        LocalizationManager::resolveLanguage(InterfaceLanguage::Russian, {QStringLiteral("en-US")}),
+        QStringLiteral("ru")
+    );
+}
+
+void TrustConfigurationTests::interfaceLanguageSettingsParsing()
+{
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+    QSettings settings(directory.filePath(QStringLiteral("preferences.ini")), QSettings::IniFormat);
+
+    QCOMPARE(
+        BrowserPreferences::loadInterfaceLanguage(settings),
+        InterfaceLanguage::System
+    );
+    settings.setValue(QStringLiteral("Browser/language"), QStringLiteral("ru"));
+    QCOMPARE(
+        BrowserPreferences::loadInterfaceLanguage(settings),
+        InterfaceLanguage::Russian
+    );
+    settings.setValue(QStringLiteral("Browser/language"), QStringLiteral("en"));
+    QCOMPARE(
+        BrowserPreferences::loadInterfaceLanguage(settings),
+        InterfaceLanguage::English
+    );
+    settings.setValue(QStringLiteral("Browser/language"), QStringLiteral("unsupported"));
+    QCOMPARE(
+        BrowserPreferences::loadInterfaceLanguage(settings),
+        InterfaceLanguage::English
+    );
+}
+
+void TrustConfigurationTests::systemInterfaceLanguageUsesFirstSupportedLanguage()
+{
+    QCOMPARE(
+        LocalizationManager::resolveLanguage(
+            InterfaceLanguage::System,
+            {QStringLiteral("fi-FI"), QStringLiteral("ru-RU"), QStringLiteral("en-US")}
+        ),
+        QStringLiteral("ru")
+    );
+    QCOMPARE(
+        LocalizationManager::resolveLanguage(
+            InterfaceLanguage::System,
+            {QStringLiteral("en-GB"), QStringLiteral("ru-RU")}
+        ),
+        QStringLiteral("en")
+    );
+}
+
+void TrustConfigurationTests::unsupportedSystemInterfaceLanguageFallsBackToEnglish()
+{
+    QCOMPARE(
+        LocalizationManager::resolveLanguage(
+            InterfaceLanguage::System,
+            {QStringLiteral("fi-FI"), QStringLiteral("sv-SE")}
+        ),
+        QStringLiteral("en")
+    );
+    QCOMPARE(
+        LocalizationManager::resolveLanguage(InterfaceLanguage::System, {}),
+        QStringLiteral("en")
+    );
+}
+
+void TrustConfigurationTests::embeddedTranslationCatalogsLoad()
+{
+    QTranslator russian;
+    QVERIFY(russian.load(QStringLiteral(":/i18n/panbrowser_ru.qm")));
+    QVERIFY(QCoreApplication::installTranslator(&russian));
+    QCOMPARE(
+        QCoreApplication::translate("SettingsDialog", "Settings"),
+        QStringLiteral("Настройки")
+    );
+    QCOMPARE(
+        QCoreApplication::translate("QPlatformTheme", "Cancel"),
+        QStringLiteral("Отмена")
+    );
+    QCOMPARE(
+        QCoreApplication::translate("BookmarksDialog", "%n bookmark(s)", nullptr, 1),
+        QStringLiteral("1 закладка")
+    );
+    QCOMPARE(
+        QCoreApplication::translate("BookmarksDialog", "%n bookmark(s)", nullptr, 2),
+        QStringLiteral("2 закладки")
+    );
+    QCOMPARE(
+        QCoreApplication::translate("BookmarksDialog", "%n bookmark(s)", nullptr, 5),
+        QStringLiteral("5 закладок")
+    );
+    QVERIFY(QCoreApplication::removeTranslator(&russian));
+
+    QTranslator english;
+    QVERIFY(english.load(QStringLiteral(":/i18n/panbrowser_en.qm")));
+    QVERIFY(QCoreApplication::installTranslator(&english));
+    QCOMPARE(
+        QCoreApplication::translate("BookmarksDialog", "%n bookmark(s)", nullptr, 1),
+        QStringLiteral("1 bookmark")
+    );
+    QCOMPARE(
+        QCoreApplication::translate("BookmarksDialog", "%n bookmark(s)", nullptr, 2),
+        QStringLiteral("2 bookmarks")
+    );
+    QVERIFY(QCoreApplication::removeTranslator(&english));
 }
 
 void TrustConfigurationTests::bookmarksRoundTripNormalizeAndSearch()

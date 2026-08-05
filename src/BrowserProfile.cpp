@@ -1,5 +1,6 @@
 #include "BrowserProfile.h"
 
+#include <QCoreApplication>
 #include "BrowserDataCleanup.h"
 
 #include <QDir>
@@ -39,7 +40,10 @@ bool settingsSucceeded(const QSettings &settings, QString *error)
     if (settings.status() == QSettings::NoError)
         return true;
     if (error)
-        *error = QStringLiteral("Cannot update the pending data reset setting");
+        *error = QCoreApplication::translate(
+            "BrowserProfile",
+            "Cannot update the pending data reset setting"
+        );
     return false;
 }
 

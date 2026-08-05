@@ -31,6 +31,7 @@ find_package(Qt6 6.11 REQUIRED COMPONENTS
     Sql
     Svg
     Test
+    LinguistTools
     Widgets
 )
 find_package(Qt6WebEngineCore 6.11 REQUIRED)
@@ -69,6 +70,8 @@ set(PANBROWSER_APP_SOURCES
     src/FindBar.h
     src/HistoryStore.cpp
     src/HistoryStore.h
+    src/Localization.cpp
+    src/Localization.h
     src/AddressCompletionPopup.cpp
     src/AddressCompletionPopup.h
     src/HistorySettingsPage.cpp
@@ -198,6 +201,8 @@ qt_add_executable(PanBrowserTests
     src/FindBar.h
     src/HistoryStore.cpp
     src/HistoryStore.h
+    src/Localization.cpp
+    src/Localization.h
     src/PermissionPolicy.cpp
     src/PermissionPolicy.h
     src/SessionStore.cpp
@@ -234,5 +239,18 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     target_sources(PanBrowserTests PRIVATE src/CertificateTrustValidatorLinux.cpp)
     target_link_libraries(PanBrowserTests PRIVATE OpenSSL::Crypto)
 endif()
+
+qt_add_translations(
+    TARGETS PanBrowser PanBrowserTests
+    TS_FILES translations/panbrowser_ru.ts
+    PLURALS_TS_FILE translations/panbrowser_en.ts
+    SOURCES
+        ${PANBROWSER_APP_SOURCES}
+        src/CertificateTrustValidatorFallback.cpp
+        src/CertificateTrustValidatorLinux.cpp
+        src/CertificateTrustValidatorMac.mm
+        src/CertificateTrustValidatorWindows.cpp
+    RESOURCE_PREFIX "/i18n"
+)
 
 add_test(NAME PanBrowserTests COMMAND PanBrowserTests)

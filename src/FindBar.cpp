@@ -17,13 +17,13 @@ FindBar::FindBar(QWidget *parent)
     layout->setContentsMargins(12, 6, 10, 6);
     layout->setSpacing(7);
 
-    auto *label = new QLabel(QStringLiteral("Find in page"), this);
+    auto *label = new QLabel(tr("Find in page"), this);
     label->setObjectName(QStringLiteral("findLabel"));
     layout->addWidget(label);
 
     m_query = new QLineEdit(this);
     m_query->setObjectName(QStringLiteral("findInput"));
-    m_query->setPlaceholderText(QStringLiteral("Search this page"));
+    m_query->setPlaceholderText(tr("Search this page"));
     m_query->setClearButtonEnabled(true);
     m_query->installEventFilter(this);
     layout->addWidget(m_query, 1);
@@ -37,21 +37,21 @@ FindBar::FindBar(QWidget *parent)
     m_previous = new QToolButton(this);
     m_previous->setObjectName(QStringLiteral("findPrevious"));
     m_previous->setIcon(QIcon(QStringLiteral(":/assets/icons/chevron-up.svg")));
-    m_previous->setToolTip(QStringLiteral("Previous match (⇧⌘G)"));
+    m_previous->setToolTip(tr("Previous match (⇧⌘G)"));
     m_previous->setFocusPolicy(Qt::NoFocus);
     layout->addWidget(m_previous);
 
     m_next = new QToolButton(this);
     m_next->setObjectName(QStringLiteral("findNext"));
     m_next->setIcon(QIcon(QStringLiteral(":/assets/icons/chevron-down.svg")));
-    m_next->setToolTip(QStringLiteral("Next match (⌘G)"));
+    m_next->setToolTip(tr("Next match (⌘G)"));
     m_next->setFocusPolicy(Qt::NoFocus);
     layout->addWidget(m_next);
 
     auto *close = new QToolButton(this);
     close->setObjectName(QStringLiteral("findClose"));
     close->setIcon(QIcon(QStringLiteral(":/assets/icons/x.svg")));
-    close->setToolTip(QStringLiteral("Close find bar (Esc)"));
+    close->setToolTip(tr("Close find bar (Esc)"));
     close->setFocusPolicy(Qt::NoFocus);
     layout->addWidget(close);
 
@@ -92,11 +92,11 @@ void FindBar::setResults(int activeMatch, int numberOfMatches)
 {
     if (numberOfMatches <= 0) {
         m_result->setText(query().isEmpty() ? QStringLiteral("—")
-                                            : QStringLiteral("No matches"));
+                                            : tr("No matches"));
         updateNavigationButtons(false);
         return;
     }
-    m_result->setText(QStringLiteral("%1 of %2").arg(activeMatch).arg(numberOfMatches));
+    m_result->setText(tr("%1 of %2").arg(activeMatch).arg(numberOfMatches));
     updateNavigationButtons(true);
 }
 

@@ -21,7 +21,7 @@ BookmarkDialog::BookmarkDialog(
     , m_existing(existing)
 {
     setObjectName(QStringLiteral("bookmarkDialog"));
-    setWindowTitle(existing ? QStringLiteral("Edit Bookmark") : QStringLiteral("Add Bookmark"));
+    setWindowTitle(existing ? tr("Edit Bookmark") : tr("Add Bookmark"));
     setWindowIcon(QIcon(QStringLiteral(":/assets/icons/star.svg")));
     setModal(true);
     resize(520, 230);
@@ -31,7 +31,7 @@ BookmarkDialog::BookmarkDialog(
     layout->setContentsMargins(24, 22, 24, 20);
     layout->setSpacing(14);
     auto *heading = new QLabel(
-        existing ? QStringLiteral("Edit bookmark") : QStringLiteral("Add bookmark"),
+        existing ? tr("Edit bookmark") : tr("Add bookmark"),
         this
     );
     heading->setObjectName(QStringLiteral("dialogTitle"));
@@ -42,20 +42,20 @@ BookmarkDialog::BookmarkDialog(
     form->setVerticalSpacing(11);
     m_title = new QLineEdit(existing ? existing->title : suggestedTitle, this);
     m_title->setObjectName(QStringLiteral("bookmarkTitle"));
-    m_title->setPlaceholderText(QStringLiteral("Bookmark title"));
+    m_title->setPlaceholderText(tr("Bookmark title"));
     m_url = new QLineEdit(
         (existing ? existing->url : url).toDisplayString(QUrl::RemovePassword),
         this
     );
     m_url->setObjectName(QStringLiteral("bookmarkUrl"));
-    form->addRow(QStringLiteral("Title"), m_title);
-    form->addRow(QStringLiteral("Address"), m_url);
+    form->addRow(tr("Title"), m_title);
+    form->addRow(tr("Address"), m_url);
     layout->addLayout(form);
 
     auto *buttonsLayout = new QHBoxLayout();
     QPushButton *remove = nullptr;
     if (existing) {
-        remove = new QPushButton(QStringLiteral("Remove Bookmark"), this);
+        remove = new QPushButton(tr("Remove Bookmark"), this);
         remove->setObjectName(QStringLiteral("dangerButton"));
         buttonsLayout->addWidget(remove);
     }
@@ -66,7 +66,7 @@ BookmarkDialog::BookmarkDialog(
         this
     );
     buttons->button(QDialogButtonBox::Save)->setText(
-        existing ? QStringLiteral("Save Changes") : QStringLiteral("Add Bookmark")
+        existing ? tr("Save Changes") : tr("Add Bookmark")
     );
     buttonsLayout->addWidget(buttons);
     layout->addLayout(buttonsLayout);
@@ -87,7 +87,7 @@ void BookmarkDialog::saveBookmark()
         ? m_store->update(m_existing->id, url, m_title->text(), QDateTime::currentDateTimeUtc(), &error)
         : m_store->addOrUpdate(url, m_title->text(), QDateTime::currentDateTimeUtc(), &error);
     if (!saved) {
-        QMessageBox::warning(this, QStringLiteral("Cannot save bookmark"), error);
+        QMessageBox::warning(this, tr("Cannot save bookmark"), error);
         return;
     }
     accept();
@@ -99,7 +99,7 @@ void BookmarkDialog::removeBookmark()
         return;
     QString error;
     if (!m_store->remove(m_existing->id, &error)) {
-        QMessageBox::warning(this, QStringLiteral("Cannot remove bookmark"), error);
+        QMessageBox::warning(this, tr("Cannot remove bookmark"), error);
         return;
     }
     accept();

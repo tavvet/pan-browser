@@ -260,6 +260,21 @@ the prompt queue.
 When adding a WebEngine capability, decide explicitly whether it belongs in
 `PermissionPolicy`; never rely only on Chromium's default prompt behavior.
 
+### 6.1 Localization
+
+English source strings are the fallback. `LocalizationManager` resolves the
+saved `InterfaceLanguage` before `MainWindow` is constructed: an explicit
+English or Russian choice wins, while `System` selects the first supported
+entry from `QLocale::system().uiLanguages()` and otherwise falls back to
+English. Unknown persisted values also fail safely to English.
+
+`qt_add_translations` embeds `panbrowser_ru.qm` and the English plural-only
+catalog under `:/i18n`. A small `QPlatformTheme` context in the application
+catalog covers standard dialog buttons without requiring the separately
+distributed Qt translation package. The first implementation applies language
+changes after restart; rebuilding every manually constructed widget in live
+WebEngine windows would add avoidable state and lifecycle risk.
+
 ## 7. Persistent data and privacy boundaries
 
 On macOS, application data is rooted at
@@ -278,7 +293,7 @@ On macOS, application data is rooted at
 | `bookmarks.sqlite` | `BookmarkStore` | WAL-mode SQLite bookmarks with normalized URL and title fields for local lookup. |
 | `session.json` | `SessionStore` | Up to 30 restorable HTTP(S) tabs, atomically written. |
 | `downloads.json` | `DownloadHistoryStore` | Up to 200 download records; paths and source host, not complete source URLs. |
-| native `QSettings` | `BrowserPreferences`, window/download UI | Start page, startup/cookie/history choices, window geometry, last download directory, and pending data-reset marker. |
+| native `QSettings` | `BrowserPreferences`, window/download UI | Start page, startup/cookie/history/language choices, window geometry, last download directory, and pending data-reset marker. |
 
 Session cookies are discarded by default. Enabling “keep sign-ins” changes the
 profile to `ForcePersistentCookies`; otherwise only cookies explicitly marked
@@ -533,6 +548,14 @@ by assumption.
 Add it to `BrowserPreferences`, validate before save, expose it in
 `SettingsDialog`, decide whether popup windows need a live copy, and include it
 in rollback behavior if saving it can precede another settings mutation.
+
+### Adding or changing interface text
+
+Use `tr()` in `QObject` classes or `QCoreApplication::translate()` with a stable
+context elsewhere. Never translate settings keys, JSON field names, schemes,
+paths, object names, or diagnostic log tags. Run the `update_translations`
+target, fill every new Russian entry, preserve English plural forms, and verify
+that `lrelease` reports no unfinished translations.
 
 ### Adding a WebEngine signal or capability
 

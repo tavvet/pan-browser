@@ -1,9 +1,12 @@
 #include "MainWindow.h"
+#include "BrowserPreferences.h"
+#include "Localization.h"
 
 #include <QApplication>
 #include <QCoreApplication>
 #include <QIcon>
 #include <QStyleFactory>
+#include <QLocale>
 
 int main(int argc, char *argv[])
 {
@@ -16,6 +19,13 @@ int main(int argc, char *argv[])
     // Window preferences use an explicit QSettings identity instead.
     QCoreApplication::setOrganizationName(QString());
     QCoreApplication::setOrganizationDomain(QStringLiteral("panbrowser.dev"));
+
+    LocalizationManager localization;
+    localization.install(
+        application,
+        BrowserPreferences::loadInterfaceLanguage(),
+        QLocale::system().uiLanguages()
+    );
 
     MainWindow window;
     window.show();

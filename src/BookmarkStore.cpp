@@ -1,5 +1,6 @@
 #include "BookmarkStore.h"
 
+#include <QCoreApplication>
 #include <QDir>
 #include <QFileInfo>
 #include <QSqlError>
@@ -57,7 +58,10 @@ std::optional<bool> bookmarkAddressBelongsToAnother(
     query.addBindValue(storedUrl(url));
     query.addBindValue(id);
     if (!query.exec()) {
-        fail(error, databaseError(QStringLiteral("Cannot check bookmark address"), query));
+        fail(error, databaseError(
+            QCoreApplication::translate("BookmarkStore", "Cannot check bookmark address"),
+            query
+        ));
         return std::nullopt;
     }
     return query.next();
@@ -91,7 +95,7 @@ bool BookmarkStore::open(QString *error)
     if (isOpen())
         return true;
     if (!QDir().mkpath(QFileInfo(m_path).absolutePath()))
-        return fail(error, QStringLiteral("Cannot create bookmarks directory"));
+        return fail(error, tr("Cannot create bookmarks directory"));
 
     m_database = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), m_connectionName);
     m_database.setDatabaseName(m_path);
@@ -99,14 +103,14 @@ bool BookmarkStore::open(QString *error)
     if (!m_database.open()) {
         return fail(
             error,
-            QStringLiteral("Cannot open bookmarks: %1").arg(m_database.lastError().text())
+            tr("Cannot open bookmarks: %1").arg(m_database.lastError().text())
         );
     }
 
     QSqlQuery pragma(m_database);
     if (!pragma.exec(QStringLiteral("PRAGMA journal_mode = WAL"))) {
         const QString message = databaseError(
-            QStringLiteral("Cannot enable bookmarks journal"),
+            tr("Cannot enable bookmarks journal"),
             pragma
         );
         m_database.close();
@@ -114,7 +118,7 @@ bool BookmarkStore::open(QString *error)
     }
     if (!pragma.exec(QStringLiteral("PRAGMA synchronous = NORMAL"))) {
         const QString message = databaseError(
-            QStringLiteral("Cannot configure bookmarks journal"),
+            tr("Cannot configure bookmarks journal"),
             pragma
         );
         m_database.close();
@@ -140,7 +144,7 @@ QString BookmarkStore::path() const
 std::optional<Bookmark> BookmarkStore::bookmarkForUrl(const QUrl &sourceUrl, QString *error) const
 {
     if (!isOpen()) {
-        fail(error, QStringLiteral("Bookmarks are unavailable"));
+        fail(error, tr("Bookmarks are unavailable"));
         return std::nullopt;
     }
     const QUrl url = normalizedUrl(sourceUrl);
@@ -153,7 +157,7 @@ std::optional<Bookmark> BookmarkStore::bookmarkForUrl(const QUrl &sourceUrl, QSt
     ));
     query.addBindValue(storedUrl(url));
     if (!query.exec()) {
-        fail(error, databaseError(QStringLiteral("Cannot find bookmark"), query));
+        fail(error, databaseError(tr("Cannot find bookmark"), query));
         return std::nullopt;
     }
     if (!query.next())
@@ -165,7 +169,7 @@ QList<Bookmark> BookmarkStore::bookmarks(const QString &sourceFilter, QString *e
 {
     QList<Bookmark> result;
     if (!isOpen()) {
-        fail(error, QStringLiteral("Bookmarks are unavailable"));
+        fail(error, tr("Bookmarks are unavailable"));
         return result;
     }
 
@@ -188,7 +192,7 @@ QList<Bookmark> BookmarkStore::bookmarks(const QString &sourceFilter, QString *e
         query.addBindValue(pattern);
     }
     if (!query.exec()) {
-        fail(error, databaseError(QStringLiteral("Cannot read bookmarks"), query));
+        fail(error, databaseError(tr("Cannot read bookmarks"), query));
         return result;
     }
     while (query.next())
@@ -204,14 +208,14 @@ bool BookmarkStore::addOrUpdate(
 )
 {
     if (!isOpen())
-        return fail(error, QStringLiteral("Bookmarks are unavailable"));
+        return fail(error, tr("Bookmarks are unavailable"));
     const QUrl url = normalizedUrl(sourceUrl);
     if (!url.isValid())
-        return fail(error, QStringLiteral("Only HTTP and HTTPS pages can be bookmarked"));
+        return fail(error, tr("Only HTTP and HTTPS pages can be bookmarked"));
     const QString title = sourceTitle.trimmed().isEmpty() ? url.host() : sourceTitle.trimmed();
     const qint64 timestamp = updatedAt.toUTC().toMSecsSinceEpoch();
     if (timestamp <= 0)
-        return fail(error, QStringLiteral("Bookmark date is invalid"));
+        return fail(error, tr("Bookmark date is invalid"));
 
     QSqlQuery query(m_database);
     query.prepare(QStringLiteral(
@@ -229,7 +233,7 @@ bool BookmarkStore::addOrUpdate(
     query.addBindValue(timestamp);
     query.addBindValue(timestamp);
     if (!query.exec())
-        return fail(error, databaseError(QStringLiteral("Cannot save bookmark"), query));
+        return fail(error, databaseError(tr("Cannot save bookmark"), query));
     emit bookmarksChanged();
     return true;
 }
@@ -243,16 +247,16 @@ bool BookmarkStore::update(
 )
 {
     if (!isOpen())
-        return fail(error, QStringLiteral("Bookmarks are unavailable"));
+        return fail(error, tr("Bookmarks are unavailable"));
     if (id <= 0)
-        return fail(error, QStringLiteral("Bookmark id is invalid"));
+        return fail(error, tr("Bookmark id is invalid"));
     const QUrl url = normalizedUrl(sourceUrl);
     if (!url.isValid())
-        return fail(error, QStringLiteral("Only HTTP and HTTPS pages can be bookmarked"));
+        return fail(error, tr("Only HTTP and HTTPS pages can be bookmarked"));
     const QString title = sourceTitle.trimmed().isEmpty() ? url.host() : sourceTitle.trimmed();
     const qint64 timestamp = updatedAt.toUTC().toMSecsSinceEpoch();
     if (timestamp <= 0)
-        return fail(error, QStringLiteral("Bookmark date is invalid"));
+        return fail(error, tr("Bookmark date is invalid"));
 
     const std::optional<bool> conflict = bookmarkAddressBelongsToAnother(
         m_database,
@@ -265,7 +269,7 @@ bool BookmarkStore::update(
     if (*conflict) {
         return fail(
             error,
-            QStringLiteral("A bookmark for this address already exists")
+            tr("A bookmark for this address already exists")
         );
     }
 
@@ -282,7 +286,7 @@ bool BookmarkStore::update(
     query.addBindValue(id);
     if (!query.exec()) {
         const QString updateError = databaseError(
-            QStringLiteral("Cannot update bookmark"),
+            tr("Cannot update bookmark"),
             query
         );
         const std::optional<bool> concurrentConflict = bookmarkAddressBelongsToAnother(
@@ -294,13 +298,13 @@ bool BookmarkStore::update(
         if (concurrentConflict && *concurrentConflict) {
             return fail(
                 error,
-                QStringLiteral("A bookmark for this address already exists")
+                tr("A bookmark for this address already exists")
             );
         }
         return fail(error, updateError);
     }
     if (query.numRowsAffected() == 0)
-        return fail(error, QStringLiteral("Bookmark no longer exists"));
+        return fail(error, tr("Bookmark no longer exists"));
     emit bookmarksChanged();
     return true;
 }
@@ -315,9 +319,9 @@ bool BookmarkStore::remove(const QList<qint64> &ids, QString *error)
     if (ids.isEmpty())
         return true;
     if (!isOpen())
-        return fail(error, QStringLiteral("Bookmarks are unavailable"));
+        return fail(error, tr("Bookmarks are unavailable"));
     if (!m_database.transaction())
-        return fail(error, QStringLiteral("Cannot start bookmark deletion"));
+        return fail(error, tr("Cannot start bookmark deletion"));
     QSqlQuery query(m_database);
     query.prepare(QStringLiteral("DELETE FROM bookmarks WHERE id = ?"));
     bool changed = false;
@@ -327,13 +331,13 @@ bool BookmarkStore::remove(const QList<qint64> &ids, QString *error)
         query.bindValue(0, id);
         if (!query.exec()) {
             m_database.rollback();
-            return fail(error, databaseError(QStringLiteral("Cannot remove bookmark"), query));
+            return fail(error, databaseError(tr("Cannot remove bookmark"), query));
         }
         changed = changed || query.numRowsAffected() > 0;
     }
     if (!m_database.commit()) {
         const QString message = databaseError(
-            QStringLiteral("Cannot commit bookmark deletion"),
+            tr("Cannot commit bookmark deletion"),
             m_database
         );
         m_database.rollback();
@@ -347,7 +351,7 @@ bool BookmarkStore::remove(const QList<qint64> &ids, QString *error)
 bool BookmarkStore::removeUrl(const QUrl &sourceUrl, QString *error)
 {
     if (!isOpen())
-        return fail(error, QStringLiteral("Bookmarks are unavailable"));
+        return fail(error, tr("Bookmarks are unavailable"));
     const QUrl url = normalizedUrl(sourceUrl);
     if (!url.isValid())
         return true;
@@ -355,7 +359,7 @@ bool BookmarkStore::removeUrl(const QUrl &sourceUrl, QString *error)
     query.prepare(QStringLiteral("DELETE FROM bookmarks WHERE url = ?"));
     query.addBindValue(storedUrl(url));
     if (!query.exec())
-        return fail(error, databaseError(QStringLiteral("Cannot remove bookmark"), query));
+        return fail(error, databaseError(tr("Cannot remove bookmark"), query));
     if (query.numRowsAffected() > 0)
         emit bookmarksChanged();
     return true;
@@ -364,10 +368,10 @@ bool BookmarkStore::removeUrl(const QUrl &sourceUrl, QString *error)
 bool BookmarkStore::clear(QString *error)
 {
     if (!isOpen())
-        return fail(error, QStringLiteral("Bookmarks are unavailable"));
+        return fail(error, tr("Bookmarks are unavailable"));
     QSqlQuery query(m_database);
     if (!query.exec(QStringLiteral("DELETE FROM bookmarks")))
-        return fail(error, databaseError(QStringLiteral("Cannot clear bookmarks"), query));
+        return fail(error, databaseError(tr("Cannot clear bookmarks"), query));
     emit bookmarksChanged();
     return true;
 }
@@ -400,20 +404,20 @@ bool BookmarkStore::createSchema(QString *error)
     if (!version.exec(QStringLiteral("PRAGMA user_version")) || !version.next()) {
         return fail(
             error,
-            databaseError(QStringLiteral("Cannot read bookmarks version"), version)
+            databaseError(tr("Cannot read bookmarks version"), version)
         );
     }
     const int schemaVersion = version.value(0).toInt();
     if (schemaVersion != 0 && schemaVersion != 1) {
         return fail(
             error,
-            QStringLiteral("Unsupported bookmarks version: %1").arg(schemaVersion)
+            tr("Unsupported bookmarks version: %1").arg(schemaVersion)
         );
     }
     if (!m_database.transaction()) {
         return fail(
             error,
-            QStringLiteral("Cannot start bookmarks schema transaction")
+            tr("Cannot start bookmarks schema transaction")
         );
     }
 
@@ -439,13 +443,13 @@ bool BookmarkStore::createSchema(QString *error)
             m_database.rollback();
             return fail(
                 error,
-                databaseError(QStringLiteral("Cannot create bookmarks schema"), query)
+                databaseError(tr("Cannot create bookmarks schema"), query)
             );
         }
     }
     if (!m_database.commit()) {
         const QString message = databaseError(
-            QStringLiteral("Cannot commit bookmarks schema"),
+            tr("Cannot commit bookmarks schema"),
             m_database
         );
         m_database.rollback();

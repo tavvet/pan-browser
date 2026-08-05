@@ -19,6 +19,7 @@
 - [x] Address-bar search with configurable built-in and custom search engines.
 - [x] Local browsing history with management controls and ranked address-bar completion.
 - [x] Runtime diagnostics page with application, Chromium, graphics, and profile details.
+- [x] English and Russian interface localization with system-language detection and explicit override.
 
 ## Browser essentials
 

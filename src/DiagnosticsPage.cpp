@@ -33,12 +33,16 @@ QLabel *valueLabel(const QString &text, QWidget *parent)
 QString environmentValue(const char *name)
 {
     const QString value = qEnvironmentVariable(name).trimmed();
-    return value.isEmpty() ? QStringLiteral("Not set") : value;
+    return value.isEmpty()
+        ? QCoreApplication::translate("DiagnosticsPage", "Not set")
+        : value;
 }
 
 QString enabledText(bool enabled)
 {
-    return enabled ? QStringLiteral("Enabled") : QStringLiteral("Disabled");
+    return enabled
+        ? QCoreApplication::translate("DiagnosticsPage", "Enabled")
+        : QCoreApplication::translate("DiagnosticsPage", "Disabled");
 }
 
 bool containsCommandLineFlag(const QString &arguments, const QString &flag)
@@ -97,39 +101,39 @@ DiagnosticsPage::DiagnosticsPage(BrowserProfile *profile, QWidget *parent)
     scroll->setWidget(content);
     rootLayout->addWidget(scroll);
 
-    auto *title = new QLabel(QStringLiteral("Diagnostics"), this);
+    auto *title = new QLabel(tr("Diagnostics"), this);
     title->setObjectName(QStringLiteral("dialogTitle"));
     layout->addWidget(title);
     auto *subtitle = new QLabel(
-        QStringLiteral("Runtime versions, graphics configuration, and profile locations."),
+        tr("Runtime versions, graphics configuration, and profile locations."),
         this
     );
     subtitle->setObjectName(QStringLiteral("dialogSubtitle"));
     layout->addWidget(subtitle);
 
-    addSectionLabel(layout, QStringLiteral("RUNTIME"), this);
+    addSectionLabel(layout, tr("RUNTIME"), this);
     QFormLayout *runtime = addCard(layout, this);
     runtime->addRow(
-        QStringLiteral("PanBrowser"),
+        tr("PanBrowser"),
         valueLabel(QCoreApplication::applicationVersion(), this)
     );
-    runtime->addRow(QStringLiteral("Qt"), valueLabel(QString::fromLatin1(qVersion()), this));
+    runtime->addRow(tr("Qt"), valueLabel(QString::fromLatin1(qVersion()), this));
     runtime->addRow(
-        QStringLiteral("Qt WebEngine"),
+        tr("Qt WebEngine"),
         valueLabel(QString::fromLatin1(qWebEngineVersion()), this)
     );
     runtime->addRow(
-        QStringLiteral("Chromium"),
+        tr("Chromium"),
         valueLabel(QString::fromLatin1(qWebEngineChromiumVersion()), this)
     );
     runtime->addRow(
-        QStringLiteral("Chromium security patch"),
+        tr("Chromium security patch"),
         valueLabel(QString::fromLatin1(qWebEngineChromiumSecurityPatchVersion()), this)
     );
-    runtime->addRow(QStringLiteral("Operating system"), valueLabel(QSysInfo::prettyProductName(), this));
-    runtime->addRow(QStringLiteral("Architecture"), valueLabel(QSysInfo::currentCpuArchitecture(), this));
+    runtime->addRow(tr("Operating system"), valueLabel(QSysInfo::prettyProductName(), this));
+    runtime->addRow(tr("Architecture"), valueLabel(QSysInfo::currentCpuArchitecture(), this));
 
-    addSectionLabel(layout, QStringLiteral("GRAPHICS & SECURITY"), this);
+    addSectionLabel(layout, tr("GRAPHICS & SECURITY"), this);
     QFormLayout *graphics = addCard(layout, this);
     const QString chromiumFlags = qEnvironmentVariable("QTWEBENGINE_CHROMIUM_FLAGS");
     const QString applicationArguments = QCoreApplication::arguments().join(QLatin1Char(' '));
@@ -139,59 +143,59 @@ DiagnosticsPage::DiagnosticsPage(BrowserProfile *profile, QWidget *parent)
         || containsCommandLineFlag(chromiumFlags, QStringLiteral("--no-sandbox"))
         || containsCommandLineFlag(applicationArguments, QStringLiteral("--no-sandbox"));
     graphics->addRow(
-        QStringLiteral("GPU acceleration"),
+        tr("GPU acceleration"),
         valueLabel(
             gpuDisabled
-                ? QStringLiteral("Forced off by runtime flag")
-                : QStringLiteral("Automatic — hardware preferred, software fallback"),
+                ? tr("Forced off by runtime flag")
+                : tr("Automatic — hardware preferred, software fallback"),
             this
         )
     );
     graphics->addRow(
-        QStringLiteral("WebGL"),
+        tr("WebGL"),
         valueLabel(enabledText(m_profile->settings()->testAttribute(
             QWebEngineSettings::WebGLEnabled
         )), this)
     );
     graphics->addRow(
-        QStringLiteral("Accelerated 2D canvas"),
+        tr("Accelerated 2D canvas"),
         valueLabel(enabledText(m_profile->settings()->testAttribute(
             QWebEngineSettings::Accelerated2dCanvasEnabled
         )), this)
     );
     graphics->addRow(
-        QStringLiteral("Chromium sandbox"),
-        valueLabel(sandboxDisabled ? QStringLiteral("Disabled by runtime flag")
-                                   : QStringLiteral("Enabled"), this)
+        tr("Chromium sandbox"),
+        valueLabel(sandboxDisabled ? tr("Disabled by runtime flag")
+                                   : tr("Enabled"), this)
     );
     graphics->addRow(
-        QStringLiteral("RHI backend override"),
+        tr("RHI backend override"),
         valueLabel(environmentValue("QSG_RHI_BACKEND"), this)
     );
     graphics->addRow(
-        QStringLiteral("Chromium flags"),
+        tr("Chromium flags"),
         valueLabel(environmentValue("QTWEBENGINE_CHROMIUM_FLAGS"), this)
     );
 
     auto *graphicsHint = new QLabel(
-        QStringLiteral("“Automatic” means Chromium attempts to use the GPU and falls back when necessary. For the exact active GPU and ANGLE/RHI backend, launch PanBrowser with QT_LOGGING_RULES=\"qt.webenginecontext=true;qt.webengine.compositor=true\"."),
+        tr("“Automatic” means Chromium attempts to use the GPU and falls back when necessary. For the exact active GPU and ANGLE/RHI backend, launch PanBrowser with QT_LOGGING_RULES=\"qt.webenginecontext=true;qt.webengine.compositor=true\"."),
         this
     );
     graphicsHint->setObjectName(QStringLiteral("fieldHint"));
     graphicsHint->setWordWrap(true);
     layout->addWidget(graphicsHint);
 
-    addSectionLabel(layout, QStringLiteral("PROFILE"), this);
+    addSectionLabel(layout, tr("PROFILE"), this);
     QFormLayout *paths = addCard(layout, this);
     paths->addRow(
-        QStringLiteral("Persistent storage"),
+        tr("Persistent storage"),
         valueLabel(m_profile->persistentStoragePath(), this)
     );
-    paths->addRow(QStringLiteral("HTTP cache"), valueLabel(m_profile->cachePath(), this));
+    paths->addRow(tr("HTTP cache"), valueLabel(m_profile->cachePath(), this));
 
     auto *actions = new QHBoxLayout();
-    auto *copy = new QPushButton(QStringLiteral("Copy diagnostic report"), this);
-    auto *copied = new QLabel(QStringLiteral("Copied."), this);
+    auto *copy = new QPushButton(tr("Copy diagnostic report"), this);
+    auto *copied = new QLabel(tr("Copied."), this);
     copied->setObjectName(QStringLiteral("dataActionStatus"));
     copied->hide();
     actions->addWidget(copy);

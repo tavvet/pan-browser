@@ -1,5 +1,6 @@
 #include "CertificateTrustValidator.h"
 
+#include <QCoreApplication>
 #include <windows.h>
 #include <wincrypt.h>
 
@@ -143,7 +144,7 @@ bool addCertificate(HCERTSTORE store, const QSslCertificate &certificate, QStrin
 {
     const QByteArray der = certificate.toDer();
     if (!canPassToCryptoApi(der)) {
-        *error = QStringLiteral("Cannot convert a certificate to DER");
+        *error = QCoreApplication::translate("CertificateTrustValidator", "Cannot convert a certificate to DER");
         return false;
     }
     if (!CertAddEncodedCertificateToStore(
@@ -153,7 +154,7 @@ bool addCertificate(HCERTSTORE store, const QSslCertificate &certificate, QStrin
             static_cast<DWORD>(der.size()),
             CERT_STORE_ADD_USE_EXISTING,
             nullptr)) {
-        *error = QStringLiteral("Cannot add a certificate to the temporary store: %1")
+        *error = QCoreApplication::translate("CertificateTrustValidator", "Cannot add a certificate to the temporary store: %1")
                      .arg(windowsError(GetLastError()));
         return false;
     }
@@ -214,7 +215,7 @@ NativeValidationResult evaluateChain(
             &rawChain)) {
         return {
             false,
-            QStringLiteral("Windows could not build the certificate chain: %1")
+            QCoreApplication::translate("CertificateTrustValidator", "Windows could not build the certificate chain: %1")
                 .arg(windowsError(GetLastError()))
         };
     }
@@ -241,14 +242,14 @@ NativeValidationResult evaluateChain(
             &policyStatus)) {
         return {
             false,
-            QStringLiteral("Windows could not evaluate the certificate policy: %1")
+            QCoreApplication::translate("CertificateTrustValidator", "Windows could not evaluate the certificate policy: %1")
                 .arg(windowsError(GetLastError()))
         };
     }
     if (policyStatus.dwError != ERROR_SUCCESS) {
         return {
             false,
-            QStringLiteral("Windows rejected the certificate: %1")
+            QCoreApplication::translate("CertificateTrustValidator", "Windows rejected the certificate: %1")
                 .arg(windowsError(policyStatus.dwError))
         };
     }
@@ -265,17 +266,17 @@ CertificateValidationResult CertificateTrustValidator::evaluate(
 )
 {
     if (serverChain.isEmpty())
-        return { false, QStringLiteral("The server did not provide a certificate chain") };
+        return { false, QCoreApplication::translate("CertificateTrustValidator", "The server did not provide a certificate chain") };
     if (anchors.isEmpty())
-        return { false, QStringLiteral("The matching rule has no anchor certificates") };
+        return { false, QCoreApplication::translate("CertificateTrustValidator", "The matching rule has no anchor certificates") };
     if (host.trimmed().isEmpty() || host.contains(QChar::Null))
-        return { false, QStringLiteral("The certificate hostname is invalid") };
+        return { false, QCoreApplication::translate("CertificateTrustValidator", "The certificate hostname is invalid") };
 
     const CertificateContext leaf = createContext(serverChain.first());
     if (!leaf.get()) {
         return {
             false,
-            QStringLiteral("Cannot decode the server certificate: %1")
+            QCoreApplication::translate("CertificateTrustValidator", "Cannot decode the server certificate: %1")
                 .arg(windowsError(GetLastError()))
         };
     }
@@ -284,7 +285,7 @@ CertificateValidationResult CertificateTrustValidator::evaluate(
     if (!intermediates.get()) {
         return {
             false,
-            QStringLiteral("Cannot create a temporary certificate store: %1")
+            QCoreApplication::translate("CertificateTrustValidator", "Cannot create a temporary certificate store: %1")
                 .arg(windowsError(GetLastError()))
         };
     }
@@ -302,14 +303,17 @@ CertificateValidationResult CertificateTrustValidator::evaluate(
             host
         );
         if (systemResult.trusted)
-            return { true, QStringLiteral("validated with Windows system CA") };
+            return { true, QCoreApplication::translate(
+                "CertificateTrustValidator",
+                "validated with Windows system CA"
+            ) };
     }
 
     const CertificateStore anchorStore = createMemoryStore();
     if (!anchorStore.get()) {
         return {
             false,
-            QStringLiteral("Cannot create the custom anchor store: %1")
+            QCoreApplication::translate("CertificateTrustValidator", "Cannot create the custom anchor store: %1")
                 .arg(windowsError(GetLastError()))
         };
     }
@@ -330,7 +334,7 @@ CertificateValidationResult CertificateTrustValidator::evaluate(
     if (!CertCreateCertificateChainEngine(&engineConfiguration, &rawEngine)) {
         return {
             false,
-            QStringLiteral("Cannot create the custom Windows trust engine: %1")
+            QCoreApplication::translate("CertificateTrustValidator", "Cannot create the custom Windows trust engine: %1")
                 .arg(windowsError(GetLastError()))
         };
     }
@@ -345,7 +349,14 @@ CertificateValidationResult CertificateTrustValidator::evaluate(
         return { false, customResult.explanation };
     return {
         true,
-        customOnly ? QStringLiteral("validated with configured CA only")
-                   : QStringLiteral("validated with configured CA")
+        customOnly
+            ? QCoreApplication::translate(
+                "CertificateTrustValidator",
+                "validated with configured CA only"
+            )
+            : QCoreApplication::translate(
+                "CertificateTrustValidator",
+                "validated with configured CA"
+            )
     };
 }

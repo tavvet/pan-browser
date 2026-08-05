@@ -3,6 +3,7 @@
 #include "DownloadManager.h"
 
 #include <QFileInfo>
+#include <QCoreApplication>
 #include <QFrame>
 #include <QGuiApplication>
 #include <QHBoxLayout>
@@ -20,6 +21,11 @@
 
 namespace {
 
+QString uiText(const char *source)
+{
+    return QCoreApplication::translate("DownloadsPanel", source);
+}
+
 bool isActive(DownloadStatus status)
 {
     return status == DownloadStatus::InProgress || status == DownloadStatus::Paused;
@@ -33,7 +39,7 @@ QString byteDescription(qint64 bytes)
 QString statusDescription(const DownloadRecord &record)
 {
     const QString host = record.sourceHost.isEmpty()
-        ? QStringLiteral("Unknown source")
+        ? uiText(QT_TRANSLATE_NOOP("DownloadsPanel", "Unknown source"))
         : record.sourceHost;
     const QString finished = record.finishedAt.isValid()
         ? QLocale().toString(record.finishedAt.toLocalTime(), QLocale::ShortFormat)
@@ -43,27 +49,27 @@ QString statusDescription(const DownloadRecord &record)
         const QString received = byteDescription(record.receivedBytes);
         const QString total = byteDescription(record.totalBytes);
         return total.isEmpty()
-            ? QStringLiteral("%1 · %2 downloaded").arg(host, received)
-            : QStringLiteral("%1 · %2 of %3").arg(host, received, total);
+            ? uiText(QT_TRANSLATE_NOOP("DownloadsPanel", "%1 · %2 downloaded")).arg(host, received)
+            : uiText(QT_TRANSLATE_NOOP("DownloadsPanel", "%1 · %2 of %3")).arg(host, received, total);
     }
     case DownloadStatus::Paused:
-        return QStringLiteral("Paused · %1").arg(host);
+        return uiText(QT_TRANSLATE_NOOP("DownloadsPanel", "Paused · %1")).arg(host);
     case DownloadStatus::Completed:
         if (!QFileInfo::exists(record.filePath))
-            return QStringLiteral("File moved or deleted · %1").arg(host);
-        return QStringLiteral("Completed · %1 · %2 · %3").arg(
+            return uiText(QT_TRANSLATE_NOOP("DownloadsPanel", "File moved or deleted · %1")).arg(host);
+        return uiText(QT_TRANSLATE_NOOP("DownloadsPanel", "Completed · %1 · %2 · %3")).arg(
             byteDescription(record.receivedBytes),
             host,
             finished
         );
     case DownloadStatus::Cancelled:
-        return QStringLiteral("Cancelled · %1 · %2").arg(host, finished);
+        return uiText(QT_TRANSLATE_NOOP("DownloadsPanel", "Cancelled · %1 · %2")).arg(host, finished);
     case DownloadStatus::Failed:
         return record.error.isEmpty()
-            ? QStringLiteral("Download failed · %1").arg(host)
+            ? uiText(QT_TRANSLATE_NOOP("DownloadsPanel", "Download failed · %1")).arg(host)
             : QStringLiteral("%1 · %2").arg(record.error, host);
     case DownloadStatus::Interrupted:
-        return QStringLiteral("Interrupted · %1 · %2").arg(host, finished);
+        return uiText(QT_TRANSLATE_NOOP("DownloadsPanel", "Interrupted · %1 · %2")).arg(host, finished);
     }
     return host;
 }
@@ -106,7 +112,7 @@ public:
         actions->setSpacing(6);
         m_primary = new QPushButton(this);
         m_secondary = new QPushButton(this);
-        m_remove = new QPushButton(QStringLiteral("Remove"), this);
+        m_remove = new QPushButton(uiText(QT_TRANSLATE_NOOP("DownloadsPanel", "Remove")), this);
         m_remove->setObjectName(QStringLiteral("subtleButton"));
         actions->addWidget(m_primary);
         actions->addWidget(m_secondary);
@@ -154,10 +160,10 @@ public:
         if (active) {
             m_primary->setText(
                 record.status == DownloadStatus::Paused
-                    ? QStringLiteral("Resume")
-                    : QStringLiteral("Pause")
+                    ? uiText(QT_TRANSLATE_NOOP("DownloadsPanel", "Resume"))
+                    : uiText(QT_TRANSLATE_NOOP("DownloadsPanel", "Pause"))
             );
-            m_secondary->setText(QStringLiteral("Cancel"));
+            m_secondary->setText(uiText(QT_TRANSLATE_NOOP("DownloadsPanel", "Cancel")));
             m_primary->setVisible(true);
             m_secondary->setVisible(true);
             m_remove->hide();
@@ -166,9 +172,9 @@ public:
 
         const bool completedFile = record.status == DownloadStatus::Completed
             && QFileInfo::exists(record.filePath);
-        m_primary->setText(QStringLiteral("Open"));
+        m_primary->setText(uiText(QT_TRANSLATE_NOOP("DownloadsPanel", "Open")));
         m_primary->setVisible(completedFile);
-        m_secondary->setText(QStringLiteral("Show in Finder"));
+        m_secondary->setText(uiText(QT_TRANSLATE_NOOP("DownloadsPanel", "Show in Finder")));
         m_secondary->setVisible(completedFile);
         m_remove->show();
     }
@@ -242,13 +248,13 @@ DownloadsPanel::DownloadsPanel(DownloadManager *manager, QWidget *parent)
     rootLayout->setSpacing(10);
 
     auto *header = new QHBoxLayout();
-    auto *title = new QLabel(QStringLiteral("Downloads"), this);
+    auto *title = new QLabel(tr("Downloads"), this);
     title->setObjectName(QStringLiteral("downloadsTitle"));
     header->addWidget(title);
     header->addStretch();
-    auto *openFolder = new QPushButton(QStringLiteral("Open folder"), this);
+    auto *openFolder = new QPushButton(tr("Open folder"), this);
     openFolder->setObjectName(QStringLiteral("subtleButton"));
-    auto *clearHistory = new QPushButton(QStringLiteral("Clear history"), this);
+    auto *clearHistory = new QPushButton(tr("Clear history"), this);
     clearHistory->setObjectName(QStringLiteral("subtleButton"));
     header->addWidget(openFolder);
     header->addWidget(clearHistory);
@@ -273,7 +279,7 @@ DownloadsPanel::DownloadsPanel(DownloadManager *manager, QWidget *parent)
     rootLayout->addWidget(scroll, 1);
 
     m_emptyState = new QLabel(
-        QStringLiteral("Downloaded files will appear here."),
+        tr("Downloaded files will appear here."),
         m_itemsContainer
     );
     m_emptyState->setObjectName(QStringLiteral("downloadsEmpty"));

@@ -1,6 +1,7 @@
 #include "CertificateTrustValidator.h"
 
 #include <QByteArray>
+#include <QCoreApplication>
 #include <QHostAddress>
 #include <QSet>
 #include <QStringList>
@@ -60,7 +61,8 @@ QString opensslErrors()
         ERR_error_string_n(error, buffer, sizeof(buffer));
         messages.append(QString::fromLatin1(buffer));
     }
-    return messages.isEmpty() ? QStringLiteral("unknown OpenSSL error")
+    return messages.isEmpty()
+        ? QCoreApplication::translate("CertificateTrustValidator", "unknown OpenSSL error")
                               : messages.join(QStringLiteral("; "));
 }
 
@@ -89,7 +91,7 @@ bool configurePeerIdentity(X509_VERIFY_PARAM *parameters, QString host, QString 
     while (host.endsWith(QLatin1Char('.')))
         host.chop(1);
     if (host.isEmpty() || host.contains(QChar::Null)) {
-        *error = QStringLiteral("The certificate hostname is invalid");
+        *error = QCoreApplication::translate("CertificateTrustValidator", "The certificate hostname is invalid");
         return false;
     }
 
@@ -97,7 +99,7 @@ bool configurePeerIdentity(X509_VERIFY_PARAM *parameters, QString host, QString 
     if (address.setAddress(host)) {
         const QByteArray asciiAddress = address.toString().toLatin1();
         if (X509_VERIFY_PARAM_set1_ip_asc(parameters, asciiAddress.constData()) != 1) {
-            *error = QStringLiteral("OpenSSL cannot configure IP address validation: %1")
+            *error = QCoreApplication::translate("CertificateTrustValidator", "OpenSSL cannot configure IP address validation: %1")
                          .arg(opensslErrors());
             return false;
         }
@@ -106,7 +108,7 @@ bool configurePeerIdentity(X509_VERIFY_PARAM *parameters, QString host, QString 
 
     const QByteArray asciiHost = QUrl::toAce(host);
     if (asciiHost.isEmpty() || asciiHost.contains('\0')) {
-        *error = QStringLiteral("The certificate hostname is invalid");
+        *error = QCoreApplication::translate("CertificateTrustValidator", "The certificate hostname is invalid");
         return false;
     }
     X509_VERIFY_PARAM_set_hostflags(parameters, X509_CHECK_FLAG_NO_PARTIAL_WILDCARDS);
@@ -114,7 +116,7 @@ bool configurePeerIdentity(X509_VERIFY_PARAM *parameters, QString host, QString 
             parameters,
             asciiHost.constData(),
             static_cast<size_t>(asciiHost.size())) != 1) {
-        *error = QStringLiteral("OpenSSL cannot configure hostname validation: %1")
+        *error = QCoreApplication::translate("CertificateTrustValidator", "OpenSSL cannot configure hostname validation: %1")
                      .arg(opensslErrors());
         return false;
     }
@@ -131,14 +133,14 @@ CertificateValidationResult CertificateTrustValidator::evaluate(
 )
 {
     if (serverChain.isEmpty())
-        return { false, QStringLiteral("The server did not provide a certificate chain") };
+        return { false, QCoreApplication::translate("CertificateTrustValidator", "The server did not provide a certificate chain") };
     if (anchors.isEmpty())
-        return { false, QStringLiteral("The matching rule has no anchor certificates") };
+        return { false, QCoreApplication::translate("CertificateTrustValidator", "The matching rule has no anchor certificates") };
 
     ERR_clear_error();
     StorePtr store(X509_STORE_new(), X509_STORE_free);
     if (!store)
-        return { false, QStringLiteral("Cannot create the OpenSSL trust store: %1").arg(opensslErrors()) };
+        return { false, QCoreApplication::translate("CertificateTrustValidator", "Cannot create the OpenSSL trust store: %1").arg(opensslErrors()) };
 
     QString systemPathsError;
     if (!customOnly && X509_STORE_set_default_paths(store.get()) != 1) {
@@ -157,7 +159,7 @@ CertificateValidationResult CertificateTrustValidator::evaluate(
         if (!certificate) {
             return {
                 false,
-                QStringLiteral("Cannot decode a configured CA certificate: %1")
+                QCoreApplication::translate("CertificateTrustValidator", "Cannot decode a configured CA certificate: %1")
                     .arg(opensslErrors())
             };
         }
@@ -171,7 +173,7 @@ CertificateValidationResult CertificateTrustValidator::evaluate(
             }
             return {
                 false,
-                QStringLiteral("Cannot add a certificate to the OpenSSL trust store: %1")
+                QCoreApplication::translate("CertificateTrustValidator", "Cannot add a certificate to the OpenSSL trust store: %1")
                     .arg(opensslErrors())
             };
         }
@@ -181,26 +183,26 @@ CertificateValidationResult CertificateTrustValidator::evaluate(
     if (!leaf) {
         return {
             false,
-            QStringLiteral("Cannot decode the server certificate: %1").arg(opensslErrors())
+            QCoreApplication::translate("CertificateTrustValidator", "Cannot decode the server certificate: %1").arg(opensslErrors())
         };
     }
 
     CertificateStack intermediates;
     if (!intermediates.get())
-        return { false, QStringLiteral("Cannot create the OpenSSL intermediate stack") };
+        return { false, QCoreApplication::translate("CertificateTrustValidator", "Cannot create the OpenSSL intermediate stack") };
     for (qsizetype index = 1; index < serverChain.size(); ++index) {
         CertificatePtr certificate = decodeCertificate(serverChain.at(index));
         if (!certificate) {
             return {
                 false,
-                QStringLiteral("Cannot decode a server chain certificate: %1")
+                QCoreApplication::translate("CertificateTrustValidator", "Cannot decode a server chain certificate: %1")
                     .arg(opensslErrors())
             };
         }
         if (!intermediates.append(std::move(certificate))) {
             return {
                 false,
-                QStringLiteral("Cannot add a certificate to the OpenSSL intermediate stack: %1")
+                QCoreApplication::translate("CertificateTrustValidator", "Cannot add a certificate to the OpenSSL intermediate stack: %1")
                     .arg(opensslErrors())
             };
         }
@@ -210,7 +212,7 @@ CertificateValidationResult CertificateTrustValidator::evaluate(
     if (!context) {
         return {
             false,
-            QStringLiteral("Cannot create the OpenSSL verification context: %1")
+            QCoreApplication::translate("CertificateTrustValidator", "Cannot create the OpenSSL verification context: %1")
                 .arg(opensslErrors())
         };
     }
@@ -221,18 +223,18 @@ CertificateValidationResult CertificateTrustValidator::evaluate(
             intermediates.get()) != 1) {
         return {
             false,
-            QStringLiteral("Cannot initialize OpenSSL certificate validation: %1")
+            QCoreApplication::translate("CertificateTrustValidator", "Cannot initialize OpenSSL certificate validation: %1")
                 .arg(opensslErrors())
         };
     }
 
     X509_VERIFY_PARAM *parameters = X509_STORE_CTX_get0_param(context.get());
     if (!parameters)
-        return { false, QStringLiteral("OpenSSL did not provide verification parameters") };
+        return { false, QCoreApplication::translate("CertificateTrustValidator", "OpenSSL did not provide verification parameters") };
     if (X509_VERIFY_PARAM_set_purpose(parameters, X509_PURPOSE_SSL_SERVER) != 1) {
         return {
             false,
-            QStringLiteral("OpenSSL cannot configure server authentication: %1")
+            QCoreApplication::translate("CertificateTrustValidator", "OpenSSL cannot configure server authentication: %1")
                 .arg(opensslErrors())
         };
     }
@@ -250,7 +252,7 @@ CertificateValidationResult CertificateTrustValidator::evaluate(
                 | X509_V_FLAG_X509_STRICT) != 1) {
         return {
             false,
-            QStringLiteral("OpenSSL cannot configure certificate validation: %1")
+            QCoreApplication::translate("CertificateTrustValidator", "OpenSSL cannot configure certificate validation: %1")
                 .arg(opensslErrors())
         };
     }
@@ -261,13 +263,19 @@ CertificateValidationResult CertificateTrustValidator::evaluate(
     ERR_clear_error();
     if (X509_verify_cert(context.get()) != 1) {
         const int verificationError = X509_STORE_CTX_get_error(context.get());
-        QString explanation = QStringLiteral("OpenSSL rejected the certificate at chain depth %1: %2")
+        QString explanation = QCoreApplication::translate(
+            "CertificateTrustValidator",
+            "OpenSSL rejected the certificate at chain depth %1: %2"
+        )
                                   .arg(X509_STORE_CTX_get_error_depth(context.get()))
                                   .arg(QString::fromLatin1(
                                       X509_verify_cert_error_string(verificationError)
                                   ));
         if (!systemPathsError.isEmpty()) {
-            explanation += QStringLiteral("; system trust paths were unavailable: %1")
+            explanation += QCoreApplication::translate(
+                "CertificateTrustValidator",
+                "; system trust paths were unavailable: %1"
+            )
                                .arg(systemPathsError);
         }
         return { false, explanation };
@@ -275,7 +283,14 @@ CertificateValidationResult CertificateTrustValidator::evaluate(
 
     return {
         true,
-        customOnly ? QStringLiteral("validated with configured CA only")
-                   : QStringLiteral("validated with system or configured CA")
+        customOnly
+            ? QCoreApplication::translate(
+                "CertificateTrustValidator",
+                "validated with configured CA only"
+            )
+            : QCoreApplication::translate(
+                "CertificateTrustValidator",
+                "validated with system or configured CA"
+            )
     };
 }

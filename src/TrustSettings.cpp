@@ -1,5 +1,6 @@
 #include "TrustSettings.h"
 
+#include <QCoreApplication>
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
@@ -68,16 +69,16 @@ bool TrustSettings::load(const QString &path, QString *error)
 {
     QFile file(path);
     if (!file.open(QIODevice::ReadOnly))
-        return fail(error, QStringLiteral("Cannot open %1: %2").arg(path, file.errorString()));
+        return fail(error, QCoreApplication::translate("TrustSettings", "Cannot open %1: %2").arg(path, file.errorString()));
 
     QJsonParseError parseError;
     const QJsonDocument document = QJsonDocument::fromJson(file.readAll(), &parseError);
     if (parseError.error != QJsonParseError::NoError || !document.isObject())
-        return fail(error, QStringLiteral("Invalid JSON: %1").arg(parseError.errorString()));
+        return fail(error, QCoreApplication::translate("TrustSettings", "Invalid JSON: %1").arg(parseError.errorString()));
 
     const QJsonObject root = document.object();
     if (root.value(QStringLiteral("version")).toInt(-1) != 1)
-        return fail(error, QStringLiteral("Unsupported rules version"));
+        return fail(error, QCoreApplication::translate("TrustSettings", "Unsupported rules version"));
 
     const QUrl startPage(root.value(QStringLiteral("startPage")).toString(
         QStringLiteral("https://example.com")
@@ -85,17 +86,17 @@ bool TrustSettings::load(const QString &path, QString *error)
     if (!startPage.isValid()
         || (startPage.scheme() != QStringLiteral("http")
             && startPage.scheme() != QStringLiteral("https"))) {
-        return fail(error, QStringLiteral("Invalid startPage"));
+        return fail(error, QCoreApplication::translate("TrustSettings", "Invalid startPage"));
     }
 
     QList<TrustRuleSettings> rules;
     const QJsonValue rulesValue = root.value(QStringLiteral("rules"));
     if (!rulesValue.isArray())
-        return fail(error, QStringLiteral("Rules must be an array"));
+        return fail(error, QCoreApplication::translate("TrustSettings", "Rules must be an array"));
 
     for (const QJsonValue &value : rulesValue.toArray()) {
         if (!value.isObject())
-            return fail(error, QStringLiteral("Every rule must be an object"));
+            return fail(error, QCoreApplication::translate("TrustSettings", "Every rule must be an object"));
 
         const QJsonObject object = value.toObject();
         TrustRuleSettings rule;
@@ -104,7 +105,7 @@ bool TrustSettings::load(const QString &path, QString *error)
         if (!trustModeFromString(object.value(QStringLiteral("mode")).toString(), &rule.mode)) {
             return fail(
                 error,
-                QStringLiteral("Rule %1 has an invalid mode").arg(
+                QCoreApplication::translate("TrustSettings", "Rule %1 has an invalid mode").arg(
                     rule.name.isEmpty() ? QStringLiteral("<unnamed>") : rule.name
                 )
             );
@@ -112,13 +113,13 @@ bool TrustSettings::load(const QString &path, QString *error)
 
         const QJsonValue domainsValue = object.value(QStringLiteral("domains"));
         if (!domainsValue.isArray())
-            return fail(error, QStringLiteral("Rule domains must be an array"));
+            return fail(error, QCoreApplication::translate("TrustSettings", "Rule domains must be an array"));
         for (const QJsonValue &domain : domainsValue.toArray())
             rule.domains.append(domain.toString());
 
         const QJsonValue anchorsValue = object.value(QStringLiteral("anchors"));
         if (!anchorsValue.isArray())
-            return fail(error, QStringLiteral("Rule anchors must be an array"));
+            return fail(error, QCoreApplication::translate("TrustSettings", "Rule anchors must be an array"));
         for (const QJsonValue &anchor : anchorsValue.toArray())
             rule.anchors.append(anchor.toString());
 
@@ -162,20 +163,20 @@ bool TrustSettings::save(const QString &path, QString *error) const
     if (QFile::exists(path)) {
         const QString backupPath = path + QStringLiteral(".backup");
         if (QFile::exists(backupPath) && !QFile::remove(backupPath))
-            return fail(error, QStringLiteral("Cannot replace backup %1").arg(backupPath));
+            return fail(error, QCoreApplication::translate("TrustSettings", "Cannot replace backup %1").arg(backupPath));
         if (!QFile::copy(path, backupPath))
-            return fail(error, QStringLiteral("Cannot create backup %1").arg(backupPath));
+            return fail(error, QCoreApplication::translate("TrustSettings", "Cannot create backup %1").arg(backupPath));
     }
 
     QSaveFile file(path);
     if (!file.open(QIODevice::WriteOnly))
-        return fail(error, QStringLiteral("Cannot write %1: %2").arg(path, file.errorString()));
+        return fail(error, QCoreApplication::translate("TrustSettings", "Cannot write %1: %2").arg(path, file.errorString()));
 
     const QByteArray contents = QJsonDocument(root).toJson(QJsonDocument::Indented);
     if (file.write(contents) != contents.size())
-        return fail(error, QStringLiteral("Cannot write %1: %2").arg(path, file.errorString()));
+        return fail(error, QCoreApplication::translate("TrustSettings", "Cannot write %1: %2").arg(path, file.errorString()));
     if (!file.commit())
-        return fail(error, QStringLiteral("Cannot commit %1: %2").arg(path, file.errorString()));
+        return fail(error, QCoreApplication::translate("TrustSettings", "Cannot commit %1: %2").arg(path, file.errorString()));
     return true;
 }
 
@@ -184,7 +185,7 @@ bool TrustSettings::validate(const QString &path, QString *error) const
     if (!m_startPage.isValid()
         || (m_startPage.scheme() != QStringLiteral("http")
             && m_startPage.scheme() != QStringLiteral("https"))) {
-        return fail(error, QStringLiteral("Invalid start page"));
+        return fail(error, QCoreApplication::translate("TrustSettings", "Invalid start page"));
     }
 
     const QDir baseDirectory = QFileInfo(path).absoluteDir();
@@ -194,18 +195,18 @@ bool TrustSettings::validate(const QString &path, QString *error) const
     for (const TrustRuleSettings &rule : m_rules) {
         const QString name = rule.name.trimmed();
         if (name.isEmpty())
-            return fail(error, QStringLiteral("Rule name cannot be empty"));
+            return fail(error, QCoreApplication::translate("TrustSettings", "Rule name cannot be empty"));
 
         const QString normalizedName = name.toCaseFolded();
         if (configuredNames.contains(normalizedName))
-            return fail(error, QStringLiteral("Duplicate rule name: %1").arg(name));
+            return fail(error, QCoreApplication::translate("TrustSettings", "Duplicate rule name: %1").arg(name));
         configuredNames.insert(normalizedName);
 
         if (!rule.enabled)
             continue;
 
         if (rule.domains.isEmpty())
-            return fail(error, QStringLiteral("Rule %1 has no domains").arg(name));
+            return fail(error, QCoreApplication::translate("TrustSettings", "Rule %1 has no domains").arg(name));
 
         for (const QString &domain : rule.domains) {
             QString domainError;
@@ -216,7 +217,7 @@ bool TrustSettings::validate(const QString &path, QString *error) const
                 if (domainPatternsOverlap(domain, configuredDomain)) {
                     return fail(
                         error,
-                        QStringLiteral("Domain %1 overlaps rule %2").arg(domain, configuredRule)
+                        QCoreApplication::translate("TrustSettings", "Domain %1 overlaps rule %2").arg(domain, configuredRule)
                     );
                 }
             }
@@ -226,7 +227,7 @@ bool TrustSettings::validate(const QString &path, QString *error) const
         if (rule.mode != TrustMode::SystemOnly && rule.anchors.isEmpty()) {
             return fail(
                 error,
-                QStringLiteral("Rule %1 requires at least one certificate").arg(name)
+                QCoreApplication::translate("TrustSettings", "Rule %1 requires at least one certificate").arg(name)
             );
         }
 
@@ -237,7 +238,7 @@ bool TrustSettings::validate(const QString &path, QString *error) const
             if (!certificateFileIsValid(absolutePath)) {
                 return fail(
                     error,
-                    QStringLiteral("Cannot decode certificate %1").arg(absolutePath)
+                    QCoreApplication::translate("TrustSettings", "Cannot decode certificate %1").arg(absolutePath)
                 );
             }
         }

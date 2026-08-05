@@ -1,5 +1,6 @@
 #include "CertificateTrustValidator.h"
 
+#include <QCoreApplication>
 #include <Security/Security.h>
 
 namespace {
@@ -16,7 +17,10 @@ QString fromCFString(CFStringRef value)
     ) + 1;
     QByteArray buffer(maximumSize, '\0');
     if (!CFStringGetCString(value, buffer.data(), maximumSize, kCFStringEncodingUTF8))
-        return QStringLiteral("Unknown trust evaluation error");
+        return QCoreApplication::translate(
+            "CertificateTrustValidator",
+            "Unknown trust evaluation error"
+        );
     return QString::fromUtf8(buffer.constData());
 }
 
@@ -72,9 +76,15 @@ CertificateValidationResult CertificateTrustValidator::evaluate(
 )
 {
     if (serverChain.isEmpty())
-        return { false, QStringLiteral("The server did not provide a certificate chain") };
+        return { false, QCoreApplication::translate(
+            "CertificateTrustValidator",
+            "The server did not provide a certificate chain"
+        ) };
     if (anchors.isEmpty())
-        return { false, QStringLiteral("The matching rule has no anchor certificates") };
+        return { false, QCoreApplication::translate(
+            "CertificateTrustValidator",
+            "The matching rule has no anchor certificates"
+        ) };
 
     CFMutableArrayRef chainArray = certificatesToArray(serverChain);
     CFMutableArrayRef anchorArray = certificatesToArray(anchors);
@@ -83,7 +93,10 @@ CertificateValidationResult CertificateTrustValidator::evaluate(
             CFRelease(chainArray);
         if (anchorArray)
             CFRelease(anchorArray);
-        return { false, QStringLiteral("Cannot convert the certificate chain") };
+        return { false, QCoreApplication::translate(
+            "CertificateTrustValidator",
+            "Cannot convert the certificate chain"
+        ) };
     }
 
     CFStringRef hostName = toCFString(host);
@@ -103,7 +116,10 @@ CertificateValidationResult CertificateTrustValidator::evaluate(
         CFRelease(anchorArray);
         return {
             false,
-            QStringLiteral("Cannot create trust object (%1)").arg(createStatus)
+            QCoreApplication::translate(
+                "CertificateTrustValidator",
+                "Cannot create trust object (%1)"
+            ).arg(createStatus)
         };
     }
 
@@ -113,7 +129,10 @@ CertificateValidationResult CertificateTrustValidator::evaluate(
         CFRelease(trust);
         return {
             false,
-            QStringLiteral("Cannot set trust anchors (%1)").arg(anchorsStatus)
+            QCoreApplication::translate(
+                "CertificateTrustValidator",
+                "Cannot set trust anchors (%1)"
+            ).arg(anchorsStatus)
         };
     }
 
@@ -122,7 +141,10 @@ CertificateValidationResult CertificateTrustValidator::evaluate(
         CFRelease(trust);
         return {
             false,
-            QStringLiteral("Cannot set trust mode (%1)").arg(modeStatus)
+            QCoreApplication::translate(
+                "CertificateTrustValidator",
+                "Cannot set trust mode (%1)"
+            ).arg(modeStatus)
         };
     }
 
@@ -131,14 +153,23 @@ CertificateValidationResult CertificateTrustValidator::evaluate(
     QString explanation;
     if (trusted) {
         explanation = customOnly
-            ? QStringLiteral("validated with configured CA only")
-            : QStringLiteral("validated with system or configured CA");
+            ? QCoreApplication::translate(
+                "CertificateTrustValidator",
+                "validated with configured CA only"
+            )
+            : QCoreApplication::translate(
+                "CertificateTrustValidator",
+                "validated with system or configured CA"
+            );
     } else if (evaluationError) {
         CFStringRef description = CFErrorCopyDescription(evaluationError);
         explanation = fromCFString(description);
         CFRelease(description);
     } else {
-        explanation = QStringLiteral("Certificate validation failed");
+        explanation = QCoreApplication::translate(
+            "CertificateTrustValidator",
+            "Certificate validation failed"
+        );
     }
 
     if (evaluationError)

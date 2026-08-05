@@ -61,6 +61,7 @@ private:
     QStackedWidget *m_pages = nullptr;
     QLineEdit *m_startPage = nullptr;
     QComboBox *m_startupMode = nullptr;
+    QComboBox *m_interfaceLanguage = nullptr;
     QCheckBox *m_persistSessionCookies = nullptr;
     SearchSettingsPage *m_searchPage = nullptr;
     HistorySettingsPage *m_historyPage = nullptr;

@@ -1,6 +1,7 @@
 #include "BrowserPreferences.h"
 
 #include <QSettings>
+#include <QCoreApplication>
 
 namespace {
 
@@ -20,6 +21,28 @@ bool isHttpUrl(const QUrl &url)
         && !url.host().isEmpty()
         && (url.scheme() == QStringLiteral("http")
             || url.scheme() == QStringLiteral("https"));
+}
+
+InterfaceLanguage languageFromSetting(const QString &value)
+{
+    if (value == QStringLiteral("system"))
+        return InterfaceLanguage::System;
+    if (value == QStringLiteral("ru"))
+        return InterfaceLanguage::Russian;
+    return InterfaceLanguage::English;
+}
+
+QString languageSetting(InterfaceLanguage language)
+{
+    switch (language) {
+    case InterfaceLanguage::System:
+        return QStringLiteral("system");
+    case InterfaceLanguage::Russian:
+        return QStringLiteral("ru");
+    case InterfaceLanguage::English:
+        return QStringLiteral("en");
+    }
+    return QStringLiteral("en");
 }
 
 } // namespace
@@ -54,8 +77,23 @@ BrowserPreferences BrowserPreferences::load(const QUrl &legacyStartPage)
         QStringLiteral("Browser/saveBrowsingHistory"),
         true
     ).toBool();
+    preferences.m_interfaceLanguage = loadInterfaceLanguage();
     settings.sync();
     return preferences;
+}
+
+InterfaceLanguage BrowserPreferences::loadInterfaceLanguage()
+{
+    QSettings settings(QString::fromLatin1(organization), QString::fromLatin1(application));
+    return loadInterfaceLanguage(settings);
+}
+
+InterfaceLanguage BrowserPreferences::loadInterfaceLanguage(const QSettings &settings)
+{
+    const QString key = QStringLiteral("Browser/language");
+    if (!settings.contains(key))
+        return InterfaceLanguage::System;
+    return languageFromSetting(settings.value(key).toString());
 }
 
 bool BrowserPreferences::save(QString *error) const
@@ -73,16 +111,23 @@ bool BrowserPreferences::save(QString *error) const
     );
     settings.setValue(QStringLiteral("Browser/persistSessionCookies"), m_persistSessionCookies);
     settings.setValue(QStringLiteral("Browser/saveBrowsingHistory"), m_saveBrowsingHistory);
+    settings.setValue(QStringLiteral("Browser/language"), languageSetting(m_interfaceLanguage));
     settings.sync();
     if (settings.status() != QSettings::NoError)
-        return fail(error, QStringLiteral("Cannot write application settings"));
+        return fail(error, QCoreApplication::translate(
+            "BrowserPreferences",
+            "Cannot write application settings"
+        ));
     return true;
 }
 
 bool BrowserPreferences::validate(QString *error) const
 {
     if (!isHttpUrl(m_startPage))
-        return fail(error, QStringLiteral("Start page must be a valid HTTP or HTTPS URL"));
+        return fail(error, QCoreApplication::translate(
+            "BrowserPreferences",
+            "Start page must be a valid HTTP or HTTPS URL"
+        ));
     return true;
 }
 
@@ -124,4 +169,14 @@ bool BrowserPreferences::saveBrowsingHistory() const
 void BrowserPreferences::setSaveBrowsingHistory(bool save)
 {
     m_saveBrowsingHistory = save;
+}
+
+InterfaceLanguage BrowserPreferences::interfaceLanguage() const
+{
+    return m_interfaceLanguage;
+}
+
+void BrowserPreferences::setInterfaceLanguage(InterfaceLanguage language)
+{
+    m_interfaceLanguage = language;
 }

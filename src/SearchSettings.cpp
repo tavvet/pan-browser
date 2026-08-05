@@ -1,5 +1,6 @@
 #include "SearchSettings.h"
 
+#include <QCoreApplication>
 #include <QFile>
 #include <QHostAddress>
 #include <QJsonArray>
@@ -147,24 +148,24 @@ bool SearchSettings::load(const QString &path, QString *error)
 {
     QFile file(path);
     if (!file.open(QIODevice::ReadOnly))
-        return fail(error, QStringLiteral("Cannot open %1: %2").arg(path, file.errorString()));
+        return fail(error, QCoreApplication::translate("SearchSettings", "Cannot open %1: %2").arg(path, file.errorString()));
 
     QJsonParseError parseError;
     const QJsonDocument document = QJsonDocument::fromJson(file.readAll(), &parseError);
     if (parseError.error != QJsonParseError::NoError || !document.isObject())
-        return fail(error, QStringLiteral("Invalid JSON: %1").arg(parseError.errorString()));
+        return fail(error, QCoreApplication::translate("SearchSettings", "Invalid JSON: %1").arg(parseError.errorString()));
 
     const QJsonObject root = document.object();
     if (root.value(QStringLiteral("version")).toInt(-1) != 1)
-        return fail(error, QStringLiteral("Unsupported search settings version"));
+        return fail(error, QCoreApplication::translate("SearchSettings", "Unsupported search settings version"));
     if (!root.value(QStringLiteral("engines")).isArray())
-        return fail(error, QStringLiteral("Search engines must be an array"));
+        return fail(error, QCoreApplication::translate("SearchSettings", "Search engines must be an array"));
 
     SearchSettings loaded;
     loaded.m_defaultEngineId = root.value(QStringLiteral("defaultEngine")).toString();
     for (const QJsonValue &value : root.value(QStringLiteral("engines")).toArray()) {
         if (!value.isObject())
-            return fail(error, QStringLiteral("Every search engine must be an object"));
+            return fail(error, QCoreApplication::translate("SearchSettings", "Every search engine must be an object"));
         const QJsonObject object = value.toObject();
         SearchEngineSettings engine;
         engine.id = object.value(QStringLiteral("id")).toString().trimmed();
@@ -208,26 +209,26 @@ bool SearchSettings::save(const QString &path, QString *error) const
     if (QFile::exists(path)) {
         const QString backupPath = path + QStringLiteral(".backup");
         if (QFile::exists(backupPath) && !QFile::remove(backupPath))
-            return fail(error, QStringLiteral("Cannot replace backup %1").arg(backupPath));
+            return fail(error, QCoreApplication::translate("SearchSettings", "Cannot replace backup %1").arg(backupPath));
         if (!QFile::copy(path, backupPath))
-            return fail(error, QStringLiteral("Cannot create backup %1").arg(backupPath));
+            return fail(error, QCoreApplication::translate("SearchSettings", "Cannot create backup %1").arg(backupPath));
     }
 
     QSaveFile file(path);
     if (!file.open(QIODevice::WriteOnly))
-        return fail(error, QStringLiteral("Cannot write %1: %2").arg(path, file.errorString()));
+        return fail(error, QCoreApplication::translate("SearchSettings", "Cannot write %1: %2").arg(path, file.errorString()));
     const QByteArray contents = QJsonDocument(root).toJson(QJsonDocument::Indented);
     if (file.write(contents) != contents.size())
-        return fail(error, QStringLiteral("Cannot write %1: %2").arg(path, file.errorString()));
+        return fail(error, QCoreApplication::translate("SearchSettings", "Cannot write %1: %2").arg(path, file.errorString()));
     if (!file.commit())
-        return fail(error, QStringLiteral("Cannot commit %1: %2").arg(path, file.errorString()));
+        return fail(error, QCoreApplication::translate("SearchSettings", "Cannot commit %1: %2").arg(path, file.errorString()));
     return true;
 }
 
 bool SearchSettings::validate(QString *error) const
 {
     if (m_engines.isEmpty())
-        return fail(error, QStringLiteral("Add at least one search engine"));
+        return fail(error, QCoreApplication::translate("SearchSettings", "Add at least one search engine"));
 
     static const QRegularExpression keywordPattern(QStringLiteral("^[a-z0-9][a-z0-9_-]{0,15}$"));
     QSet<QString> ids;
@@ -241,31 +242,31 @@ bool SearchSettings::validate(QString *error) const
         const QString keyword = normalizedKeyword(engine.keyword);
         const QString urlTemplate = engine.urlTemplate.trimmed();
         if (id.isEmpty())
-            return fail(error, QStringLiteral("Search engine id cannot be empty"));
+            return fail(error, QCoreApplication::translate("SearchSettings", "Search engine id cannot be empty"));
         if (ids.contains(id))
-            return fail(error, QStringLiteral("Duplicate search engine id: %1").arg(id));
+            return fail(error, QCoreApplication::translate("SearchSettings", "Duplicate search engine id: %1").arg(id));
         ids.insert(id);
         if (name.isEmpty())
-            return fail(error, QStringLiteral("Search engine name cannot be empty"));
+            return fail(error, QCoreApplication::translate("SearchSettings", "Search engine name cannot be empty"));
         const QString foldedName = name.toCaseFolded();
         if (names.contains(foldedName))
-            return fail(error, QStringLiteral("Duplicate search engine name: %1").arg(name));
+            return fail(error, QCoreApplication::translate("SearchSettings", "Duplicate search engine name: %1").arg(name));
         names.insert(foldedName);
         if (!keyword.isEmpty() && !keywordPattern.match(keyword).hasMatch()) {
             return fail(
                 error,
-                QStringLiteral("Keyword for %1 must contain 1–16 lowercase letters, numbers, _ or -")
+                QCoreApplication::translate("SearchSettings", "Keyword for %1 must contain 1–16 lowercase letters, numbers, _ or -")
                     .arg(name)
             );
         }
         if (!keyword.isEmpty() && keywords.contains(keyword))
-            return fail(error, QStringLiteral("Duplicate search keyword: @%1").arg(keyword));
+            return fail(error, QCoreApplication::translate("SearchSettings", "Duplicate search keyword: @%1").arg(keyword));
         if (!keyword.isEmpty())
             keywords.insert(keyword);
         if (urlTemplate.count(QString::fromLatin1(searchTermsPlaceholder)) != 1) {
             return fail(
                 error,
-                QStringLiteral("URL template for %1 must contain {searchTerms} exactly once")
+                QCoreApplication::translate("SearchSettings", "URL template for %1 must contain {searchTerms} exactly once")
                     .arg(name)
             );
         }
@@ -273,18 +274,18 @@ bool SearchSettings::validate(QString *error) const
         testTemplate.replace(QString::fromLatin1(searchTermsPlaceholder), QStringLiteral("test"));
         const QUrl testUrl(testTemplate, QUrl::StrictMode);
         if (!isWebUrl(testUrl))
-            return fail(error, QStringLiteral("%1 has an invalid HTTP or HTTPS URL template").arg(name));
+            return fail(error, QCoreApplication::translate("SearchSettings", "%1 has an invalid HTTP or HTTPS URL template").arg(name));
         if (!testUrl.userName().isEmpty() || !testUrl.password().isEmpty())
-            return fail(error, QStringLiteral("URL template for %1 must not contain credentials").arg(name));
+            return fail(error, QCoreApplication::translate("SearchSettings", "URL template for %1 must not contain credentials").arg(name));
         if (engine.enabled)
             ++enabledCount;
     }
 
     if (enabledCount == 0)
-        return fail(error, QStringLiteral("Enable at least one search engine"));
+        return fail(error, QCoreApplication::translate("SearchSettings", "Enable at least one search engine"));
     const SearchEngineSettings *selected = engineById(m_defaultEngineId);
     if (!selected || !selected->enabled)
-        return fail(error, QStringLiteral("Choose an enabled default search engine"));
+        return fail(error, QCoreApplication::translate("SearchSettings", "Choose an enabled default search engine"));
     return true;
 }
 
@@ -340,14 +341,14 @@ QUrl SearchSettings::searchUrl(
 {
     const QString trimmedQuery = query.trimmed();
     if (trimmedQuery.isEmpty()) {
-        fail(error, QStringLiteral("Enter a search query"));
+        fail(error, QCoreApplication::translate("SearchSettings", "Enter a search query"));
         return {};
     }
     const SearchEngineSettings *engine = engineId.isEmpty()
         ? defaultEngine()
         : engineById(engineId);
     if (!engine || !engine->enabled) {
-        fail(error, QStringLiteral("The selected search engine is unavailable"));
+        fail(error, QCoreApplication::translate("SearchSettings", "The selected search engine is unavailable"));
         return {};
     }
 
@@ -358,7 +359,7 @@ QUrl SearchSettings::searchUrl(
     );
     const QUrl url(target, QUrl::StrictMode);
     if (!isWebUrl(url)) {
-        fail(error, QStringLiteral("The search engine produced an invalid URL"));
+        fail(error, QCoreApplication::translate("SearchSettings", "The search engine produced an invalid URL"));
         return {};
     }
     return url;
@@ -384,7 +385,7 @@ ResolvedAddressInput resolveAddressInput(
 {
     const QString input = source.trimmed();
     if (input.isEmpty())
-        return inputError(QStringLiteral("Enter an address or search query"));
+        return inputError(QCoreApplication::translate("SearchSettings", "Enter an address or search query"));
 
     if (input.startsWith(QLatin1Char('?')))
         return searchInput(input.sliced(1).trimmed(), settings);
@@ -395,11 +396,11 @@ ResolvedAddressInput resolveAddressInput(
         );
         const QRegularExpressionMatch match = keywordInput.match(input);
         if (!match.hasMatch())
-            return inputError(QStringLiteral("Use @keyword followed by a search query"));
+            return inputError(QCoreApplication::translate("SearchSettings", "Use @keyword followed by a search query"));
         const QString keyword = match.captured(1).toLower();
         const SearchEngineSettings *engine = settings.engineForKeyword(keyword);
         if (!engine)
-            return inputError(QStringLiteral("Unknown or disabled search keyword: @%1").arg(keyword));
+            return inputError(QCoreApplication::translate("SearchSettings", "Unknown or disabled search keyword: @%1").arg(keyword));
         return searchInput(match.captured(2), settings, engine->id);
     }
 
@@ -411,7 +412,7 @@ ResolvedAddressInput resolveAddressInput(
             result.url = url;
             return result;
         }
-        return inputError(QStringLiteral("Invalid web address"));
+        return inputError(QCoreApplication::translate("SearchSettings", "Invalid web address"));
     }
 
     static const QRegularExpression explicitScheme(
@@ -425,7 +426,7 @@ ResolvedAddressInput resolveAddressInput(
             result.url = url;
             return result;
         }
-        return inputError(QStringLiteral("Only HTTP and HTTPS URLs are supported"));
+        return inputError(QCoreApplication::translate("SearchSettings", "Only HTTP and HTTPS URLs are supported"));
     }
 
     return searchInput(input, settings);

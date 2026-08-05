@@ -162,6 +162,13 @@ tabs are loaded only when selected. Tab URLs and titles are stored atomically in
 `session.json`; form contents, scroll position, and navigation history are not
 restored.
 
+The General page also offers **System default**, **English**, and **Русский**
+for the interface language. With no saved choice, PanBrowser follows the first
+supported system UI language and falls back to English. Language changes apply
+after restarting the application. Application and standard dialog translations
+are embedded in the executable, so release bundles do not depend on a separate
+Qt translation package.
+
 The **Privacy & Data** section can clear the HTTP cache or all cookies
 immediately. A full site-data reset is scheduled for the next launch so the
 WebEngine profile can be removed before Chromium opens it. This reset removes

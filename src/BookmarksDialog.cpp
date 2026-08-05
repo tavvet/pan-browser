@@ -28,7 +28,7 @@ BookmarksDialog::BookmarksDialog(BookmarkStore *store, QWidget *parent)
     , m_store(store)
 {
     setObjectName(QStringLiteral("bookmarksDialog"));
-    setWindowTitle(QStringLiteral("Bookmarks"));
+    setWindowTitle(tr("Bookmarks"));
     setWindowIcon(QIcon(QStringLiteral(":/assets/icons/star.svg")));
     resize(760, 620);
     setMinimumSize(620, 460);
@@ -36,11 +36,11 @@ BookmarksDialog::BookmarksDialog(BookmarkStore *store, QWidget *parent)
     auto *layout = new QVBoxLayout(this);
     layout->setContentsMargins(26, 22, 26, 20);
     layout->setSpacing(13);
-    auto *title = new QLabel(QStringLiteral("Bookmarks"), this);
+    auto *title = new QLabel(tr("Bookmarks"), this);
     title->setObjectName(QStringLiteral("dialogTitle"));
     layout->addWidget(title);
     auto *subtitle = new QLabel(
-        QStringLiteral("Open, edit, and remove pages saved in PanBrowser."),
+        tr("Open, edit, and remove pages saved in PanBrowser."),
         this
     );
     subtitle->setObjectName(QStringLiteral("dialogSubtitle"));
@@ -48,7 +48,7 @@ BookmarksDialog::BookmarksDialog(BookmarkStore *store, QWidget *parent)
 
     m_filter = new QLineEdit(this);
     m_filter->setObjectName(QStringLiteral("bookmarkFilter"));
-    m_filter->setPlaceholderText(QStringLiteral("Search titles and addresses"));
+    m_filter->setPlaceholderText(tr("Search titles and addresses"));
     m_filter->addAction(
         QIcon(QStringLiteral(":/assets/icons/search.svg")),
         QLineEdit::LeadingPosition
@@ -66,10 +66,10 @@ BookmarksDialog::BookmarksDialog(BookmarkStore *store, QWidget *parent)
     m_status = new QLabel(this);
     m_status->setObjectName(QStringLiteral("fieldHint"));
     actions->addWidget(m_status, 1);
-    m_edit = new QPushButton(QStringLiteral("Edit…"), this);
-    m_remove = new QPushButton(QStringLiteral("Remove"), this);
+    m_edit = new QPushButton(tr("Edit…"), this);
+    m_remove = new QPushButton(tr("Remove"), this);
     m_remove->setObjectName(QStringLiteral("dangerButton"));
-    auto *clear = new QPushButton(QStringLiteral("Clear All…"), this);
+    auto *clear = new QPushButton(tr("Clear All…"), this);
     clear->setObjectName(QStringLiteral("dangerButton"));
     actions->addWidget(m_edit);
     actions->addWidget(m_remove);
@@ -78,9 +78,9 @@ BookmarksDialog::BookmarksDialog(BookmarkStore *store, QWidget *parent)
 
     auto *openActions = new QHBoxLayout();
     openActions->addStretch();
-    auto *close = new QPushButton(QStringLiteral("Close"), this);
-    m_openNewTab = new QPushButton(QStringLiteral("Open in New Tab"), this);
-    m_open = new QPushButton(QStringLiteral("Open"), this);
+    auto *close = new QPushButton(tr("Close"), this);
+    m_openNewTab = new QPushButton(tr("Open in New Tab"), this);
+    m_open = new QPushButton(tr("Open"), this);
     m_open->setDefault(true);
     openActions->addWidget(close);
     openActions->addWidget(m_openNewTab);
@@ -111,7 +111,7 @@ void BookmarksDialog::reload()
 {
     m_bookmarks->clear();
     if (!m_store || !m_store->isOpen()) {
-        m_status->setText(QStringLiteral("Bookmarks are unavailable."));
+        m_status->setText(tr("Bookmarks are unavailable."));
         m_filter->setEnabled(false);
         updateActions();
         return;
@@ -144,16 +144,14 @@ void BookmarksDialog::reload()
     if (bookmarks.isEmpty()) {
         auto *empty = new QListWidgetItem(
             m_filter->text().trimmed().isEmpty()
-                ? QStringLiteral("No bookmarks yet")
-                : QStringLiteral("No matching bookmarks"),
+                ? tr("No bookmarks yet")
+                : tr("No matching bookmarks"),
             m_bookmarks
         );
         empty->setFlags(Qt::NoItemFlags);
     }
     m_status->setText(
-        QStringLiteral("%1 bookmark%2")
-            .arg(bookmarks.size())
-            .arg(bookmarks.size() == 1 ? QString() : QStringLiteral("s"))
+        tr("%n bookmark(s)", nullptr, bookmarks.size())
     );
     updateActions();
 }
@@ -198,7 +196,7 @@ void BookmarksDialog::removeSelected()
         return;
     QString error;
     if (!m_store->remove(ids, &error))
-        QMessageBox::warning(this, QStringLiteral("Cannot remove bookmarks"), error);
+        QMessageBox::warning(this, tr("Cannot remove bookmarks"), error);
 }
 
 void BookmarksDialog::clearAll()
@@ -207,8 +205,8 @@ void BookmarksDialog::clearAll()
         return;
     if (QMessageBox::question(
             this,
-            QStringLiteral("Clear bookmarks"),
-            QStringLiteral("Remove every bookmark from PanBrowser?"),
+            tr("Clear bookmarks"),
+            tr("Remove every bookmark from PanBrowser?"),
             QMessageBox::Yes | QMessageBox::Cancel,
             QMessageBox::Cancel
         ) != QMessageBox::Yes) {
@@ -216,7 +214,7 @@ void BookmarksDialog::clearAll()
     }
     QString error;
     if (!m_store->clear(&error))
-        QMessageBox::warning(this, QStringLiteral("Cannot clear bookmarks"), error);
+        QMessageBox::warning(this, tr("Cannot clear bookmarks"), error);
 }
 
 void BookmarksDialog::openSelected(bool newTab)

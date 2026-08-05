@@ -3,6 +3,7 @@
 #include "HistoryStore.h"
 
 #include <QCheckBox>
+#include <QCoreApplication>
 #include <QDate>
 #include <QFrame>
 #include <QHBoxLayout>
@@ -22,9 +23,9 @@ QString dayLabel(const QDate &date)
 {
     const QDate today = QDate::currentDate();
     if (date == today)
-        return QStringLiteral("TODAY");
+        return QCoreApplication::translate("HistorySettingsPage", "TODAY");
     if (date == today.addDays(-1))
-        return QStringLiteral("YESTERDAY");
+        return QCoreApplication::translate("HistorySettingsPage", "YESTERDAY");
     return QLocale().toString(date, QLocale::LongFormat).toUpper();
 }
 
@@ -43,11 +44,11 @@ HistorySettingsPage::HistorySettingsPage(
     layout->setContentsMargins(30, 24, 30, 24);
     layout->setSpacing(14);
 
-    auto *title = new QLabel(QStringLiteral("History"), this);
+    auto *title = new QLabel(tr("History"), this);
     title->setObjectName(QStringLiteral("dialogTitle"));
     layout->addWidget(title);
     auto *subtitle = new QLabel(
-        QStringLiteral("Review and remove pages saved in PanBrowser’s local history."),
+        tr("Review and remove pages saved in PanBrowser’s local history."),
         this
     );
     subtitle->setObjectName(QStringLiteral("dialogSubtitle"));
@@ -58,11 +59,11 @@ HistorySettingsPage::HistorySettingsPage(
     auto *privacyLayout = new QVBoxLayout(privacyCard);
     privacyLayout->setContentsMargins(18, 14, 18, 14);
     privacyLayout->setSpacing(7);
-    m_saveHistory = new QCheckBox(QStringLiteral("Save browsing history"), privacyCard);
+    m_saveHistory = new QCheckBox(tr("Save browsing history"), privacyCard);
     m_saveHistory->setChecked(saveHistoryEnabled);
     privacyLayout->addWidget(m_saveHistory);
     auto *privacyHint = new QLabel(
-        QStringLiteral("Disabling this stops new entries and address-bar suggestions. Existing history is kept until you remove it."),
+        tr("Disabling this stops new entries and address-bar suggestions. Existing history is kept until you remove it."),
         privacyCard
     );
     privacyHint->setObjectName(QStringLiteral("fieldHint"));
@@ -70,13 +71,13 @@ HistorySettingsPage::HistorySettingsPage(
     privacyLayout->addWidget(privacyHint);
     layout->addWidget(privacyCard);
 
-    auto *historyLabel = new QLabel(QStringLiteral("VISITS"), this);
+    auto *historyLabel = new QLabel(tr("VISITS"), this);
     historyLabel->setObjectName(QStringLiteral("sectionLabel"));
     layout->addWidget(historyLabel);
 
     m_filter = new QLineEdit(this);
     m_filter->setObjectName(QStringLiteral("historyFilter"));
-    m_filter->setPlaceholderText(QStringLiteral("Search titles and addresses"));
+    m_filter->setPlaceholderText(tr("Search titles and addresses"));
     m_filter->addAction(
         QIcon(QStringLiteral(":/assets/icons/search.svg")),
         QLineEdit::LeadingPosition
@@ -94,9 +95,9 @@ HistorySettingsPage::HistorySettingsPage(
     m_status = new QLabel(this);
     m_status->setObjectName(QStringLiteral("fieldHint"));
     footer->addWidget(m_status, 1);
-    m_remove = new QPushButton(QStringLiteral("Remove selected"), this);
+    m_remove = new QPushButton(tr("Remove selected"), this);
     m_remove->setObjectName(QStringLiteral("dangerButton"));
-    auto *clear = new QPushButton(QStringLiteral("Clear all history…"), this);
+    auto *clear = new QPushButton(tr("Clear all history…"), this);
     clear->setObjectName(QStringLiteral("dangerButton"));
     footer->addWidget(m_remove);
     footer->addWidget(clear);
@@ -125,7 +126,7 @@ void HistorySettingsPage::reload()
 {
     m_visits->clear();
     if (!m_store || !m_store->isOpen()) {
-        m_status->setText(QStringLiteral("History is unavailable."));
+        m_status->setText(tr("History is unavailable."));
         m_filter->setEnabled(false);
         m_remove->setEnabled(false);
         return;
@@ -164,16 +165,16 @@ void HistorySettingsPage::reload()
     if (visits.isEmpty()) {
         auto *empty = new QListWidgetItem(
             m_filter->text().trimmed().isEmpty()
-                ? QStringLiteral("No browsing history yet")
-                : QStringLiteral("No matching history"),
+                ? tr("No browsing history yet")
+                : tr("No matching history"),
             m_visits
         );
         empty->setFlags(Qt::NoItemFlags);
     }
     m_status->setText(
         visits.size() == 1000
-            ? QStringLiteral("Showing the latest 1,000 visits")
-            : QStringLiteral("%1 visit%2").arg(visits.size()).arg(visits.size() == 1 ? QString() : QStringLiteral("s"))
+            ? tr("Showing the latest 1,000 visits")
+            : tr("%n visit(s)", nullptr, visits.size())
     );
     updateActions();
 }
@@ -202,7 +203,7 @@ void HistorySettingsPage::removeSelected()
         return;
     QString error;
     if (!m_store->removeVisits(ids, &error))
-        QMessageBox::warning(this, QStringLiteral("Cannot remove history"), error);
+        QMessageBox::warning(this, tr("Cannot remove history"), error);
 }
 
 void HistorySettingsPage::clearAll()
@@ -211,8 +212,8 @@ void HistorySettingsPage::clearAll()
         return;
     if (QMessageBox::question(
             this,
-            QStringLiteral("Clear browsing history"),
-            QStringLiteral("Remove all browsing history and address-bar history suggestions? Cookies, sign-ins, and downloads will be kept."),
+            tr("Clear browsing history"),
+            tr("Remove all browsing history and address-bar history suggestions? Cookies, sign-ins, and downloads will be kept."),
             QMessageBox::Yes | QMessageBox::Cancel,
             QMessageBox::Cancel
         ) != QMessageBox::Yes) {
@@ -220,5 +221,5 @@ void HistorySettingsPage::clearAll()
     }
     QString error;
     if (!m_store->clear(&error))
-        QMessageBox::warning(this, QStringLiteral("Cannot clear history"), error);
+        QMessageBox::warning(this, tr("Cannot clear history"), error);
 }

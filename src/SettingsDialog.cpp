@@ -8,6 +8,7 @@
 
 #include <QCheckBox>
 #include <QComboBox>
+#include <QCoreApplication>
 #include <QDialogButtonBox>
 #include <QFile>
 #include <QFormLayout>
@@ -42,7 +43,10 @@ bool captureFile(const QString &path, FileSnapshot *snapshot, QString *error)
     QFile file(path);
     if (!file.open(QIODevice::ReadOnly)) {
         if (error)
-            *error = QStringLiteral("Cannot snapshot %1: %2").arg(path, file.errorString());
+            *error = QCoreApplication::translate(
+                "SettingsDialog",
+                "Cannot snapshot %1: %2"
+            ).arg(path, file.errorString());
         return false;
     }
     snapshot->contents = file.readAll();
@@ -55,19 +59,28 @@ bool restoreFile(const FileSnapshot &snapshot, QString *error)
         if (!QFile::exists(snapshot.path) || QFile::remove(snapshot.path))
             return true;
         if (error)
-            *error = QStringLiteral("Cannot remove %1 during rollback").arg(snapshot.path);
+            *error = QCoreApplication::translate(
+                "SettingsDialog",
+                "Cannot remove %1 during rollback"
+            ).arg(snapshot.path);
         return false;
     }
 
     QSaveFile file(snapshot.path);
     if (!file.open(QIODevice::WriteOnly)) {
         if (error)
-            *error = QStringLiteral("Cannot restore %1: %2").arg(snapshot.path, file.errorString());
+            *error = QCoreApplication::translate(
+                "SettingsDialog",
+                "Cannot restore %1: %2"
+            ).arg(snapshot.path, file.errorString());
         return false;
     }
     if (file.write(snapshot.contents) != snapshot.contents.size() || !file.commit()) {
         if (error)
-            *error = QStringLiteral("Cannot restore %1: %2").arg(snapshot.path, file.errorString());
+            *error = QCoreApplication::translate(
+                "SettingsDialog",
+                "Cannot restore %1: %2"
+            ).arg(snapshot.path, file.errorString());
         return false;
     }
     return true;
@@ -140,7 +153,7 @@ SearchSettings SettingsDialog::searchSettings() const
 void SettingsDialog::createInterface(const QUrl &currentUrl, Page initialPage)
 {
     setObjectName(QStringLiteral("settingsDialog"));
-    setWindowTitle(QStringLiteral("Settings"));
+    setWindowTitle(tr("Settings"));
     setWindowIcon(QIcon(QStringLiteral(":/assets/icons/settings.svg")));
     resize(1180, 760);
     setMinimumSize(980, 640);
@@ -161,37 +174,37 @@ void SettingsDialog::createInterface(const QUrl &currentUrl, Page initialPage)
     m_sidebar->setFixedWidth(190);
     auto *generalItem = new QListWidgetItem(
         QIcon(QStringLiteral(":/assets/icons/settings.svg")),
-        QStringLiteral("General"),
+        tr("General"),
         m_sidebar
     );
     generalItem->setData(Qt::UserRole, static_cast<int>(Page::General));
     auto *searchItem = new QListWidgetItem(
         QIcon(QStringLiteral(":/assets/icons/search.svg")),
-        QStringLiteral("Search"),
+        tr("Search"),
         m_sidebar
     );
     searchItem->setData(Qt::UserRole, static_cast<int>(Page::Search));
     auto *historyItem = new QListWidgetItem(
         QIcon(QStringLiteral(":/assets/icons/history.svg")),
-        QStringLiteral("History"),
+        tr("History"),
         m_sidebar
     );
     historyItem->setData(Qt::UserRole, static_cast<int>(Page::History));
     auto *privacyDataItem = new QListWidgetItem(
         QIcon(QStringLiteral(":/assets/icons/database.svg")),
-        QStringLiteral("Privacy & Data"),
+        tr("Privacy & Data"),
         m_sidebar
     );
     privacyDataItem->setData(Qt::UserRole, static_cast<int>(Page::PrivacyData));
     auto *trustItem = new QListWidgetItem(
         QIcon(QStringLiteral(":/assets/icons/shield-check.svg")),
-        QStringLiteral("Trust Rules"),
+        tr("Trust Rules"),
         m_sidebar
     );
     trustItem->setData(Qt::UserRole, static_cast<int>(Page::TrustRules));
     auto *diagnosticsItem = new QListWidgetItem(
         QIcon(QStringLiteral(":/assets/icons/info.svg")),
-        QStringLiteral("Diagnostics"),
+        tr("Diagnostics"),
         m_sidebar
     );
     diagnosticsItem->setData(Qt::UserRole, static_cast<int>(Page::Diagnostics));
@@ -207,17 +220,54 @@ void SettingsDialog::createInterface(const QUrl &currentUrl, Page initialPage)
     generalLayout->setContentsMargins(30, 24, 30, 24);
     generalLayout->setSpacing(14);
 
-    auto *title = new QLabel(QStringLiteral("General"), generalPage);
+    auto *title = new QLabel(tr("General"), generalPage);
     title->setObjectName(QStringLiteral("dialogTitle"));
     generalLayout->addWidget(title);
     auto *subtitle = new QLabel(
-        QStringLiteral("Choose how PanBrowser starts and what it keeps between launches."),
+        tr("Choose how PanBrowser starts and what it keeps between launches."),
         generalPage
     );
     subtitle->setObjectName(QStringLiteral("dialogSubtitle"));
     generalLayout->addWidget(subtitle);
 
-    auto *startupLabel = new QLabel(QStringLiteral("STARTUP"), generalPage);
+    auto *languageLabel = new QLabel(tr("LANGUAGE"), generalPage);
+    languageLabel->setObjectName(QStringLiteral("sectionLabel"));
+    generalLayout->addWidget(languageLabel);
+
+    auto *languageCard = new QFrame(generalPage);
+    languageCard->setObjectName(QStringLiteral("settingsCard"));
+    auto *languageLayout = new QFormLayout(languageCard);
+    languageLayout->setContentsMargins(18, 16, 18, 16);
+    languageLayout->setHorizontalSpacing(18);
+    languageLayout->setVerticalSpacing(8);
+    languageLayout->setFieldGrowthPolicy(QFormLayout::AllNonFixedFieldsGrow);
+    m_interfaceLanguage = new QComboBox(languageCard);
+    m_interfaceLanguage->addItem(
+        tr("System default"),
+        static_cast<int>(InterfaceLanguage::System)
+    );
+    m_interfaceLanguage->addItem(
+        tr("English"),
+        static_cast<int>(InterfaceLanguage::English)
+    );
+    m_interfaceLanguage->addItem(
+        QStringLiteral("Русский"),
+        static_cast<int>(InterfaceLanguage::Russian)
+    );
+    m_interfaceLanguage->setCurrentIndex(m_interfaceLanguage->findData(
+        static_cast<int>(m_preferences.interfaceLanguage())
+    ));
+    languageLayout->addRow(tr("Interface language"), m_interfaceLanguage);
+    auto *languageHint = new QLabel(
+        tr("Language changes take effect after PanBrowser restarts."),
+        languageCard
+    );
+    languageHint->setObjectName(QStringLiteral("fieldHint"));
+    languageHint->setWordWrap(true);
+    languageLayout->addRow(languageHint);
+    generalLayout->addWidget(languageCard);
+
+    auto *startupLabel = new QLabel(tr("STARTUP"), generalPage);
     startupLabel->setObjectName(QStringLiteral("sectionLabel"));
     generalLayout->addWidget(startupLabel);
 
@@ -236,7 +286,7 @@ void SettingsDialog::createInterface(const QUrl &currentUrl, Page initialPage)
     m_startPage = new QLineEdit(startPageRow);
     m_startPage->setText(m_preferences.startPage().toString());
     m_startPage->setPlaceholderText(QStringLiteral("https://example.com"));
-    auto *useCurrent = new QPushButton(QStringLiteral("Use current tab"), startPageRow);
+    auto *useCurrent = new QPushButton(tr("Use current tab"), startPageRow);
     useCurrent->setEnabled(
         currentUrl.isValid()
         && (currentUrl.scheme() == QStringLiteral("http")
@@ -244,24 +294,24 @@ void SettingsDialog::createInterface(const QUrl &currentUrl, Page initialPage)
     );
     startPageLayout->addWidget(m_startPage, 1);
     startPageLayout->addWidget(useCurrent);
-    startupLayout->addRow(QStringLiteral("Start page"), startPageRow);
+    startupLayout->addRow(tr("Start page"), startPageRow);
 
     m_startupMode = new QComboBox(startupCard);
     m_startupMode->addItem(
-        QStringLiteral("Open the start page"),
+        tr("Open the start page"),
         static_cast<int>(StartupMode::StartPage)
     );
     m_startupMode->addItem(
-        QStringLiteral("Continue with previous tabs"),
+        tr("Continue with previous tabs"),
         static_cast<int>(StartupMode::RestoreTabs)
     );
     m_startupMode->setCurrentIndex(m_startupMode->findData(
         static_cast<int>(m_preferences.startupMode())
     ));
-    startupLayout->addRow(QStringLiteral("On launch"), m_startupMode);
+    startupLayout->addRow(tr("On launch"), m_startupMode);
 
     auto *restoreSignInHint = new QLabel(
-        QStringLiteral("Some restored tabs may ask you to sign in again unless “Keep sign-ins between launches” is enabled."),
+        tr("Some restored tabs may ask you to sign in again unless “Keep sign-ins between launches” is enabled."),
         startupCard
     );
     restoreSignInHint->setObjectName(QStringLiteral("fieldHint"));
@@ -269,7 +319,7 @@ void SettingsDialog::createInterface(const QUrl &currentUrl, Page initialPage)
     startupLayout->addRow(restoreSignInHint);
     generalLayout->addWidget(startupCard);
 
-    auto *privacyLabel = new QLabel(QStringLiteral("PRIVACY"), generalPage);
+    auto *privacyLabel = new QLabel(tr("PRIVACY"), generalPage);
     privacyLabel->setObjectName(QStringLiteral("sectionLabel"));
     generalLayout->addWidget(privacyLabel);
 
@@ -279,13 +329,13 @@ void SettingsDialog::createInterface(const QUrl &currentUrl, Page initialPage)
     privacyLayout->setContentsMargins(18, 16, 18, 16);
     privacyLayout->setSpacing(8);
     m_persistSessionCookies = new QCheckBox(
-        QStringLiteral("Keep sign-ins between launches"),
+        tr("Keep sign-ins between launches"),
         privacyCard
     );
     m_persistSessionCookies->setChecked(m_preferences.persistSessionCookies());
     privacyLayout->addWidget(m_persistSessionCookies);
     auto *privacyHint = new QLabel(
-        QStringLiteral("Session cookies will be stored in the PanBrowser profile. Avoid this on a shared computer."),
+        tr("Session cookies will be stored in the PanBrowser profile. Avoid this on a shared computer."),
         privacyCard
     );
     privacyHint->setObjectName(QStringLiteral("fieldHint"));
@@ -304,17 +354,17 @@ void SettingsDialog::createInterface(const QUrl &currentUrl, Page initialPage)
     dataLayout->setContentsMargins(30, 24, 30, 24);
     dataLayout->setSpacing(14);
 
-    auto *dataTitle = new QLabel(QStringLiteral("Privacy & Data"), privacyDataPage);
+    auto *dataTitle = new QLabel(tr("Privacy & Data"), privacyDataPage);
     dataTitle->setObjectName(QStringLiteral("dialogTitle"));
     dataLayout->addWidget(dataTitle);
     auto *dataSubtitle = new QLabel(
-        QStringLiteral("Remove browsing data kept in PanBrowser’s isolated WebEngine profile."),
+        tr("Remove browsing data kept in PanBrowser’s isolated WebEngine profile."),
         privacyDataPage
     );
     dataSubtitle->setObjectName(QStringLiteral("dialogSubtitle"));
     dataLayout->addWidget(dataSubtitle);
 
-    auto *storedDataLabel = new QLabel(QStringLiteral("STORED DATA"), privacyDataPage);
+    auto *storedDataLabel = new QLabel(tr("STORED DATA"), privacyDataPage);
     storedDataLabel->setObjectName(QStringLiteral("sectionLabel"));
     dataLayout->addWidget(storedDataLabel);
 
@@ -325,11 +375,11 @@ void SettingsDialog::createInterface(const QUrl &currentUrl, Page initialPage)
     cacheLayout->setSpacing(18);
     auto *cacheTextLayout = new QVBoxLayout();
     cacheTextLayout->setSpacing(5);
-    auto *cacheTitle = new QLabel(QStringLiteral("HTTP cache"), cacheCard);
+    auto *cacheTitle = new QLabel(tr("HTTP cache"), cacheCard);
     cacheTitle->setObjectName(QStringLiteral("settingsCardTitle"));
     cacheTextLayout->addWidget(cacheTitle);
     auto *cacheDescription = new QLabel(
-        QStringLiteral("Remove temporary page resources. This does not sign you out."),
+        tr("Remove temporary page resources. This does not sign you out."),
         cacheCard
     );
     cacheDescription->setObjectName(QStringLiteral("fieldHint"));
@@ -340,7 +390,7 @@ void SettingsDialog::createInterface(const QUrl &currentUrl, Page initialPage)
     cacheStatus->hide();
     cacheTextLayout->addWidget(cacheStatus);
     cacheLayout->addLayout(cacheTextLayout, 1);
-    auto *clearCache = new QPushButton(QStringLiteral("Clear cache"), cacheCard);
+    auto *clearCache = new QPushButton(tr("Clear cache"), cacheCard);
     cacheLayout->addWidget(clearCache);
     dataLayout->addWidget(cacheCard);
 
@@ -351,11 +401,11 @@ void SettingsDialog::createInterface(const QUrl &currentUrl, Page initialPage)
     cookiesLayout->setSpacing(18);
     auto *cookiesTextLayout = new QVBoxLayout();
     cookiesTextLayout->setSpacing(5);
-    auto *cookiesTitle = new QLabel(QStringLiteral("Cookies"), cookiesCard);
+    auto *cookiesTitle = new QLabel(tr("Cookies"), cookiesCard);
     cookiesTitle->setObjectName(QStringLiteral("settingsCardTitle"));
     cookiesTextLayout->addWidget(cookiesTitle);
     auto *cookiesDescription = new QLabel(
-        QStringLiteral("Remove persistent and session cookies. Most sites will ask you to sign in again."),
+        tr("Remove persistent and session cookies. Most sites will ask you to sign in again."),
         cookiesCard
     );
     cookiesDescription->setObjectName(QStringLiteral("fieldHint"));
@@ -366,7 +416,7 @@ void SettingsDialog::createInterface(const QUrl &currentUrl, Page initialPage)
     cookiesStatus->hide();
     cookiesTextLayout->addWidget(cookiesStatus);
     cookiesLayout->addLayout(cookiesTextLayout, 1);
-    auto *clearCookies = new QPushButton(QStringLiteral("Clear cookies…"), cookiesCard);
+    auto *clearCookies = new QPushButton(tr("Clear cookies…"), cookiesCard);
     cookiesLayout->addWidget(clearCookies);
     dataLayout->addWidget(cookiesCard);
 
@@ -377,11 +427,11 @@ void SettingsDialog::createInterface(const QUrl &currentUrl, Page initialPage)
     allDataLayout->setSpacing(18);
     auto *allDataTextLayout = new QVBoxLayout();
     allDataTextLayout->setSpacing(5);
-    auto *allDataTitle = new QLabel(QStringLiteral("All site data"), allDataCard);
+    auto *allDataTitle = new QLabel(tr("All site data"), allDataCard);
     allDataTitle->setObjectName(QStringLiteral("settingsCardTitle"));
     allDataTextLayout->addWidget(allDataTitle);
     auto *allDataDescription = new QLabel(
-        QStringLiteral("Remove cookies, local storage, IndexedDB, service workers, and cache on the next launch. Settings, history, trust rules, certificates, and saved tabs are kept."),
+        tr("Remove cookies, local storage, IndexedDB, service workers, and cache on the next launch. Settings, history, trust rules, certificates, and saved tabs are kept."),
         allDataCard
     );
     allDataDescription->setObjectName(QStringLiteral("fieldHint"));
@@ -412,7 +462,7 @@ void SettingsDialog::createInterface(const QUrl &currentUrl, Page initialPage)
         this
     );
     buttons->setContentsMargins(18, 12, 18, 0);
-    buttons->button(QDialogButtonBox::Save)->setText(QStringLiteral("Save settings"));
+    buttons->button(QDialogButtonBox::Save)->setText(tr("Save settings"));
     rootLayout->addWidget(buttons);
 
     connect(m_sidebar, &QListWidget::currentRowChanged, m_pages, &QStackedWidget::setCurrentIndex);
@@ -421,7 +471,7 @@ void SettingsDialog::createInterface(const QUrl &currentUrl, Page initialPage)
     });
     connect(clearCache, &QPushButton::clicked, this, [this, clearCache, cacheStatus] {
         clearCache->setEnabled(false);
-        cacheStatus->setText(QStringLiteral("Clearing cache…"));
+        cacheStatus->setText(tr("Clearing cache…"));
         cacheStatus->show();
         m_profile->clearHttpCache();
     });
@@ -431,15 +481,15 @@ void SettingsDialog::createInterface(const QUrl &currentUrl, Page initialPage)
         this,
         [clearCache, cacheStatus] {
             clearCache->setEnabled(true);
-            cacheStatus->setText(QStringLiteral("Cache cleared."));
+            cacheStatus->setText(QCoreApplication::translate("SettingsDialog", "Cache cleared."));
             cacheStatus->show();
         }
     );
     connect(clearCookies, &QPushButton::clicked, this, [this, cookiesStatus] {
         if (QMessageBox::question(
                 this,
-                QStringLiteral("Clear cookies"),
-                QStringLiteral("Clear all cookies? Most sites will ask you to sign in again."),
+                tr("Clear cookies"),
+                tr("Clear all cookies? Most sites will ask you to sign in again."),
                 QMessageBox::Yes | QMessageBox::Cancel,
                 QMessageBox::Cancel
             ) != QMessageBox::Yes) {
@@ -447,18 +497,22 @@ void SettingsDialog::createInterface(const QUrl &currentUrl, Page initialPage)
         }
         m_profile->clearAllCookies();
         cookiesStatus->setText(
-            QStringLiteral("Cookie deletion requested. Reload open tabs to update their sign-in state.")
+            tr("Cookie deletion requested. Reload open tabs to update their sign-in state.")
         );
         cookiesStatus->show();
     });
     const auto updateDataResetUi = [resetAllData, allDataStatus] {
         const bool scheduled = BrowserProfile::dataResetScheduled();
         resetAllData->setText(
-            scheduled ? QStringLiteral("Cancel scheduled reset")
-                      : QStringLiteral("Reset on next launch…")
+            scheduled
+                ? QCoreApplication::translate("SettingsDialog", "Cancel scheduled reset")
+                : QCoreApplication::translate("SettingsDialog", "Reset on next launch…")
         );
         allDataStatus->setText(
-            scheduled ? QStringLiteral("Full site-data reset is scheduled for the next launch.")
+            scheduled ? QCoreApplication::translate(
+                            "SettingsDialog",
+                            "Full site-data reset is scheduled for the next launch."
+                        )
                       : QString()
         );
         allDataStatus->setVisible(scheduled);
@@ -467,22 +521,22 @@ void SettingsDialog::createInterface(const QUrl &currentUrl, Page initialPage)
         QString error;
         if (BrowserProfile::dataResetScheduled()) {
             if (!BrowserProfile::cancelDataReset(&error))
-                QMessageBox::warning(this, QStringLiteral("Cannot cancel reset"), error);
+                QMessageBox::warning(this, tr("Cannot cancel reset"), error);
             updateDataResetUi();
             return;
         }
 
         if (QMessageBox::question(
                 this,
-                QStringLiteral("Reset all site data"),
-                QStringLiteral("Schedule deletion of all cookies and site storage the next time PanBrowser starts? History, trust rules, certificates, settings, and saved tabs will be kept."),
+                tr("Reset all site data"),
+                tr("Schedule deletion of all cookies and site storage the next time PanBrowser starts? History, trust rules, certificates, settings, and saved tabs will be kept."),
                 QMessageBox::Yes | QMessageBox::Cancel,
                 QMessageBox::Cancel
             ) != QMessageBox::Yes) {
             return;
         }
         if (!BrowserProfile::scheduleDataReset(&error))
-            QMessageBox::warning(this, QStringLiteral("Cannot schedule reset"), error);
+            QMessageBox::warning(this, tr("Cannot schedule reset"), error);
         updateDataResetUi();
     });
     const auto updateRestoreHint = [this, restoreSignInHint] {
@@ -525,6 +579,9 @@ BrowserPreferences SettingsDialog::preferencesFromControls() const
     );
     preferences.setPersistSessionCookies(m_persistSessionCookies->isChecked());
     preferences.setSaveBrowsingHistory(m_historyPage->saveHistoryEnabled());
+    preferences.setInterfaceLanguage(
+        static_cast<InterfaceLanguage>(m_interfaceLanguage->currentData().toInt())
+    );
     return preferences;
 }
 
@@ -534,17 +591,17 @@ void SettingsDialog::saveAndClose()
     QString error;
     if (!preferences.validate(&error)) {
         selectPage(Page::General);
-        QMessageBox::warning(this, QStringLiteral("Cannot save settings"), error);
+        QMessageBox::warning(this, tr("Cannot save settings"), error);
         return;
     }
     if (!m_trustRules->validate(&error)) {
         selectPage(Page::TrustRules);
-        QMessageBox::warning(this, QStringLiteral("Cannot save trust rules"), error);
+        QMessageBox::warning(this, tr("Cannot save trust rules"), error);
         return;
     }
     if (!m_searchPage->validate(&error)) {
         selectPage(Page::Search);
-        QMessageBox::warning(this, QStringLiteral("Cannot save search settings"), error);
+        QMessageBox::warning(this, tr("Cannot save search settings"), error);
         return;
     }
     QList<FileSnapshot> snapshots;
@@ -556,7 +613,7 @@ void SettingsDialog::saveAndClose()
          }) {
         FileSnapshot snapshot;
         if (!captureFile(path, &snapshot, &error)) {
-            QMessageBox::warning(this, QStringLiteral("Cannot save settings"), error);
+            QMessageBox::warning(this, tr("Cannot save settings"), error);
             return;
         }
         snapshots.append(snapshot);
@@ -565,23 +622,23 @@ void SettingsDialog::saveAndClose()
     SearchSettings searchSettings = m_searchPage->settings();
     if (!preferences.save(&error)) {
         selectPage(Page::General);
-        QMessageBox::warning(this, QStringLiteral("Cannot save settings"), error);
+        QMessageBox::warning(this, tr("Cannot save settings"), error);
         return;
     }
     if (!searchSettings.save(m_searchConfigurationPath, &error)) {
         const QString rollbackError = rollbackSettings(m_preferences, snapshots.mid(0, 2));
         selectPage(Page::Search);
         if (!rollbackError.isEmpty())
-            error += QStringLiteral("\n\nRollback was incomplete:\n") + rollbackError;
-        QMessageBox::warning(this, QStringLiteral("Cannot save search settings"), error);
+            error += tr("\n\nRollback was incomplete:\n") + rollbackError;
+        QMessageBox::warning(this, tr("Cannot save search settings"), error);
         return;
     }
     if (!m_trustRules->save(&error)) {
         const QString rollbackError = rollbackSettings(m_preferences, snapshots);
         selectPage(Page::TrustRules);
         if (!rollbackError.isEmpty())
-            error += QStringLiteral("\n\nRollback was incomplete:\n") + rollbackError;
-        QMessageBox::warning(this, QStringLiteral("Cannot save trust rules"), error);
+            error += tr("\n\nRollback was incomplete:\n") + rollbackError;
+        QMessageBox::warning(this, tr("Cannot save trust rules"), error);
         return;
     }
 

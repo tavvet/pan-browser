@@ -1,6 +1,7 @@
 #include "SearchSettingsPage.h"
 
 #include <QCheckBox>
+#include <QCoreApplication>
 #include <QComboBox>
 #include <QDialog>
 #include <QDialogButtonBox>
@@ -18,14 +19,20 @@
 
 namespace {
 
+QString uiText(const char *source)
+{
+    return QCoreApplication::translate("SearchSettingsPage", source);
+}
+
 class SearchEngineEditor final : public QDialog {
 public:
     SearchEngineEditor(const SearchEngineSettings &engine, bool adding, QWidget *parent)
         : QDialog(parent)
     {
         setObjectName(QStringLiteral("searchEngineDialog"));
-        setWindowTitle(adding ? QStringLiteral("Add search engine")
-                              : QStringLiteral("Edit search engine"));
+        setWindowTitle(adding
+            ? uiText(QT_TRANSLATE_NOOP("SearchSettingsPage", "Add search engine"))
+            : uiText(QT_TRANSLATE_NOOP("SearchSettingsPage", "Edit search engine")));
         setModal(true);
         resize(620, 300);
 
@@ -42,23 +49,23 @@ public:
         form->setVerticalSpacing(12);
         form->setFieldGrowthPolicy(QFormLayout::AllNonFixedFieldsGrow);
         m_name = new QLineEdit(engine.name, this);
-        m_name->setPlaceholderText(QStringLiteral("Example Search"));
-        form->addRow(QStringLiteral("Name"), m_name);
+        m_name->setPlaceholderText(uiText(QT_TRANSLATE_NOOP("SearchSettingsPage", "Example Search")));
+        form->addRow(uiText(QT_TRANSLATE_NOOP("SearchSettingsPage", "Name")), m_name);
         m_keyword = new QLineEdit(engine.keyword, this);
         m_keyword->setPlaceholderText(QStringLiteral("ex"));
-        form->addRow(QStringLiteral("Keyword"), m_keyword);
+        form->addRow(uiText(QT_TRANSLATE_NOOP("SearchSettingsPage", "Keyword")), m_keyword);
         m_urlTemplate = new QLineEdit(engine.urlTemplate, this);
         m_urlTemplate->setPlaceholderText(
             QStringLiteral("https://search.example/?q={searchTerms}")
         );
-        form->addRow(QStringLiteral("URL template"), m_urlTemplate);
-        m_enabled = new QCheckBox(QStringLiteral("Search engine is enabled"), this);
+        form->addRow(uiText(QT_TRANSLATE_NOOP("SearchSettingsPage", "URL template")), m_urlTemplate);
+        m_enabled = new QCheckBox(uiText(QT_TRANSLATE_NOOP("SearchSettingsPage", "Search engine is enabled")), this);
         m_enabled->setChecked(engine.enabled);
-        form->addRow(QStringLiteral("Status"), m_enabled);
+        form->addRow(uiText(QT_TRANSLATE_NOOP("SearchSettingsPage", "Status")), m_enabled);
         layout->addLayout(form);
 
         auto *hint = new QLabel(
-            QStringLiteral("Use {searchTerms} exactly once. The optional keyword is entered as @keyword in the address bar."),
+            uiText(QT_TRANSLATE_NOOP("SearchSettingsPage", "Use {searchTerms} exactly once. The optional keyword is entered as @keyword in the address bar.")),
             this
         );
         hint->setObjectName(QStringLiteral("fieldHint"));
@@ -71,7 +78,9 @@ public:
             this
         );
         buttons->button(QDialogButtonBox::Save)->setText(
-            adding ? QStringLiteral("Add engine") : QStringLiteral("Save engine")
+            adding
+                ? uiText(QT_TRANSLATE_NOOP("SearchSettingsPage", "Add engine"))
+                : uiText(QT_TRANSLATE_NOOP("SearchSettingsPage", "Save engine"))
         );
         layout->addWidget(buttons);
         connect(buttons, &QDialogButtonBox::accepted, this, &QDialog::accept);
@@ -106,17 +115,17 @@ SearchSettingsPage::SearchSettingsPage(const SearchSettings &settings, QWidget *
     layout->setContentsMargins(30, 24, 30, 24);
     layout->setSpacing(14);
 
-    auto *title = new QLabel(QStringLiteral("Search"), this);
+    auto *title = new QLabel(tr("Search"), this);
     title->setObjectName(QStringLiteral("dialogTitle"));
     layout->addWidget(title);
     auto *subtitle = new QLabel(
-        QStringLiteral("Search from the address bar without sending queries until you press Enter."),
+        tr("Search from the address bar without sending queries until you press Enter."),
         this
     );
     subtitle->setObjectName(QStringLiteral("dialogSubtitle"));
     layout->addWidget(subtitle);
 
-    auto *defaultLabel = new QLabel(QStringLiteral("DEFAULT SEARCH ENGINE"), this);
+    auto *defaultLabel = new QLabel(tr("DEFAULT SEARCH ENGINE"), this);
     defaultLabel->setObjectName(QStringLiteral("sectionLabel"));
     layout->addWidget(defaultLabel);
     auto *defaultCard = new QFrame(this);
@@ -125,10 +134,10 @@ SearchSettingsPage::SearchSettingsPage(const SearchSettings &settings, QWidget *
     defaultLayout->setContentsMargins(18, 16, 18, 16);
     defaultLayout->setFieldGrowthPolicy(QFormLayout::AllNonFixedFieldsGrow);
     m_defaultEngine = new QComboBox(defaultCard);
-    defaultLayout->addRow(QStringLiteral("Search engine"), m_defaultEngine);
+    defaultLayout->addRow(tr("Search engine"), m_defaultEngine);
     layout->addWidget(defaultCard);
 
-    auto *enginesLabel = new QLabel(QStringLiteral("SEARCH ENGINES"), this);
+    auto *enginesLabel = new QLabel(tr("SEARCH ENGINES"), this);
     enginesLabel->setObjectName(QStringLiteral("sectionLabel"));
     layout->addWidget(enginesLabel);
     m_engineList = new QListWidget(this);
@@ -143,11 +152,11 @@ SearchSettingsPage::SearchSettingsPage(const SearchSettings &settings, QWidget *
     layout->addWidget(m_details);
 
     auto *buttons = new QHBoxLayout();
-    auto *addButton = new QPushButton(QStringLiteral("Add engine"), this);
-    m_editButton = new QPushButton(QStringLiteral("Edit"), this);
-    m_removeButton = new QPushButton(QStringLiteral("Remove"), this);
+    auto *addButton = new QPushButton(tr("Add engine"), this);
+    m_editButton = new QPushButton(tr("Edit"), this);
+    m_removeButton = new QPushButton(tr("Remove"), this);
     m_removeButton->setObjectName(QStringLiteral("dangerButton"));
-    auto *restoreButton = new QPushButton(QStringLiteral("Restore built-ins"), this);
+    auto *restoreButton = new QPushButton(tr("Restore built-ins"), this);
     buttons->addWidget(addButton);
     buttons->addWidget(m_editButton);
     buttons->addWidget(m_removeButton);
@@ -201,7 +210,7 @@ void SearchSettingsPage::rebuildList(const QString &selectedId)
         if (!engine.keyword.isEmpty())
             text += QStringLiteral("   @%1").arg(engine.keyword);
         if (engine.builtIn)
-            text += QStringLiteral("   Built-in");
+            text += tr("   Built-in");
         auto *item = new QListWidgetItem(text, m_engineList);
         item->setData(Qt::UserRole, engine.id);
         item->setFlags(item->flags() | Qt::ItemIsUserCheckable);
@@ -251,7 +260,7 @@ void SearchSettingsPage::updateDetails()
     }
     QString text = engine->urlTemplate;
     if (engine->urlTemplate.startsWith(QStringLiteral("http://"), Qt::CaseInsensitive))
-        text += QStringLiteral("\nWarning: searches sent through HTTP are not encrypted.");
+        text += tr("\nWarning: searches sent through HTTP are not encrypted.");
     m_details->setText(text);
 }
 
@@ -284,8 +293,8 @@ void SearchSettingsPage::removeSelectedEngine()
     const QString name = engine->name;
     if (QMessageBox::question(
             this,
-            QStringLiteral("Remove search engine"),
-            QStringLiteral("Remove “%1”?").arg(name),
+            tr("Remove search engine"),
+            tr("Remove “%1”?").arg(name),
             QMessageBox::Yes | QMessageBox::Cancel,
             QMessageBox::Cancel
         ) != QMessageBox::Yes) {
@@ -304,8 +313,8 @@ void SearchSettingsPage::restoreBuiltInEngines()
 {
     if (QMessageBox::question(
             this,
-            QStringLiteral("Restore built-in search engines"),
-            QStringLiteral("Restore the built-in engines and their original settings? Custom engines will be kept."),
+            tr("Restore built-in search engines"),
+            tr("Restore the built-in engines and their original settings? Custom engines will be kept."),
             QMessageBox::Yes | QMessageBox::Cancel,
             QMessageBox::Cancel
         ) != QMessageBox::Yes) {
@@ -315,7 +324,7 @@ void SearchSettingsPage::restoreBuiltInEngines()
     restored.restoreBuiltIns();
     QString error;
     if (!restored.validate(&error)) {
-        QMessageBox::warning(this, QStringLiteral("Cannot restore built-ins"), error);
+        QMessageBox::warning(this, tr("Cannot restore built-ins"), error);
         return;
     }
     m_settings = restored;
@@ -368,7 +377,7 @@ bool SearchSettingsPage::editEngine(SearchEngineSettings *engine, bool adding)
         }
         QString error;
         if (!candidateSettings.validate(&error)) {
-            QMessageBox::warning(&editor, QStringLiteral("Invalid search engine"), error);
+            QMessageBox::warning(&editor, tr("Invalid search engine"), error);
             continue;
         }
         *engine = candidate;
@@ -398,7 +407,7 @@ void SearchSettingsPage::setEngineEnabled(const QString &id, bool enabled)
     }
     QString error;
     if (!candidate.validate(&error)) {
-        QMessageBox::warning(this, QStringLiteral("Cannot change search engine"), error);
+        QMessageBox::warning(this, tr("Cannot change search engine"), error);
         if (const SearchEngineSettings *current = m_settings.engineById(id)) {
             for (int row = 0; row < m_engineList->count(); ++row) {
                 QListWidgetItem *item = m_engineList->item(row);

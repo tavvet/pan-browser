@@ -4,6 +4,7 @@
 #include <QCheckBox>
 #include <QClipboard>
 #include <QComboBox>
+#include <QCoreApplication>
 #include <QCryptographicHash>
 #include <QDateTime>
 #include <QDialogButtonBox>
@@ -71,7 +72,9 @@ QString certificateName(const QSslCertificate &certificate)
     QStringList names = certificate.subjectInfo(QSslCertificate::CommonName);
     if (names.isEmpty())
         names = certificate.subjectInfo(QSslCertificate::Organization);
-    return names.isEmpty() ? QStringLiteral("Unnamed certificate") : names.join(QStringLiteral(", "));
+    return names.isEmpty()
+        ? QCoreApplication::translate("TrustRulesDialog", "Unnamed certificate")
+        : names.join(QStringLiteral(", "));
 }
 
 QByteArray fileContents(const QString &path)
@@ -163,7 +166,7 @@ void TrustRulesDialog::finalizeSave()
 void TrustRulesDialog::createInterface(bool embedded)
 {
     setObjectName(QStringLiteral("trustRulesDialog"));
-    setWindowTitle(QStringLiteral("Trust Rules"));
+    setWindowTitle(tr("Trust Rules"));
     setWindowIcon(QIcon(QStringLiteral(":/assets/icons/shield-check.svg")));
     resize(960, 680);
     setMinimumSize(820, 580);
@@ -172,12 +175,12 @@ void TrustRulesDialog::createInterface(bool embedded)
     rootLayout->setContentsMargins(22, 20, 22, 18);
     rootLayout->setSpacing(14);
 
-    auto *title = new QLabel(QStringLiteral("Trust Rules"), this);
+    auto *title = new QLabel(tr("Trust Rules"), this);
     title->setObjectName(QStringLiteral("dialogTitle"));
     rootLayout->addWidget(title);
 
     auto *subtitle = new QLabel(
-        QStringLiteral("Control which domains may use certificate authorities added to PanBrowser."),
+        tr("Control which domains may use certificate authorities added to PanBrowser."),
         this
     );
     subtitle->setObjectName(QStringLiteral("dialogSubtitle"));
@@ -194,7 +197,7 @@ void TrustRulesDialog::createInterface(bool embedded)
     sidebarLayout->setContentsMargins(0, 0, 12, 0);
     sidebarLayout->setSpacing(10);
 
-    auto *rulesLabel = new QLabel(QStringLiteral("DOMAIN RULES"), sidebar);
+    auto *rulesLabel = new QLabel(tr("DOMAIN RULES"), sidebar);
     rulesLabel->setObjectName(QStringLiteral("sectionLabel"));
     sidebarLayout->addWidget(rulesLabel);
 
@@ -204,9 +207,9 @@ void TrustRulesDialog::createInterface(bool embedded)
     sidebarLayout->addWidget(m_ruleList, 1);
 
     auto *ruleButtons = new QHBoxLayout();
-    auto *addButton = new QPushButton(QStringLiteral("Add rule"), sidebar);
+    auto *addButton = new QPushButton(tr("Add rule"), sidebar);
     addButton->setObjectName(QStringLiteral("secondaryButton"));
-    m_deleteRule = new QPushButton(QStringLiteral("Remove rule"), sidebar);
+    m_deleteRule = new QPushButton(tr("Remove rule"), sidebar);
     m_deleteRule->setObjectName(QStringLiteral("dangerButton"));
     ruleButtons->addWidget(addButton);
     ruleButtons->addWidget(m_deleteRule);
@@ -224,7 +227,7 @@ void TrustRulesDialog::createInterface(bool embedded)
     editorLayout->setContentsMargins(16, 0, 0, 0);
     editorLayout->setSpacing(12);
 
-    auto *detailsLabel = new QLabel(QStringLiteral("RULE DETAILS"), m_editor);
+    auto *detailsLabel = new QLabel(tr("RULE DETAILS"), m_editor);
     detailsLabel->setObjectName(QStringLiteral("sectionLabel"));
     editorLayout->addWidget(detailsLabel);
 
@@ -235,23 +238,23 @@ void TrustRulesDialog::createInterface(bool embedded)
     form->setFieldGrowthPolicy(QFormLayout::AllNonFixedFieldsGrow);
 
     m_name = new QLineEdit(m_editor);
-    m_name->setPlaceholderText(QStringLiteral("Example Bank"));
-    form->addRow(QStringLiteral("Name"), m_name);
+    m_name->setPlaceholderText(tr("Example Bank"));
+    form->addRow(tr("Name"), m_name);
 
-    m_enabled = new QCheckBox(QStringLiteral("Rule is enabled"), m_editor);
-    form->addRow(QStringLiteral("Status"), m_enabled);
+    m_enabled = new QCheckBox(tr("Rule is enabled"), m_editor);
+    form->addRow(tr("Status"), m_enabled);
 
     m_mode = new QComboBox(m_editor);
-    m_mode->addItem(QStringLiteral("System trust only"), static_cast<int>(TrustMode::SystemOnly));
+    m_mode->addItem(tr("System trust only"), static_cast<int>(TrustMode::SystemOnly));
     m_mode->addItem(
-        QStringLiteral("System trust or added certificates"),
+        tr("System trust or added certificates"),
         static_cast<int>(TrustMode::SystemPlusCustom)
     );
     m_mode->addItem(
-        QStringLiteral("Added certificates only"),
+        tr("Added certificates only"),
         static_cast<int>(TrustMode::CustomOnly)
     );
-    form->addRow(QStringLiteral("Trust mode"), m_mode);
+    form->addRow(tr("Trust mode"), m_mode);
     editorLayout->addLayout(form);
 
     m_modeDescription = new QLabel(m_editor);
@@ -259,7 +262,7 @@ void TrustRulesDialog::createInterface(bool embedded)
     m_modeDescription->setWordWrap(true);
     editorLayout->addWidget(m_modeDescription);
 
-    auto *domainsLabel = new QLabel(QStringLiteral("DOMAINS"), m_editor);
+    auto *domainsLabel = new QLabel(tr("DOMAINS"), m_editor);
     domainsLabel->setObjectName(QStringLiteral("sectionLabel"));
     editorLayout->addWidget(domainsLabel);
 
@@ -270,14 +273,14 @@ void TrustRulesDialog::createInterface(bool embedded)
     editorLayout->addWidget(m_domains);
 
     auto *domainsHint = new QLabel(
-        QStringLiteral("One domain per line. Wildcards match subdomains only; include the base domain separately."),
+        tr("One domain per line. Wildcards match subdomains only; include the base domain separately."),
         m_editor
     );
     domainsHint->setObjectName(QStringLiteral("fieldHint"));
     domainsHint->setWordWrap(true);
     editorLayout->addWidget(domainsHint);
 
-    auto *certificatesLabel = new QLabel(QStringLiteral("ADDED CERTIFICATES"), m_editor);
+    auto *certificatesLabel = new QLabel(tr("ADDED CERTIFICATES"), m_editor);
     certificatesLabel->setObjectName(QStringLiteral("sectionLabel"));
     editorLayout->addWidget(certificatesLabel);
 
@@ -287,11 +290,11 @@ void TrustRulesDialog::createInterface(bool embedded)
     editorLayout->addWidget(m_certificates, 1);
 
     auto *certificateButtons = new QHBoxLayout();
-    auto *importButton = new QPushButton(QStringLiteral("Add certificates…"), m_editor);
+    auto *importButton = new QPushButton(tr("Add certificates…"), m_editor);
     importButton->setObjectName(QStringLiteral("secondaryButton"));
-    m_viewCertificate = new QPushButton(QStringLiteral("View details…"), m_editor);
+    m_viewCertificate = new QPushButton(tr("View details…"), m_editor);
     m_viewCertificate->setObjectName(QStringLiteral("secondaryButton"));
-    m_removeCertificate = new QPushButton(QStringLiteral("Remove from rule"), m_editor);
+    m_removeCertificate = new QPushButton(tr("Remove from rule"), m_editor);
     m_removeCertificate->setObjectName(QStringLiteral("secondaryButton"));
     certificateButtons->addWidget(importButton);
     certificateButtons->addWidget(m_viewCertificate);
@@ -301,8 +304,8 @@ void TrustRulesDialog::createInterface(bool embedded)
 
     auto *testLayout = new QHBoxLayout();
     m_testDomain = new QLineEdit(m_editor);
-    m_testDomain->setPlaceholderText(QStringLiteral("Enter a domain to see which rule applies"));
-    auto *testButton = new QPushButton(QStringLiteral("Check domain"), m_editor);
+    m_testDomain->setPlaceholderText(tr("Enter a domain to see which rule applies"));
+    auto *testButton = new QPushButton(tr("Check domain"), m_editor);
     testButton->setObjectName(QStringLiteral("secondaryButton"));
     testLayout->addWidget(m_testDomain, 1);
     testLayout->addWidget(testButton);
@@ -328,7 +331,7 @@ void TrustRulesDialog::createInterface(bool embedded)
             Qt::Horizontal,
             this
         );
-        buttons->button(QDialogButtonBox::Save)->setText(QStringLiteral("Save rules"));
+        buttons->button(QDialogButtonBox::Save)->setText(tr("Save rules"));
         rootLayout->addWidget(buttons);
     }
 
@@ -375,11 +378,11 @@ void TrustRulesDialog::rebuildRuleList()
         item->setSizeHint(QSize(220, 52));
         item->setIcon(QIcon(QStringLiteral(":/assets/icons/shield-check.svg")));
         const QString summary = rule.enabled
-            ? (rule.domains.isEmpty() ? QStringLiteral("No domains") : rule.domains.first())
-            : QStringLiteral("Disabled");
+            ? (rule.domains.isEmpty() ? tr("No domains") : rule.domains.first())
+            : tr("Disabled");
         item->setText(
             QStringLiteral("%1\n%2").arg(
-                rule.name.isEmpty() ? QStringLiteral("Untitled rule") : rule.name,
+                rule.name.isEmpty() ? tr("Untitled rule") : rule.name,
                 summary
             )
         );
@@ -442,12 +445,12 @@ void TrustRulesDialog::updateCurrentRuleItem()
 
     const TrustRuleSettings &rule = m_settings.rules().at(m_currentRule);
     const QString summary = rule.enabled
-        ? (rule.domains.isEmpty() ? QStringLiteral("No domains") : rule.domains.first())
-        : QStringLiteral("Disabled");
+        ? (rule.domains.isEmpty() ? tr("No domains") : rule.domains.first())
+        : tr("Disabled");
     QListWidgetItem *item = m_ruleList->item(m_currentRule);
     item->setText(
         QStringLiteral("%1\n%2").arg(
-            rule.name.isEmpty() ? QStringLiteral("Untitled rule") : rule.name,
+            rule.name.isEmpty() ? tr("Untitled rule") : rule.name,
             summary
         )
     );
@@ -475,17 +478,17 @@ void TrustRulesDialog::updateModeDescription()
     switch (mode) {
     case TrustMode::SystemOnly:
         m_modeDescription->setText(
-            QStringLiteral("Use Chromium’s normal certificate validation. Certificates added below are ignored.")
+            tr("Use Chromium’s normal certificate validation. Certificates added below are ignored.")
         );
         break;
     case TrustMode::SystemPlusCustom:
         m_modeDescription->setText(
-            QStringLiteral("Use normal system trust. If the certificate authority is unknown, also try the certificates added below.")
+            tr("Use normal system trust. If the certificate authority is unknown, also try the certificates added below.")
         );
         break;
     case TrustMode::CustomOnly:
         m_modeDescription->setText(
-            QStringLiteral("For an unknown certificate authority, accept only chains ending at a certificate added below. Sites Chromium already trusts are unaffected.")
+            tr("For an unknown certificate authority, accept only chains ending at a certificate added below. Sites Chromium already trusts are unaffected.")
         );
         break;
     }
@@ -510,7 +513,7 @@ void TrustRulesDialog::refreshCertificates()
         item->setSizeHint(QSize(0, 48));
         if (certificates.isEmpty()) {
             item->setText(
-                QStringLiteral("%1\nMissing or invalid certificate").arg(
+                tr("%1\nMissing or invalid certificate").arg(
                     QFileInfo(configuredPath).fileName()
                 )
             );
@@ -525,7 +528,7 @@ void TrustRulesDialog::refreshCertificates()
             ? fingerprint.left(23) + QChar(0x2026)
             : fingerprint;
         const QString extra = certificates.size() > 1
-            ? QStringLiteral(" · %1 certificates").arg(certificates.size())
+            ? tr(" · %n certificates", nullptr, certificates.size())
             : QString();
         item->setText(
             QStringLiteral("%1\n%2 · SHA-256 %3%4").arg(
@@ -537,7 +540,7 @@ void TrustRulesDialog::refreshCertificates()
         );
         item->setIcon(QIcon(QStringLiteral(":/assets/icons/shield-check.svg")));
         item->setToolTip(
-            QStringLiteral(
+            tr(
                 "Path: %1\nSubject: %2\nIssuer: %3\nValid until: %4\nSHA-256: %5"
             ).arg(
                 absolutePath,
@@ -560,9 +563,9 @@ void TrustRulesDialog::addRule()
     for (const TrustRuleSettings &rule : std::as_const(m_settings.rules()))
         names.insert(rule.name.toCaseFolded());
 
-    QString name = QStringLiteral("New rule");
+    QString name = tr("New rule");
     for (int suffix = 2; names.contains(name.toCaseFolded()); ++suffix)
-        name = QStringLiteral("New rule %1").arg(suffix);
+        name = tr("New rule %1").arg(suffix);
 
     TrustRuleSettings rule;
     rule.name = name;
@@ -583,8 +586,8 @@ void TrustRulesDialog::removeRule()
     const QString name = m_settings.rules().at(m_currentRule).name;
     if (QMessageBox::question(
             this,
-            QStringLiteral("Remove trust rule"),
-            QStringLiteral("Remove “%1”? The certificate files will be kept.").arg(name),
+            tr("Remove trust rule"),
+            tr("Remove “%1”? The certificate files will be kept.").arg(name),
             QMessageBox::Yes | QMessageBox::Cancel,
             QMessageBox::Cancel
         ) != QMessageBox::Yes) {
@@ -610,9 +613,9 @@ void TrustRulesDialog::importCertificates()
 
     const QStringList sourcePaths = QFileDialog::getOpenFileNames(
         this,
-        QStringLiteral("Import CA certificates"),
+        tr("Import CA certificates"),
         QString(),
-        QStringLiteral("Certificates (*.cer *.crt *.der *.pem);;All files (*)")
+        tr("Certificates (*.cer *.crt *.der *.pem);;All files (*)")
     );
     if (sourcePaths.isEmpty())
         return;
@@ -624,8 +627,8 @@ void TrustRulesDialog::importCertificates()
     if (!QDir().mkpath(certificateDirectoryPath)) {
         QMessageBox::critical(
             this,
-            QStringLiteral("Import failed"),
-            QStringLiteral("Cannot create %1").arg(certificateDirectoryPath)
+            tr("Import failed"),
+            tr("Cannot create %1").arg(certificateDirectoryPath)
         );
         return;
     }
@@ -635,7 +638,7 @@ void TrustRulesDialog::importCertificates()
     TrustRuleSettings &rule = m_settings.rules()[m_currentRule];
     for (const QString &sourcePath : sourcePaths) {
         if (readCertificates(sourcePath).isEmpty()) {
-            failures.append(QStringLiteral("%1 is not a readable certificate").arg(sourcePath));
+            failures.append(tr("%1 is not a readable certificate").arg(sourcePath));
             continue;
         }
 
@@ -647,7 +650,7 @@ void TrustRulesDialog::importCertificates()
 
         if (!alreadyThere && !sameExistingFile) {
             if (!QFile::copy(sourcePath, destination)) {
-                failures.append(QStringLiteral("Cannot copy %1").arg(sourcePath));
+                failures.append(tr("Cannot copy %1").arg(sourcePath));
                 continue;
             }
             m_pendingCertificateFiles.append(destination);
@@ -664,7 +667,7 @@ void TrustRulesDialog::importCertificates()
     if (!failures.isEmpty()) {
         QMessageBox::warning(
             this,
-            QStringLiteral("Some certificates were not imported"),
+            tr("Some certificates were not imported"),
             failures.join(QLatin1Char('\n'))
         );
     }
@@ -697,15 +700,15 @@ void TrustRulesDialog::showCertificateDetails()
     if (certificates.isEmpty()) {
         QMessageBox::warning(
             this,
-            QStringLiteral("Certificate unavailable"),
-            QStringLiteral("Cannot read certificate file:\n%1").arg(absolutePath)
+            tr("Certificate unavailable"),
+            tr("Cannot read certificate file:\n%1").arg(absolutePath)
         );
         return;
     }
 
     QDialog details(this);
     details.setObjectName(QStringLiteral("certificateDetailsDialog"));
-    details.setWindowTitle(QStringLiteral("Certificate Details"));
+    details.setWindowTitle(tr("Certificate Details"));
     details.setWindowIcon(QIcon(QStringLiteral(":/assets/icons/shield-check.svg")));
     details.resize(640, 510);
 
@@ -713,7 +716,7 @@ void TrustRulesDialog::showCertificateDetails()
     layout->setContentsMargins(22, 20, 22, 18);
     layout->setSpacing(12);
 
-    auto *title = new QLabel(QStringLiteral("Certificate Details"), &details);
+    auto *title = new QLabel(tr("Certificate Details"), &details);
     title->setObjectName(QStringLiteral("dialogTitle"));
     layout->addWidget(title);
 
@@ -728,7 +731,7 @@ void TrustRulesDialog::showCertificateDetails()
         certificateSelector = new QComboBox(&details);
         for (qsizetype index = 0; index < certificates.size(); ++index) {
             certificateSelector->addItem(
-                QStringLiteral("Certificate %1 — %2")
+                tr("Certificate %1 — %2")
                     .arg(index + 1)
                     .arg(certificateName(certificates.at(index)))
             );
@@ -761,17 +764,17 @@ void TrustRulesDialog::showCertificateDetails()
     auto *fingerprint = selectableValue();
     fingerprint->setObjectName(QStringLiteral("certificateFingerprint"));
 
-    form->addRow(QStringLiteral("Subject"), subject);
-    form->addRow(QStringLiteral("Issuer"), issuer);
-    form->addRow(QStringLiteral("Serial number"), serial);
-    form->addRow(QStringLiteral("Valid from"), validFrom);
-    form->addRow(QStringLiteral("Valid until"), validUntil);
+    form->addRow(tr("Subject"), subject);
+    form->addRow(tr("Issuer"), issuer);
+    form->addRow(tr("Serial number"), serial);
+    form->addRow(tr("Valid from"), validFrom);
+    form->addRow(tr("Valid until"), validUntil);
     form->addRow(QStringLiteral("SHA-256"), fingerprint);
     layout->addLayout(form, 1);
 
     auto *buttons = new QDialogButtonBox(QDialogButtonBox::Close, &details);
     auto *copyFingerprint = buttons->addButton(
-        QStringLiteral("Copy fingerprint"),
+        tr("Copy fingerprint"),
         QDialogButtonBox::ActionRole
     );
     layout->addWidget(buttons);
@@ -784,7 +787,7 @@ void TrustRulesDialog::showCertificateDetails()
         if (issuerNames.isEmpty())
             issuerNames = certificate.issuerInfo(QSslCertificate::Organization);
         issuer->setText(
-            issuerNames.isEmpty() ? QStringLiteral("Unknown") : issuerNames.join(QStringLiteral(", "))
+            issuerNames.isEmpty() ? tr("Unknown") : issuerNames.join(QStringLiteral(", "))
         );
         serial->setText(QString::fromLatin1(certificate.serialNumber()).toUpper());
         validFrom->setText(certificate.effectiveDate().toLocalTime().toString(Qt::ISODate));
@@ -793,13 +796,13 @@ void TrustRulesDialog::showCertificateDetails()
 
         const QDateTime now = QDateTime::currentDateTimeUtc();
         if (now < certificate.effectiveDate().toUTC()) {
-            status->setText(QStringLiteral("Not valid yet"));
+            status->setText(tr("Not valid yet"));
             status->setProperty("state", QStringLiteral("warning"));
         } else if (now > certificate.expiryDate().toUTC()) {
-            status->setText(QStringLiteral("Expired"));
+            status->setText(tr("Expired"));
             status->setProperty("state", QStringLiteral("error"));
         } else {
-            status->setText(QStringLiteral("Valid"));
+            status->setText(tr("Valid"));
             status->setProperty("state", QStringLiteral("valid"));
         }
         repolish(status);
@@ -846,8 +849,8 @@ void TrustRulesDialog::testDomain()
     m_testResult->setProperty("state", match.isEmpty() ? QStringLiteral("none") : QStringLiteral("match"));
     m_testResult->setText(
         match.isEmpty()
-            ? QStringLiteral("No enabled rule matches %1").arg(host)
-            : QStringLiteral("%1 matches rule “%2”").arg(host, match)
+            ? tr("No enabled rule matches %1").arg(host)
+            : tr("%1 matches rule “%2”").arg(host, match)
     );
     m_testResult->show();
     repolish(m_testResult);
@@ -857,7 +860,7 @@ void TrustRulesDialog::saveAndClose()
 {
     QString error;
     if (!save(&error)) {
-        QMessageBox::warning(this, QStringLiteral("Cannot save trust rules"), error);
+        QMessageBox::warning(this, tr("Cannot save trust rules"), error);
         return;
     }
     finalizeSave();

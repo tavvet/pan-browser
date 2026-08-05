@@ -86,27 +86,27 @@ bool HistoryStore::open(QString *error)
     if (isOpen())
         return true;
     if (!QDir().mkpath(QFileInfo(m_path).absolutePath()))
-        return fail(error, QStringLiteral("Cannot create history directory"));
+        return fail(error, tr("Cannot create history directory"));
 
     m_database = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), m_connectionName);
     m_database.setDatabaseName(m_path);
     m_database.setConnectOptions(QStringLiteral("QSQLITE_BUSY_TIMEOUT=3000"));
     if (!m_database.open())
-        return fail(error, QStringLiteral("Cannot open history: %1").arg(m_database.lastError().text()));
+        return fail(error, tr("Cannot open history: %1").arg(m_database.lastError().text()));
 
     QSqlQuery pragma(m_database);
     if (!pragma.exec(QStringLiteral("PRAGMA foreign_keys = ON"))) {
-        const QString message = databaseError(QStringLiteral("Cannot enable foreign keys"), pragma);
+        const QString message = databaseError(tr("Cannot enable foreign keys"), pragma);
         m_database.close();
         return fail(error, message);
     }
     if (!pragma.exec(QStringLiteral("PRAGMA journal_mode = WAL"))) {
-        const QString message = databaseError(QStringLiteral("Cannot enable history journal"), pragma);
+        const QString message = databaseError(tr("Cannot enable history journal"), pragma);
         m_database.close();
         return fail(error, message);
     }
     if (!pragma.exec(QStringLiteral("PRAGMA synchronous = NORMAL"))) {
-        const QString message = databaseError(QStringLiteral("Cannot configure history journal"), pragma);
+        const QString message = databaseError(tr("Cannot configure history journal"), pragma);
         m_database.close();
         return fail(error, message);
     }
@@ -136,18 +136,18 @@ bool HistoryStore::recordVisit(
 )
 {
     if (!isOpen())
-        return fail(error, QStringLiteral("History is unavailable"));
+        return fail(error, tr("History is unavailable"));
     const QUrl url = sanitizedUrl(sourceUrl);
     if (!url.isValid())
-        return fail(error, QStringLiteral("Only HTTP and HTTPS visits can be stored"));
+        return fail(error, tr("Only HTTP and HTTPS visits can be stored"));
     const QString encodedUrl = url.toString(QUrl::FullyEncoded);
     const QString title = sourceTitle.trimmed();
     const qint64 timestamp = visitedAt.toUTC().toMSecsSinceEpoch();
     if (timestamp <= 0)
-        return fail(error, QStringLiteral("Visit date is invalid"));
+        return fail(error, tr("Visit date is invalid"));
 
     if (!m_database.transaction())
-        return fail(error, QStringLiteral("Cannot start history transaction: %1").arg(m_database.lastError().text()));
+        return fail(error, tr("Cannot start history transaction: %1").arg(m_database.lastError().text()));
 
     QSqlQuery upsert(m_database);
     upsert.prepare(QStringLiteral(
@@ -168,7 +168,7 @@ bool HistoryStore::recordVisit(
     upsert.addBindValue(timestamp);
     if (!upsert.exec()) {
         m_database.rollback();
-        return fail(error, databaseError(QStringLiteral("Cannot save history page"), upsert));
+        return fail(error, databaseError(tr("Cannot save history page"), upsert));
     }
 
     QSqlQuery pageId(m_database);
@@ -176,7 +176,7 @@ bool HistoryStore::recordVisit(
     pageId.addBindValue(encodedUrl);
     if (!pageId.exec() || !pageId.next()) {
         m_database.rollback();
-        return fail(error, databaseError(QStringLiteral("Cannot find history page"), pageId));
+        return fail(error, databaseError(tr("Cannot find history page"), pageId));
     }
 
     QSqlQuery insertVisit(m_database);
@@ -188,10 +188,10 @@ bool HistoryStore::recordVisit(
     insertVisit.addBindValue(transitionValue(transition));
     if (!insertVisit.exec()) {
         m_database.rollback();
-        return fail(error, databaseError(QStringLiteral("Cannot save history visit"), insertVisit));
+        return fail(error, databaseError(tr("Cannot save history visit"), insertVisit));
     }
     if (!m_database.commit())
-        return fail(error, QStringLiteral("Cannot commit history: %1").arg(m_database.lastError().text()));
+        return fail(error, tr("Cannot commit history: %1").arg(m_database.lastError().text()));
     if (!pruneIfNeeded(error))
         return false;
     emit historyChanged();
@@ -201,7 +201,7 @@ bool HistoryStore::recordVisit(
 bool HistoryStore::updateTitle(const QUrl &sourceUrl, const QString &sourceTitle, QString *error)
 {
     if (!isOpen())
-        return fail(error, QStringLiteral("History is unavailable"));
+        return fail(error, tr("History is unavailable"));
     const QUrl url = sanitizedUrl(sourceUrl);
     const QString title = sourceTitle.trimmed();
     if (!url.isValid() || title.isEmpty())
@@ -214,7 +214,7 @@ bool HistoryStore::updateTitle(const QUrl &sourceUrl, const QString &sourceTitle
     query.addBindValue(normalizedText(title));
     query.addBindValue(url.toString(QUrl::FullyEncoded));
     if (!query.exec())
-        return fail(error, databaseError(QStringLiteral("Cannot update history title"), query));
+        return fail(error, databaseError(tr("Cannot update history title"), query));
     if (query.numRowsAffected() > 0)
         emit historyChanged();
     return true;
@@ -228,7 +228,7 @@ QList<HistoryVisit> HistoryStore::visits(
 {
     QList<HistoryVisit> result;
     if (!isOpen()) {
-        fail(error, QStringLiteral("History is unavailable"));
+        fail(error, tr("History is unavailable"));
         return result;
     }
     QSqlQuery query(m_database);
@@ -248,7 +248,7 @@ QList<HistoryVisit> HistoryStore::visits(
     }
     query.addBindValue(std::clamp(limit, 1, 5000));
     if (!query.exec()) {
-        fail(error, databaseError(QStringLiteral("Cannot read history"), query));
+        fail(error, databaseError(tr("Cannot read history"), query));
         return result;
     }
     while (query.next()) {
@@ -271,7 +271,7 @@ QList<HistorySuggestion> HistoryStore::suggestions(
 {
     QList<HistorySuggestion> result;
     if (!isOpen()) {
-        fail(error, QStringLiteral("History is unavailable"));
+        fail(error, tr("History is unavailable"));
         return result;
     }
     if (limit <= 0)
@@ -295,7 +295,7 @@ QList<HistorySuggestion> HistoryStore::suggestions(
     query.addBindValue(pattern);
     query.addBindValue(pattern);
     if (!query.exec()) {
-        fail(error, databaseError(QStringLiteral("Cannot search history"), query));
+        fail(error, databaseError(tr("Cannot search history"), query));
         return result;
     }
     QList<RankedHistorySuggestion> candidates;
@@ -340,9 +340,9 @@ bool HistoryStore::removeVisits(const QList<qint64> &visitIds, QString *error)
     if (visitIds.isEmpty())
         return true;
     if (!isOpen())
-        return fail(error, QStringLiteral("History is unavailable"));
+        return fail(error, tr("History is unavailable"));
     if (!m_database.transaction())
-        return fail(error, QStringLiteral("Cannot start history transaction"));
+        return fail(error, tr("Cannot start history transaction"));
 
     QSet<qint64> pageIds;
     QSqlQuery findPage(m_database);
@@ -353,14 +353,14 @@ bool HistoryStore::removeVisits(const QList<qint64> &visitIds, QString *error)
         findPage.bindValue(0, visitId);
         if (!findPage.exec()) {
             m_database.rollback();
-            return fail(error, databaseError(QStringLiteral("Cannot find history visit"), findPage));
+            return fail(error, databaseError(tr("Cannot find history visit"), findPage));
         }
         if (findPage.next())
             pageIds.insert(findPage.value(0).toLongLong());
         remove.bindValue(0, visitId);
         if (!remove.exec()) {
             m_database.rollback();
-            return fail(error, databaseError(QStringLiteral("Cannot remove history visit"), remove));
+            return fail(error, databaseError(tr("Cannot remove history visit"), remove));
         }
     }
     if (!rebuildPageAggregates(pageIds.values(), error)) {
@@ -368,7 +368,7 @@ bool HistoryStore::removeVisits(const QList<qint64> &visitIds, QString *error)
         return false;
     }
     if (!m_database.commit())
-        return fail(error, QStringLiteral("Cannot commit history deletion"));
+        return fail(error, tr("Cannot commit history deletion"));
     emit historyChanged();
     return true;
 }
@@ -376,10 +376,10 @@ bool HistoryStore::removeVisits(const QList<qint64> &visitIds, QString *error)
 bool HistoryStore::clear(QString *error)
 {
     if (!isOpen())
-        return fail(error, QStringLiteral("History is unavailable"));
+        return fail(error, tr("History is unavailable"));
     QSqlQuery query(m_database);
     if (!query.exec(QStringLiteral("DELETE FROM pages")))
-        return fail(error, databaseError(QStringLiteral("Cannot clear history"), query));
+        return fail(error, databaseError(tr("Cannot clear history"), query));
     emit historyChanged();
     return true;
 }
@@ -404,12 +404,12 @@ bool HistoryStore::createSchema(QString *error)
 {
     QSqlQuery version(m_database);
     if (!version.exec(QStringLiteral("PRAGMA user_version")) || !version.next())
-        return fail(error, databaseError(QStringLiteral("Cannot read history version"), version));
+        return fail(error, databaseError(tr("Cannot read history version"), version));
     const int schemaVersion = version.value(0).toInt();
     if (schemaVersion != 0 && schemaVersion != 1)
-        return fail(error, QStringLiteral("Unsupported history version: %1").arg(schemaVersion));
+        return fail(error, tr("Unsupported history version: %1").arg(schemaVersion));
     if (!m_database.transaction())
-        return fail(error, QStringLiteral("Cannot start history schema transaction"));
+        return fail(error, tr("Cannot start history schema transaction"));
 
     const QStringList statements = {
         QStringLiteral(
@@ -439,11 +439,11 @@ bool HistoryStore::createSchema(QString *error)
         QSqlQuery query(m_database);
         if (!query.exec(statement)) {
             m_database.rollback();
-            return fail(error, databaseError(QStringLiteral("Cannot create history schema"), query));
+            return fail(error, databaseError(tr("Cannot create history schema"), query));
         }
     }
     if (!m_database.commit())
-        return fail(error, QStringLiteral("Cannot commit history schema"));
+        return fail(error, tr("Cannot commit history schema"));
     return true;
 }
 
@@ -451,11 +451,11 @@ bool HistoryStore::pruneIfNeeded(QString *error)
 {
     QSqlQuery count(m_database);
     if (!count.exec(QStringLiteral("SELECT COUNT(*) FROM visits")) || !count.next())
-        return fail(error, databaseError(QStringLiteral("Cannot count history"), count));
+        return fail(error, databaseError(tr("Cannot count history"), count));
     if (count.value(0).toInt() <= maximumVisits + 100)
         return true;
     if (!m_database.transaction())
-        return fail(error, QStringLiteral("Cannot start history cleanup"));
+        return fail(error, tr("Cannot start history cleanup"));
 
     const int removalCount = count.value(0).toInt() - maximumVisits;
     QSqlQuery affectedPages(m_database);
@@ -469,7 +469,7 @@ bool HistoryStore::pruneIfNeeded(QString *error)
         m_database.rollback();
         return fail(
             error,
-            databaseError(QStringLiteral("Cannot find history pages to prune"), affectedPages)
+            databaseError(tr("Cannot find history pages to prune"), affectedPages)
         );
     }
     QList<qint64> pageIds;
@@ -485,14 +485,14 @@ bool HistoryStore::pruneIfNeeded(QString *error)
     remove.addBindValue(removalCount);
     if (!remove.exec()) {
         m_database.rollback();
-        return fail(error, databaseError(QStringLiteral("Cannot prune history"), remove));
+        return fail(error, databaseError(tr("Cannot prune history"), remove));
     }
     if (!rebuildPageAggregates(pageIds, error)) {
         m_database.rollback();
         return false;
     }
     if (!m_database.commit())
-        return fail(error, QStringLiteral("Cannot commit history cleanup"));
+        return fail(error, tr("Cannot commit history cleanup"));
     return true;
 }
 
@@ -514,12 +514,12 @@ bool HistoryStore::rebuildPageAggregates(const QList<qint64> &pageIds, QString *
         count.bindValue(0, transitionValue(HistoryTransition::Typed));
         count.bindValue(1, pageId);
         if (!count.exec() || !count.next())
-            return fail(error, databaseError(QStringLiteral("Cannot rebuild history page"), count));
+            return fail(error, databaseError(tr("Cannot rebuild history page"), count));
         const int visits = count.value(0).toInt();
         if (visits == 0) {
             remove.bindValue(0, pageId);
             if (!remove.exec())
-                return fail(error, databaseError(QStringLiteral("Cannot remove empty history page"), remove));
+                return fail(error, databaseError(tr("Cannot remove empty history page"), remove));
             continue;
         }
         update.bindValue(0, visits);
@@ -527,7 +527,7 @@ bool HistoryStore::rebuildPageAggregates(const QList<qint64> &pageIds, QString *
         update.bindValue(2, count.value(2).toLongLong());
         update.bindValue(3, pageId);
         if (!update.exec())
-            return fail(error, databaseError(QStringLiteral("Cannot update history page"), update));
+            return fail(error, databaseError(tr("Cannot update history page"), update));
     }
     return true;
 }

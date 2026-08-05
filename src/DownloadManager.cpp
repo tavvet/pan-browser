@@ -54,7 +54,7 @@ DownloadManager::DownloadManager(
         if (isActive(record.status)) {
             record.status = DownloadStatus::Interrupted;
             record.finishedAt = QDateTime::currentDateTimeUtc();
-            record.error = QStringLiteral("PanBrowser closed before the download finished");
+            record.error = tr("PanBrowser closed before the download finished");
             changed = true;
         }
     }
@@ -74,7 +74,7 @@ DownloadManager::~DownloadManager()
         if (isActive(record.status)) {
             record.status = DownloadStatus::Interrupted;
             record.finishedAt = QDateTime::currentDateTimeUtc();
-            record.error = QStringLiteral("PanBrowser closed before the download finished");
+            record.error = tr("PanBrowser closed before the download finished");
         }
     }
     saveNow();
@@ -180,7 +180,7 @@ void DownloadManager::handleDownload(QWebEngineDownloadRequest *download)
         dialogParent = m_dialogParent;
     const QString selectedPath = QFileDialog::getSaveFileName(
         dialogParent,
-        QStringLiteral("Save download"),
+        tr("Save download"),
         QDir(downloadsDirectory()).filePath(suggestedName)
     );
     if (selectedPath.isEmpty()) {
@@ -228,7 +228,7 @@ void DownloadManager::handleDownload(QWebEngineDownloadRequest *download)
             DownloadRecord &item = m_records[index];
             item.status = DownloadStatus::Interrupted;
             item.finishedAt = QDateTime::currentDateTimeUtc();
-            item.error = QStringLiteral("The download ended unexpectedly");
+            item.error = tr("The download ended unexpectedly");
             emit recordUpdated(id);
             saveNow();
         }

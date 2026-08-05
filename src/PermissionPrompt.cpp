@@ -33,9 +33,9 @@ PermissionPrompt::PermissionPrompt(QWidget *parent)
     textLayout->addWidget(m_description);
     layout->addLayout(textLayout, 1);
 
-    auto *block = new QPushButton(QStringLiteral("Block"), this);
+    auto *block = new QPushButton(tr("Block"), this);
     block->setObjectName(QStringLiteral("permissionBlock"));
-    auto *allow = new QPushButton(QStringLiteral("Allow once"), this);
+    auto *allow = new QPushButton(tr("Allow once"), this);
     allow->setObjectName(QStringLiteral("permissionAllow"));
     allow->setDefault(true);
     layout->addWidget(block);

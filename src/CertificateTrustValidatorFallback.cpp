@@ -1,5 +1,7 @@
 #include "CertificateTrustValidator.h"
 
+#include <QCoreApplication>
+
 CertificateValidationResult CertificateTrustValidator::evaluate(
     const QList<QSslCertificate> &,
     const QList<QSslCertificate> &,
@@ -9,6 +11,9 @@ CertificateValidationResult CertificateTrustValidator::evaluate(
 {
     return {
         false,
-        QStringLiteral("Custom certificate validation is not implemented on this platform yet")
+        QCoreApplication::translate(
+            "CertificateTrustValidator",
+            "Custom certificate validation is not implemented on this platform yet"
+        )
     };
 }
