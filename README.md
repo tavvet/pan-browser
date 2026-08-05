@@ -82,6 +82,13 @@ HTTP pages or background tabs are denied, as are notifications and unsupported
 sensitive permissions. macOS may show its own system prompt after PanBrowser's
 **Allow once** action.
 
+Links that leave the browser, such as `mailto:`, `tel:`, or application deep
+links, require an explicit confirmation that displays both the requesting site
+and destination. Only direct actions in the active tab can produce this prompt;
+scripted requests and background tabs are rejected. Local and executable
+schemes such as `file:` and `javascript:` are always blocked. PanBrowser passes
+an approved URL directly to the operating system without invoking a shell.
+
 Open **PanBrowser → Trust Rules…** to jump directly to the Trust Rules section
 of the same settings window. The editor imports certificates into the
 application data directory, validates the complete configuration, saves it

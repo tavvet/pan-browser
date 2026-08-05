@@ -1,9 +1,11 @@
 #include "MainWindow.h"
 
+#include "BrowserPage.h"
 #include "BrowserProfile.h"
 #include "CertificateTrustValidator.h"
 #include "DownloadManager.h"
 #include "DownloadsPanel.h"
+#include "ExternalNavigationPolicy.h"
 #include "PermissionController.h"
 #include "PermissionPrompt.h"
 #include "SettingsDialog.h"
@@ -23,8 +25,10 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QMenuBar>
+#include <QMessageBox>
 #include <QIcon>
 #include <QProgressBar>
+#include <QPushButton>
 #include <QSaveFile>
 #include <QScreen>
 #include <QSettings>
@@ -221,6 +225,8 @@ void MainWindow::createInterface()
         }
         if (m_permissionController)
             m_permissionController->currentViewChanged(currentWebView());
+        if (m_externalUrlSource && m_externalUrlSource != currentWebView())
+            cancelExternalUrlPrompt();
         updateCurrentTabUi();
         scheduleSessionSave();
     });
@@ -333,7 +339,7 @@ QWebEngineView *MainWindow::createTab(
 )
 {
     QWebEngineView *webView = new QWebEngineView(m_tabStack);
-    webView->setPage(new QWebEnginePage(m_profile, webView));
+    webView->setPage(new BrowserPage(m_profile, webView));
     BrowserTabState state;
     if (deferred)
         state.pendingUrl = url;
@@ -368,6 +374,7 @@ void MainWindow::closeTab(int index)
         return;
 
     m_permissionController->cancelForView(webView);
+    cancelExternalUrlPrompt(webView);
     disconnect(webView, nullptr, this, nullptr);
     disconnect(webView->page(), nullptr, this, nullptr);
     webView->stop();
@@ -440,7 +447,12 @@ void MainWindow::connectBrowserSignals(QWebEngineView *webView)
     });
     connect(webView, &QWebEngineView::loadStarted, this, [this, webView] {
         m_permissionController->cancelForView(webView);
+        cancelExternalUrlPrompt(webView);
         BrowserTabState &state = m_tabStates[webView];
+        state.previousTrustStatus = state.trustStatus;
+        state.previousTrustError = state.trustError;
+        state.previousAcceptedRule = state.lastAcceptedRule;
+        state.externalNavigationDelegated = false;
         state.lastAcceptedRule.clear();
         state.loading = true;
         state.progress = 0;
@@ -462,6 +474,13 @@ void MainWindow::connectBrowserSignals(QWebEngineView *webView)
         state.progress = 100;
         if (webView == currentWebView())
             m_progress->hide();
+        if (state.externalNavigationDelegated) {
+            state.externalNavigationDelegated = false;
+            state.lastAcceptedRule = state.previousAcceptedRule;
+            setTabTrustStatus(webView, state.previousTrustStatus, state.previousTrustError);
+            updateNavigationActions();
+            return;
+        }
         if (ok) {
             if (state.lastAcceptedRule.isEmpty())
                 setTabTrustStatus(webView, QStringLiteral("Secure · Chromium system trust"));
@@ -470,6 +489,15 @@ void MainWindow::connectBrowserSignals(QWebEngineView *webView)
         }
         updateNavigationActions();
     });
+    connect(
+        static_cast<BrowserPage *>(webView->page()),
+        &BrowserPage::externalUrlRequested,
+        this,
+        [this, webView](const QUrl &url) {
+            m_tabStates[webView].externalNavigationDelegated = true;
+            handleExternalUrlRequest(webView, url);
+        }
+    );
     connect(
         webView->page(),
         &QWebEnginePage::certificateError,
@@ -490,9 +518,22 @@ void MainWindow::connectBrowserSignals(QWebEngineView *webView)
         webView->page(),
         &QWebEnginePage::newWindowRequested,
         this,
-        [this](QWebEngineNewWindowRequest &request) {
+        [this, webView](QWebEngineNewWindowRequest &request) {
             if (!request.isUserInitiated())
                 return;
+
+            const QUrl requestedUrl = request.requestedUrl();
+            if (!requestedUrl.scheme().isEmpty()) {
+                switch (externalNavigationDisposition(requestedUrl, true)) {
+                case ExternalNavigationDisposition::Prompt:
+                    handleExternalUrlRequest(webView, requestedUrl);
+                    return;
+                case ExternalNavigationDisposition::Block:
+                    return;
+                case ExternalNavigationDisposition::Browse:
+                    break;
+                }
+            }
 
             const bool activate = request.destination()
                 != QWebEngineNewWindowRequest::InNewBackgroundTab;
@@ -500,6 +541,72 @@ void MainWindow::connectBrowserSignals(QWebEngineView *webView)
             request.openIn(newView->page());
         }
     );
+}
+
+void MainWindow::handleExternalUrlRequest(QWebEngineView *webView, const QUrl &url)
+{
+    if (!webView || webView != currentWebView() || m_externalUrlDialog)
+        return;
+
+    const QUrl sourceUrl = webView->url();
+    const QString source = sourceUrl.host().isEmpty()
+        ? QStringLiteral("The current page")
+        : QStringLiteral("%1://%2").arg(sourceUrl.scheme(), sourceUrl.host());
+    QString target = url.toDisplayString(QUrl::RemovePassword);
+    constexpr qsizetype maximumDisplayedUrlLength = 700;
+    if (target.size() > maximumDisplayedUrlLength)
+        target = target.left(maximumDisplayedUrlLength) + QStringLiteral("…");
+
+    auto *dialog = new QMessageBox(this);
+    dialog->setWindowTitle(QStringLiteral("Open external application?"));
+    dialog->setIcon(QMessageBox::Question);
+    dialog->setTextFormat(Qt::PlainText);
+    dialog->setText(QStringLiteral("Open this link in another application?"));
+    dialog->setInformativeText(
+        QStringLiteral("%1 wants to open:\n\n%2").arg(source, target)
+    );
+    auto *openButton = dialog->addButton(
+        QStringLiteral("Open application"),
+        QMessageBox::AcceptRole
+    );
+    auto *cancelButton = dialog->addButton(QStringLiteral("Cancel"), QMessageBox::RejectRole);
+    dialog->setDefaultButton(cancelButton);
+    dialog->setEscapeButton(cancelButton);
+    dialog->setWindowModality(Qt::WindowModal);
+
+    m_externalUrlDialog = dialog;
+    m_externalUrlSource = webView;
+    const QPointer<QWebEngineView> sourceView(webView);
+    connect(dialog, &QMessageBox::finished, this, [
+        this,
+        dialog,
+        openButton,
+        sourceView,
+        url
+    ] {
+        const bool accepted = dialog->clickedButton() == openButton;
+        m_externalUrlDialog.clear();
+        m_externalUrlSource.clear();
+        dialog->deleteLater();
+        if (!accepted || !sourceView || sourceView != currentWebView())
+            return;
+        if (!QDesktopServices::openUrl(url)) {
+            statusBar()->showMessage(
+                QStringLiteral("No application is available for the %1 link").arg(url.scheme()),
+                5000
+            );
+        }
+    });
+    dialog->open();
+}
+
+void MainWindow::cancelExternalUrlPrompt(QWebEngineView *webView)
+{
+    if (!m_externalUrlDialog)
+        return;
+    if (webView && m_externalUrlSource != webView)
+        return;
+    m_externalUrlDialog->reject();
 }
 
 void MainWindow::updateCurrentTabUi()

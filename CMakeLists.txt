@@ -40,12 +40,16 @@ set(PANBROWSER_APP_SOURCES
     src/BrowserProfile.h
     src/BrowserPreferences.cpp
     src/BrowserPreferences.h
+    src/BrowserPage.cpp
+    src/BrowserPage.h
     src/DownloadHistoryStore.cpp
     src/DownloadHistoryStore.h
     src/DownloadManager.cpp
     src/DownloadManager.h
     src/DownloadsPanel.cpp
     src/DownloadsPanel.h
+    src/ExternalNavigationPolicy.cpp
+    src/ExternalNavigationPolicy.h
     src/PermissionController.cpp
     src/PermissionController.h
     src/PermissionPolicy.cpp
@@ -120,6 +124,8 @@ qt_add_executable(PanBrowserTests
     src/BrowserPreferences.h
     src/DownloadHistoryStore.cpp
     src/DownloadHistoryStore.h
+    src/ExternalNavigationPolicy.cpp
+    src/ExternalNavigationPolicy.h
     src/PermissionPolicy.cpp
     src/PermissionPolicy.h
     src/SessionStore.cpp

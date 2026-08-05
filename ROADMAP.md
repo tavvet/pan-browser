@@ -14,11 +14,11 @@
 - [x] Browsing data controls for cookies, site storage, and HTTP cache.
 - [x] Download manager with progress controls and persistent history.
 - [x] One-time permission prompts for camera, microphone, and location.
+- [x] Safe confirmation for external URL schemes and application deep links.
 
 ## Browser essentials
 
 - [ ] Popup handling in a new PanBrowser window with the same profile and trust policy.
-- [ ] Safe handling of external URL schemes such as `mailto:` and application deep links.
 
 ## Cross-platform
 

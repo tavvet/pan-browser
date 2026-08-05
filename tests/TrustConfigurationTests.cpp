@@ -1,6 +1,7 @@
 #include "BrowserPreferences.h"
 #include "BrowserDataCleanup.h"
 #include "DownloadHistoryStore.h"
+#include "ExternalNavigationPolicy.h"
 #include "PermissionPolicy.h"
 #include "SessionStore.h"
 #include "TrustConfiguration.h"
@@ -34,6 +35,9 @@ private slots:
     void downloadHistoryRoundTripAndLimit();
     void sensitivePermissionsRequireSecureOrigin();
     void unsupportedPermissionsAreDenied();
+    void webSchemesStayInsideBrowser();
+    void externalSchemesRequireMainFrameConfirmation();
+    void dangerousLocalSchemesAreBlocked();
 };
 
 void TrustConfigurationTests::exactDomainIsCaseInsensitive()
@@ -348,6 +352,54 @@ void TrustConfigurationTests::unsupportedPermissionsAreDenied()
     );
     QVERIFY(!permissionTitle(BrowserPermissionKind::Location).isEmpty());
     QVERIFY(!permissionDescription(BrowserPermissionKind::Location).isEmpty());
+}
+
+void TrustConfigurationTests::webSchemesStayInsideBrowser()
+{
+    QCOMPARE(
+        externalNavigationDisposition(QUrl(QStringLiteral("https://example.com")), true),
+        ExternalNavigationDisposition::Browse
+    );
+    QCOMPARE(
+        externalNavigationDisposition(QUrl(QStringLiteral("http://example.com")), false),
+        ExternalNavigationDisposition::Browse
+    );
+    QCOMPARE(
+        externalNavigationDisposition(QUrl(QStringLiteral("blob:https://example.com/id")), true),
+        ExternalNavigationDisposition::Browse
+    );
+}
+
+void TrustConfigurationTests::externalSchemesRequireMainFrameConfirmation()
+{
+    QCOMPARE(
+        externalNavigationDisposition(QUrl(QStringLiteral("mailto:user@example.com")), true),
+        ExternalNavigationDisposition::Prompt
+    );
+    QCOMPARE(
+        externalNavigationDisposition(QUrl(QStringLiteral("bank-app://open/payment")), true),
+        ExternalNavigationDisposition::Prompt
+    );
+    QCOMPARE(
+        externalNavigationDisposition(QUrl(QStringLiteral("bank-app://open/payment")), false),
+        ExternalNavigationDisposition::Block
+    );
+}
+
+void TrustConfigurationTests::dangerousLocalSchemesAreBlocked()
+{
+    QCOMPARE(
+        externalNavigationDisposition(QUrl::fromLocalFile(QStringLiteral("/tmp/file")), true),
+        ExternalNavigationDisposition::Block
+    );
+    QCOMPARE(
+        externalNavigationDisposition(QUrl(QStringLiteral("javascript:alert(1)")), true),
+        ExternalNavigationDisposition::Block
+    );
+    QCOMPARE(
+        externalNavigationDisposition(QUrl(), true),
+        ExternalNavigationDisposition::Block
+    );
 }
 
 QTEST_MAIN(TrustConfigurationTests)

@@ -6,10 +6,12 @@
 
 #include <QHash>
 #include <QMainWindow>
+#include <QPointer>
 #include <QString>
 
 class QLabel;
 class QLineEdit;
+class QMessageBox;
 class QProgressBar;
 class QStackedWidget;
 class QTabBar;
@@ -39,7 +41,11 @@ private:
     struct BrowserTabState {
         QString lastAcceptedRule;
         QString trustStatus = QStringLiteral("Ready");
+        QString previousAcceptedRule;
+        QString previousTrustStatus;
         bool trustError = false;
+        bool previousTrustError = false;
+        bool externalNavigationDelegated = false;
         bool loading = false;
         int progress = 0;
         QUrl pendingUrl;
@@ -69,6 +75,8 @@ private:
         QWebEngineView *webView,
         const QWebEngineCertificateError &error
     );
+    void handleExternalUrlRequest(QWebEngineView *webView, const QUrl &url);
+    void cancelExternalUrlPrompt(QWebEngineView *webView = nullptr);
     void setTabTrustStatus(QWebEngineView *webView, const QString &text, bool error = false);
     void setTrustStatus(const QString &text, bool error = false);
     void restoreWindowPlacement();
@@ -80,6 +88,8 @@ private:
     DownloadButton *m_downloadButton = nullptr;
     PermissionController *m_permissionController = nullptr;
     PermissionPrompt *m_permissionPrompt = nullptr;
+    QPointer<QMessageBox> m_externalUrlDialog;
+    QPointer<QWebEngineView> m_externalUrlSource;
     QTabBar *m_tabBar = nullptr;
     QStackedWidget *m_tabStack = nullptr;
     QLineEdit *m_address = nullptr;
