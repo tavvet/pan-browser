@@ -37,6 +37,7 @@ private slots:
     void browserPreferencesValidateStartPage();
     void bookmarksRoundTripNormalizeAndSearch();
     void bookmarksCanBeEditedAndRemoved();
+    void bookmarkEditRejectsDuplicateAddress();
     void corruptBookmarksArePreservedAndDisabled();
     void sessionRoundTripFiltersInvalidUrls();
     void invalidSessionFileFailsClosed();
@@ -351,6 +352,53 @@ void TrustConfigurationTests::bookmarksCanBeEditedAndRemoved()
     QCOMPARE(store.bookmarks({}, &error).size(), 1);
     QVERIFY2(store.clear(&error), qPrintable(error));
     QVERIFY(store.bookmarks({}, &error).isEmpty());
+}
+
+void TrustConfigurationTests::bookmarkEditRejectsDuplicateAddress()
+{
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+    BookmarkStore store(directory.filePath(QStringLiteral("bookmarks.sqlite")));
+    QString error;
+    QVERIFY2(store.open(&error), qPrintable(error));
+    QVERIFY2(store.addOrUpdate(
+        QUrl(QStringLiteral("https://one.example/")),
+        QStringLiteral("One"),
+        QDateTime::fromSecsSinceEpoch(1000, QTimeZone::UTC),
+        &error
+    ), qPrintable(error));
+    QVERIFY2(store.addOrUpdate(
+        QUrl(QStringLiteral("https://two.example/")),
+        QStringLiteral("Two"),
+        QDateTime::fromSecsSinceEpoch(2000, QTimeZone::UTC),
+        &error
+    ), qPrintable(error));
+
+    const std::optional<Bookmark> first = store.bookmarkForUrl(
+        QUrl(QStringLiteral("https://one.example/")),
+        &error
+    );
+    QVERIFY(first.has_value());
+    error.clear();
+    QVERIFY(!store.update(
+        first->id,
+        QUrl(QStringLiteral("https://two.example/")),
+        QStringLiteral("Duplicate"),
+        QDateTime::fromSecsSinceEpoch(3000, QTimeZone::UTC),
+        &error
+    ));
+    QCOMPARE(error, QStringLiteral("A bookmark for this address already exists"));
+
+    error.clear();
+    const QList<Bookmark> bookmarks = store.bookmarks({}, &error);
+    QVERIFY2(error.isEmpty(), qPrintable(error));
+    QCOMPARE(bookmarks.size(), 2);
+    const std::optional<Bookmark> unchanged = store.bookmarkForUrl(
+        QUrl(QStringLiteral("https://one.example/")),
+        &error
+    );
+    QVERIFY(unchanged.has_value());
+    QCOMPARE(unchanged->title, QStringLiteral("One"));
 }
 
 void TrustConfigurationTests::corruptBookmarksArePreservedAndDisabled()
