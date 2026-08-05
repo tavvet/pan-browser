@@ -1,6 +1,7 @@
 #include "SettingsDialog.h"
 
 #include "BrowserProfile.h"
+#include "SearchSettingsPage.h"
 #include "TrustRulesDialog.h"
 
 #include <QCheckBox>
@@ -20,7 +21,9 @@
 
 SettingsDialog::SettingsDialog(
     const QString &configurationPath,
+    const QString &searchConfigurationPath,
     const BrowserPreferences &preferences,
+    const SearchSettings &searchSettings,
     BrowserProfile *profile,
     const QUrl &currentUrl,
     Page initialPage,
@@ -28,7 +31,9 @@ SettingsDialog::SettingsDialog(
 )
     : QDialog(parent)
     , m_configurationPath(configurationPath)
+    , m_searchConfigurationPath(searchConfigurationPath)
     , m_preferences(preferences)
+    , m_searchSettings(searchSettings)
     , m_profile(profile)
 {
     createInterface(currentUrl, initialPage);
@@ -42,6 +47,11 @@ bool SettingsDialog::load(QString *error)
 BrowserPreferences SettingsDialog::preferences() const
 {
     return m_preferences;
+}
+
+SearchSettings SettingsDialog::searchSettings() const
+{
+    return m_searchSettings;
 }
 
 void SettingsDialog::createInterface(const QUrl &currentUrl, Page initialPage)
@@ -72,6 +82,12 @@ void SettingsDialog::createInterface(const QUrl &currentUrl, Page initialPage)
         m_sidebar
     );
     generalItem->setData(Qt::UserRole, static_cast<int>(Page::General));
+    auto *searchItem = new QListWidgetItem(
+        QIcon(QStringLiteral(":/assets/icons/search.svg")),
+        QStringLiteral("Search"),
+        m_sidebar
+    );
+    searchItem->setData(Qt::UserRole, static_cast<int>(Page::Search));
     auto *privacyDataItem = new QListWidgetItem(
         QIcon(QStringLiteral(":/assets/icons/database.svg")),
         QStringLiteral("Privacy & Data"),
@@ -183,6 +199,9 @@ void SettingsDialog::createInterface(const QUrl &currentUrl, Page initialPage)
     generalLayout->addWidget(privacyCard);
     generalLayout->addStretch();
     m_pages->addWidget(generalPage);
+
+    m_searchPage = new SearchSettingsPage(m_searchSettings, m_pages);
+    m_pages->addWidget(m_searchPage);
 
     auto *privacyDataPage = new QWidget(m_pages);
     privacyDataPage->setObjectName(QStringLiteral("privacyDataSettingsPage"));
@@ -427,9 +446,20 @@ void SettingsDialog::saveAndClose()
         QMessageBox::warning(this, QStringLiteral("Cannot save trust rules"), error);
         return;
     }
+    if (!m_searchPage->validate(&error)) {
+        selectPage(Page::Search);
+        QMessageBox::warning(this, QStringLiteral("Cannot save search settings"), error);
+        return;
+    }
     if (!m_trustRules->save(&error)) {
         selectPage(Page::TrustRules);
         QMessageBox::warning(this, QStringLiteral("Cannot save trust rules"), error);
+        return;
+    }
+    SearchSettings searchSettings = m_searchPage->settings();
+    if (!searchSettings.save(m_searchConfigurationPath, &error)) {
+        selectPage(Page::Search);
+        QMessageBox::warning(this, QStringLiteral("Cannot save search settings"), error);
         return;
     }
     if (!preferences.save(&error)) {
@@ -439,5 +469,6 @@ void SettingsDialog::saveAndClose()
     }
 
     m_preferences = preferences;
+    m_searchSettings = searchSettings;
     accept();
 }

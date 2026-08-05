@@ -74,6 +74,7 @@ MainWindow::MainWindow(
         QString bootstrapError;
         m_trustPolicy.load(m_configurationPath, &bootstrapError);
         m_preferences = BrowserPreferences::load(m_trustPolicy.startPage());
+        initializeSearchSettings();
         QString dataResetError;
         if (!BrowserProfile::applyPendingDataReset(&dataResetError))
             qWarning().noquote() << "[PanBrowser data reset]" << dataResetError;
@@ -92,8 +93,10 @@ MainWindow::MainWindow(
         m_profile = sharedProfile;
         m_downloadManager = sharedDownloadManager;
         m_configurationPath = primaryWindow->m_configurationPath;
+        m_searchConfigurationPath = primaryWindow->m_searchConfigurationPath;
         m_trustPolicy = primaryWindow->m_trustPolicy;
         m_preferences = primaryWindow->m_preferences;
+        m_searchSettings = primaryWindow->m_searchSettings;
         setAttribute(Qt::WA_DeleteOnClose);
     }
 
@@ -218,7 +221,7 @@ void MainWindow::createInterface()
 
     m_address = new QLineEdit(toolbar);
     m_address->setObjectName(QStringLiteral("addressBar"));
-    m_address->setPlaceholderText(QStringLiteral("https://example.com"));
+    updateAddressPlaceholder();
     m_address->setClearButtonEnabled(true);
     m_securityIndicator = m_address->addAction(
         QIcon(),
@@ -747,17 +750,26 @@ void MainWindow::updateNavigationActions()
     m_reloadAction->setEnabled(webView != nullptr);
 }
 
+void MainWindow::updateAddressPlaceholder()
+{
+    if (!m_address)
+        return;
+    const SearchEngineSettings *engine = m_searchSettings.defaultEngine();
+    m_address->setPlaceholderText(
+        engine ? QStringLiteral("Search with %1 or enter an address").arg(engine->name)
+               : QStringLiteral("Enter an address")
+    );
+}
+
 void MainWindow::navigateFromAddressBar()
 {
-    const QUrl url = QUrl::fromUserInput(m_address->text().trimmed());
-    if (!url.isValid()
-        || (url.scheme() != QStringLiteral("http")
-            && url.scheme() != QStringLiteral("https"))) {
-        setTrustStatus(QStringLiteral("Only HTTP and HTTPS URLs are supported"), true);
+    const ResolvedAddressInput result = resolveAddressInput(m_address->text(), m_searchSettings);
+    if (result.kind == AddressInputKind::Error) {
+        setTrustStatus(result.error, true);
         return;
     }
     if (QWebEngineView *webView = currentWebView())
-        webView->setUrl(url);
+        webView->setUrl(result.url);
 }
 
 void MainWindow::openSettings(bool trustRules)
@@ -772,7 +784,9 @@ void MainWindow::openSettings(bool trustRules)
 
     SettingsDialog dialog(
         m_configurationPath,
+        m_searchConfigurationPath,
         m_preferences,
+        m_searchSettings,
         m_profile,
         currentWebView() ? currentWebView()->url() : QUrl(),
         trustRules ? SettingsDialog::Page::TrustRules : SettingsDialog::Page::General,
@@ -786,14 +800,19 @@ void MainWindow::openSettings(bool trustRules)
 
     if (dialog.exec() == QDialog::Accepted) {
         m_preferences = dialog.preferences();
+        m_searchSettings = dialog.searchSettings();
+        updateAddressPlaceholder();
         m_profile->setPersistSessionCookies(m_preferences.persistSessionCookies());
         if (m_preferences.startupMode() == StartupMode::RestoreTabs)
             scheduleSessionSave();
         else
             m_sessionStore.clear();
         for (MainWindow *popup : std::as_const(m_popupWindows)) {
-            if (popup)
+            if (popup) {
                 popup->m_preferences = m_preferences;
+                popup->m_searchSettings = m_searchSettings;
+                popup->updateAddressPlaceholder();
+            }
         }
         reloadRules();
     }
@@ -1059,4 +1078,29 @@ QString MainWindow::ensureConfiguration()
         file.commit();
     }
     return path;
+}
+
+void MainWindow::initializeSearchSettings()
+{
+    const QString directory = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+    QDir().mkpath(directory);
+    m_searchConfigurationPath = QDir(directory).filePath(
+        QStringLiteral("search-engines.json")
+    );
+    m_searchSettings = SearchSettings::defaults();
+
+    QString error;
+    if (QFile::exists(m_searchConfigurationPath)) {
+        SearchSettings loaded;
+        if (loaded.load(m_searchConfigurationPath, &error)) {
+            m_searchSettings = loaded;
+        } else {
+            qWarning().noquote() << "[PanBrowser search settings]" << error
+                                 << "Using in-memory defaults; the file was not overwritten.";
+        }
+        return;
+    }
+
+    if (!m_searchSettings.save(m_searchConfigurationPath, &error))
+        qWarning().noquote() << "[PanBrowser search settings]" << error;
 }

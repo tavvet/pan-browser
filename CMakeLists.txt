@@ -61,6 +61,10 @@ set(PANBROWSER_APP_SOURCES
     src/MainWindow.h
     src/SessionStore.cpp
     src/SessionStore.h
+    src/SearchSettings.cpp
+    src/SearchSettings.h
+    src/SearchSettingsPage.cpp
+    src/SearchSettingsPage.h
     src/SettingsDialog.cpp
     src/SettingsDialog.h
     src/TrustConfiguration.cpp
@@ -130,6 +134,8 @@ qt_add_executable(PanBrowserTests
     src/PermissionPolicy.h
     src/SessionStore.cpp
     src/SessionStore.h
+    src/SearchSettings.cpp
+    src/SearchSettings.h
     src/TrustConfiguration.cpp
     src/TrustConfiguration.h
     src/TrustSettings.cpp

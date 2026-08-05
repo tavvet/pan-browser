@@ -16,6 +16,7 @@
 - [x] One-time permission prompts for camera, microphone, and location.
 - [x] Safe confirmation for external URL schemes and application deep links.
 - [x] User-initiated popup windows with shared profile and trust policy.
+- [x] Address-bar search with configurable built-in and custom search engines.
 
 ## Browser essentials
 

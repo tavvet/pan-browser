@@ -40,6 +40,7 @@ On first launch PanBrowser creates:
 ├── WebEngine/
 ├── session.json        # when tab restoration is enabled
 ├── downloads.json      # download history
+├── search-engines.json # address-bar search configuration
 ├── rules.json
 └── Certificates/
 ```
@@ -58,6 +59,21 @@ window open a full PanBrowser window with visible URL and TLS status, even when
 the site asks for a chromeless dialog. Popup windows share cookies, cache,
 downloads, permissions, and trust rules with the primary window, but are not
 saved in the restored tab session. Automatic popups remain blocked.
+
+The address bar opens explicit HTTP/HTTPS URLs, domains, IP addresses, and
+`localhost` directly. Other input is sent to the selected search engine only
+after Enter is pressed. Prefix a query with `?` to force a search, or use an
+engine keyword such as `@g qt webengine` or `@ddg certificate validation` for a
+one-off choice. Dotless intranet hosts must be entered with an explicit
+`http://` or `https://` prefix.
+
+The **Search** settings section selects the default engine and manages enabled
+engines. DuckDuckGo, Google, Bing, and Brave Search are included by default;
+custom engines use an HTTP or HTTPS URL template containing `{searchTerms}`
+exactly once. HTTP templates are allowed but expose search queries in transit.
+Search suggestions are deliberately not requested. Configuration is saved
+atomically in `search-engines.json`, with the previous version retained as
+`search-engines.json.backup`.
 
 Open **PanBrowser → Settings…** or press <kbd>⌘,</kbd> to choose the start page,
 restore previous tabs, or retain session-cookie sign-ins. Restored background

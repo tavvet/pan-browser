@@ -1,6 +1,7 @@
 #pragma once
 
 #include "BrowserPreferences.h"
+#include "SearchSettings.h"
 
 #include <QDialog>
 
@@ -10,6 +11,7 @@ class QLineEdit;
 class QListWidget;
 class QStackedWidget;
 class BrowserProfile;
+class SearchSettingsPage;
 class TrustRulesDialog;
 
 class SettingsDialog final : public QDialog {
@@ -18,13 +20,16 @@ class SettingsDialog final : public QDialog {
 public:
     enum class Page {
         General,
+        Search,
         PrivacyData,
         TrustRules,
     };
 
     SettingsDialog(
         const QString &configurationPath,
+        const QString &searchConfigurationPath,
         const BrowserPreferences &preferences,
+        const SearchSettings &searchSettings,
         BrowserProfile *profile,
         const QUrl &currentUrl,
         Page initialPage,
@@ -33,6 +38,7 @@ public:
 
     bool load(QString *error = nullptr);
     [[nodiscard]] BrowserPreferences preferences() const;
+    [[nodiscard]] SearchSettings searchSettings() const;
 
 private:
     void createInterface(const QUrl &currentUrl, Page initialPage);
@@ -41,12 +47,15 @@ private:
     void saveAndClose();
 
     QString m_configurationPath;
+    QString m_searchConfigurationPath;
     BrowserPreferences m_preferences;
+    SearchSettings m_searchSettings;
     BrowserProfile *m_profile = nullptr;
     QListWidget *m_sidebar = nullptr;
     QStackedWidget *m_pages = nullptr;
     QLineEdit *m_startPage = nullptr;
     QComboBox *m_startupMode = nullptr;
     QCheckBox *m_persistSessionCookies = nullptr;
+    SearchSettingsPage *m_searchPage = nullptr;
     TrustRulesDialog *m_trustRules = nullptr;
 };

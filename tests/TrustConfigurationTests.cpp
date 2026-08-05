@@ -4,6 +4,7 @@
 #include "ExternalNavigationPolicy.h"
 #include "PermissionPolicy.h"
 #include "SessionStore.h"
+#include "SearchSettings.h"
 #include "TrustConfiguration.h"
 #include "TrustSettings.h"
 #include "WindowPlacement.h"
@@ -39,6 +40,11 @@ private slots:
     void externalSchemesRequireMainFrameConfirmation();
     void dangerousLocalSchemesAreBlocked();
     void popupGeometryIsVisibleAndUsable();
+    void searchSettingsRoundTripAndCreateBackup();
+    void searchSettingsRejectInvalidTemplatesAndDuplicates();
+    void addressInputDistinguishesUrlsAndSearches();
+    void addressInputSupportsSearchKeywords();
+    void searchTermsAreEncodedExactlyOnce();
 };
 
 void TrustConfigurationTests::exactDomainIsCaseInsensitive()
@@ -416,6 +422,105 @@ void TrustConfigurationTests::popupGeometryIsVisibleAndUsable()
         popupWindowGeometry(QRect(2000, 100, 200, 100), owner, {screen}, screen),
         QRect(360, 190, 720, 520)
     );
+}
+
+void TrustConfigurationTests::searchSettingsRoundTripAndCreateBackup()
+{
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+    const QString path = directory.filePath(QStringLiteral("search-engines.json"));
+
+    SearchSettings settings = SearchSettings::defaults();
+    SearchEngineSettings custom;
+    custom.id = QStringLiteral("custom-example");
+    custom.name = QStringLiteral("Example Search");
+    custom.keyword = QStringLiteral("ex");
+    custom.urlTemplate = QStringLiteral("https://search.example/?q={searchTerms}");
+    settings.engines().append(custom);
+    settings.setDefaultEngineId(custom.id);
+
+    QString error;
+    QVERIFY2(settings.save(path, &error), qPrintable(error));
+    settings.setDefaultEngineId(QStringLiteral("builtin-duckduckgo"));
+    QVERIFY2(settings.save(path, &error), qPrintable(error));
+    QVERIFY(QFile::exists(path + QStringLiteral(".backup")));
+
+    SearchSettings loaded;
+    QVERIFY2(loaded.load(path, &error), qPrintable(error));
+    QCOMPARE(loaded.engines().size(), 5);
+    QCOMPARE(loaded.defaultEngine()->name, QStringLiteral("DuckDuckGo"));
+    QCOMPARE(loaded.engineForKeyword(QStringLiteral("@ex"))->name, QStringLiteral("Example Search"));
+}
+
+void TrustConfigurationTests::searchSettingsRejectInvalidTemplatesAndDuplicates()
+{
+    SearchSettings settings = SearchSettings::defaults();
+    QString error;
+
+    settings.engines()[0].urlTemplate = QStringLiteral("https://example.com/search");
+    QVERIFY(!settings.validate(&error));
+    QVERIFY(error.contains(QStringLiteral("{searchTerms}")));
+
+    settings = SearchSettings::defaults();
+    settings.engines()[1].keyword = settings.engines()[0].keyword;
+    QVERIFY(!settings.validate(&error));
+    QVERIFY(error.contains(QStringLiteral("Duplicate search keyword")));
+
+    settings = SearchSettings::defaults();
+    settings.engines()[0].urlTemplate = QStringLiteral("https://user:secret@example.com/?q={searchTerms}");
+    QVERIFY(!settings.validate(&error));
+    QVERIFY(error.contains(QStringLiteral("credentials")));
+}
+
+void TrustConfigurationTests::addressInputDistinguishesUrlsAndSearches()
+{
+    const SearchSettings settings = SearchSettings::defaults();
+
+    ResolvedAddressInput result = resolveAddressInput(QStringLiteral("example.com/path"), settings);
+    QCOMPARE(result.kind, AddressInputKind::Navigate);
+    QCOMPARE(result.url.host(), QStringLiteral("example.com"));
+
+    result = resolveAddressInput(QStringLiteral("localhost:8080/test"), settings);
+    QCOMPARE(result.kind, AddressInputKind::Navigate);
+    QCOMPARE(result.url.port(), 8080);
+
+    result = resolveAddressInput(QStringLiteral("как войти в банк"), settings);
+    QCOMPARE(result.kind, AddressInputKind::Search);
+    QCOMPARE(result.url.host(), QStringLiteral("duckduckgo.com"));
+
+    result = resolveAddressInput(QStringLiteral("singleword"), settings);
+    QCOMPARE(result.kind, AddressInputKind::Search);
+
+    result = resolveAddressInput(QStringLiteral("mailto:user@example.com"), settings);
+    QCOMPARE(result.kind, AddressInputKind::Error);
+}
+
+void TrustConfigurationTests::addressInputSupportsSearchKeywords()
+{
+    SearchSettings settings = SearchSettings::defaults();
+    ResolvedAddressInput result = resolveAddressInput(QStringLiteral("@g qt webengine"), settings);
+    QCOMPARE(result.kind, AddressInputKind::Search);
+    QCOMPARE(result.url.host(), QStringLiteral("www.google.com"));
+    QCOMPARE(result.engineId, QStringLiteral("builtin-google"));
+
+    result = resolveAddressInput(QStringLiteral("? example.com"), settings);
+    QCOMPARE(result.kind, AddressInputKind::Search);
+    QCOMPARE(result.url.host(), QStringLiteral("duckduckgo.com"));
+
+    result = resolveAddressInput(QStringLiteral("@missing query"), settings);
+    QCOMPARE(result.kind, AddressInputKind::Error);
+    QVERIFY(result.error.contains(QStringLiteral("Unknown")));
+}
+
+void TrustConfigurationTests::searchTermsAreEncodedExactlyOnce()
+{
+    const SearchSettings settings = SearchSettings::defaults();
+    QString error;
+    const QUrl url = settings.searchUrl(QStringLiteral("C++ 100% русский"), {}, &error);
+    QVERIFY2(url.isValid(), qPrintable(error));
+    const QString encoded = url.toString(QUrl::FullyEncoded);
+    QVERIFY(encoded.contains(QStringLiteral("C%2B%2B%20100%25%20")));
+    QVERIFY(!encoded.contains(QStringLiteral("%252B")));
 }
 
 QTEST_MAIN(TrustConfigurationTests)

@@ -2,6 +2,7 @@
 
 #include "BrowserPreferences.h"
 #include "SessionStore.h"
+#include "SearchSettings.h"
 #include "TrustConfiguration.h"
 
 #include <QHash>
@@ -80,6 +81,7 @@ private:
     void connectBrowserSignals(QWebEngineView *webView);
     void updateCurrentTabUi();
     void updateNavigationActions();
+    void updateAddressPlaceholder();
     void navigateFromAddressBar();
     void openSettings(bool trustRules = false);
     void reloadRules();
@@ -98,6 +100,7 @@ private:
     void setTrustStatus(const QString &text, bool error = false);
     void restoreWindowPlacement();
     QString ensureConfiguration();
+    void initializeSearchSettings();
 
     BrowserProfile *m_profile = nullptr;
     DownloadManager *m_downloadManager = nullptr;
@@ -120,9 +123,11 @@ private:
     QTimer *m_sessionSaveTimer = nullptr;
     QHash<QWebEngineView *, BrowserTabState> m_tabStates;
     BrowserPreferences m_preferences;
+    SearchSettings m_searchSettings;
     SessionStore m_sessionStore;
     TrustPolicy m_trustPolicy;
     QString m_configurationPath;
+    QString m_searchConfigurationPath;
     MainWindow *m_primaryWindow = nullptr;
     QList<QPointer<MainWindow>> m_popupWindows;
     bool m_ownsBrowserResources = true;
