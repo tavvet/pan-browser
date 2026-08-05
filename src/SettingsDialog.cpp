@@ -9,6 +9,7 @@
 #include <QCheckBox>
 #include <QComboBox>
 #include <QDialogButtonBox>
+#include <QFile>
 #include <QFormLayout>
 #include <QFrame>
 #include <QHBoxLayout>
@@ -18,8 +19,78 @@
 #include <QListWidget>
 #include <QMessageBox>
 #include <QPushButton>
+#include <QSaveFile>
 #include <QStackedWidget>
 #include <QVBoxLayout>
+
+namespace {
+
+struct FileSnapshot {
+    QString path;
+    QByteArray contents;
+    bool existed = false;
+};
+
+bool captureFile(const QString &path, FileSnapshot *snapshot, QString *error)
+{
+    snapshot->path = path;
+    snapshot->existed = QFile::exists(path);
+    snapshot->contents.clear();
+    if (!snapshot->existed)
+        return true;
+
+    QFile file(path);
+    if (!file.open(QIODevice::ReadOnly)) {
+        if (error)
+            *error = QStringLiteral("Cannot snapshot %1: %2").arg(path, file.errorString());
+        return false;
+    }
+    snapshot->contents = file.readAll();
+    return true;
+}
+
+bool restoreFile(const FileSnapshot &snapshot, QString *error)
+{
+    if (!snapshot.existed) {
+        if (!QFile::exists(snapshot.path) || QFile::remove(snapshot.path))
+            return true;
+        if (error)
+            *error = QStringLiteral("Cannot remove %1 during rollback").arg(snapshot.path);
+        return false;
+    }
+
+    QSaveFile file(snapshot.path);
+    if (!file.open(QIODevice::WriteOnly)) {
+        if (error)
+            *error = QStringLiteral("Cannot restore %1: %2").arg(snapshot.path, file.errorString());
+        return false;
+    }
+    if (file.write(snapshot.contents) != snapshot.contents.size() || !file.commit()) {
+        if (error)
+            *error = QStringLiteral("Cannot restore %1: %2").arg(snapshot.path, file.errorString());
+        return false;
+    }
+    return true;
+}
+
+QString rollbackSettings(
+    const BrowserPreferences &preferences,
+    const QList<FileSnapshot> &snapshots
+)
+{
+    QStringList failures;
+    for (const FileSnapshot &snapshot : snapshots) {
+        QString error;
+        if (!restoreFile(snapshot, &error))
+            failures.append(error);
+    }
+    QString error;
+    if (!preferences.save(&error))
+        failures.append(error);
+    return failures.join(QLatin1Char('\n'));
+}
+
+} // namespace
 
 SettingsDialog::SettingsDialog(
     const QString &configurationPath,
@@ -476,23 +547,45 @@ void SettingsDialog::saveAndClose()
         QMessageBox::warning(this, QStringLiteral("Cannot save search settings"), error);
         return;
     }
-    if (!m_trustRules->save(&error)) {
-        selectPage(Page::TrustRules);
-        QMessageBox::warning(this, QStringLiteral("Cannot save trust rules"), error);
-        return;
+    QList<FileSnapshot> snapshots;
+    for (const QString &path : {
+             m_searchConfigurationPath,
+             m_searchConfigurationPath + QStringLiteral(".backup"),
+             m_configurationPath,
+             m_configurationPath + QStringLiteral(".backup"),
+         }) {
+        FileSnapshot snapshot;
+        if (!captureFile(path, &snapshot, &error)) {
+            QMessageBox::warning(this, QStringLiteral("Cannot save settings"), error);
+            return;
+        }
+        snapshots.append(snapshot);
     }
+
     SearchSettings searchSettings = m_searchPage->settings();
-    if (!searchSettings.save(m_searchConfigurationPath, &error)) {
-        selectPage(Page::Search);
-        QMessageBox::warning(this, QStringLiteral("Cannot save search settings"), error);
-        return;
-    }
     if (!preferences.save(&error)) {
         selectPage(Page::General);
         QMessageBox::warning(this, QStringLiteral("Cannot save settings"), error);
         return;
     }
+    if (!searchSettings.save(m_searchConfigurationPath, &error)) {
+        const QString rollbackError = rollbackSettings(m_preferences, snapshots.mid(0, 2));
+        selectPage(Page::Search);
+        if (!rollbackError.isEmpty())
+            error += QStringLiteral("\n\nRollback was incomplete:\n") + rollbackError;
+        QMessageBox::warning(this, QStringLiteral("Cannot save search settings"), error);
+        return;
+    }
+    if (!m_trustRules->save(&error)) {
+        const QString rollbackError = rollbackSettings(m_preferences, snapshots);
+        selectPage(Page::TrustRules);
+        if (!rollbackError.isEmpty())
+            error += QStringLiteral("\n\nRollback was incomplete:\n") + rollbackError;
+        QMessageBox::warning(this, QStringLiteral("Cannot save trust rules"), error);
+        return;
+    }
 
+    m_trustRules->finalizeSave();
     m_preferences = preferences;
     m_searchSettings = searchSettings;
     accept();

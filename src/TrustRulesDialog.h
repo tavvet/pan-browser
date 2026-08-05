@@ -27,6 +27,7 @@ public:
     bool load(QString *error = nullptr);
     bool validate(QString *error = nullptr);
     bool save(QString *error = nullptr);
+    void finalizeSave();
 
 private:
     void createInterface(bool embedded);

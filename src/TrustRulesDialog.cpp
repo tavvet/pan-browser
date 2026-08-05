@@ -151,12 +151,13 @@ bool TrustRulesDialog::validate(QString *error)
 bool TrustRulesDialog::save(QString *error)
 {
     storeCurrentRule();
-    if (!m_settings.save(m_configurationPath, error))
-        return false;
+    return m_settings.save(m_configurationPath, error);
+}
 
+void TrustRulesDialog::finalizeSave()
+{
     cleanupPendingCertificates(true);
     m_saved = true;
-    return true;
 }
 
 void TrustRulesDialog::createInterface(bool embedded)
@@ -856,6 +857,7 @@ void TrustRulesDialog::saveAndClose()
         QMessageBox::warning(this, QStringLiteral("Cannot save trust rules"), error);
         return;
     }
+    finalizeSave();
     accept();
 }
 
