@@ -1,5 +1,6 @@
 #include "HistoryCompletionPopup.h"
 
+#include <QApplication>
 #include <QDate>
 #include <QGuiApplication>
 #include <QKeyEvent>
@@ -12,7 +13,13 @@
 #include <algorithm>
 
 HistoryCompletionPopup::HistoryCompletionPopup(QLineEdit *addressBar, QWidget *parent)
-    : QFrame(parent, Qt::Popup | Qt::FramelessWindowHint | Qt::NoDropShadowWindowHint)
+    : QFrame(
+        parent,
+        Qt::Tool
+            | Qt::FramelessWindowHint
+            | Qt::NoDropShadowWindowHint
+            | Qt::WindowDoesNotAcceptFocus
+    )
     , m_addressBar(addressBar)
 {
     setObjectName(QStringLiteral("historyCompletionPopup"));
@@ -29,10 +36,16 @@ HistoryCompletionPopup::HistoryCompletionPopup(QLineEdit *addressBar, QWidget *p
     m_list->setSelectionMode(QAbstractItemView::SingleSelection);
     layout->addWidget(m_list);
 
-    m_addressBar->installEventFilter(this);
+    qApp->installEventFilter(this);
     connect(m_list, &QListWidget::itemClicked, this, [this](QListWidgetItem *) {
         activateCurrent();
     });
+}
+
+HistoryCompletionPopup::~HistoryCompletionPopup()
+{
+    if (qApp)
+        qApp->removeEventFilter(this);
 }
 
 void HistoryCompletionPopup::showSuggestions(
@@ -71,8 +84,42 @@ void HistoryCompletionPopup::showSuggestions(
 
 bool HistoryCompletionPopup::eventFilter(QObject *watched, QEvent *event)
 {
-    if (watched != m_addressBar || !isVisible() || event->type() != QEvent::KeyPress)
+    if (!isVisible())
         return QFrame::eventFilter(watched, event);
+
+    const QWidget *target = qobject_cast<QWidget *>(watched);
+    const bool eventBelongsToCompletion = target
+        && (target == this || isAncestorOf(target));
+
+    if (event->type() == QEvent::MouseButtonPress) {
+        const bool eventBelongsToAddress = target
+            && (target == m_addressBar || m_addressBar->isAncestorOf(target));
+        if (!eventBelongsToCompletion && !eventBelongsToAddress)
+            hide();
+        return QFrame::eventFilter(watched, event);
+    }
+
+    if (event->type() == QEvent::FocusIn
+        && target
+        && target != m_addressBar
+        && !m_addressBar->isAncestorOf(target)
+        && !eventBelongsToCompletion) {
+        hide();
+        return QFrame::eventFilter(watched, event);
+    }
+
+    if (event->type() == QEvent::ApplicationDeactivate) {
+        hide();
+        return QFrame::eventFilter(watched, event);
+    }
+
+    if (event->type() != QEvent::KeyPress)
+        return QFrame::eventFilter(watched, event);
+
+    if (!m_addressBar->hasFocus()
+        && !eventBelongsToCompletion) {
+        return QFrame::eventFilter(watched, event);
+    }
 
     auto *keyEvent = static_cast<QKeyEvent *>(event);
     switch (keyEvent->key()) {
@@ -81,6 +128,7 @@ bool HistoryCompletionPopup::eventFilter(QObject *watched, QEvent *event)
             ? m_list->currentRow() + 1
             : 0;
         m_list->setCurrentRow(next);
+        m_list->scrollToItem(m_list->currentItem());
         return true;
     }
     case Qt::Key_Up: {
@@ -88,6 +136,7 @@ bool HistoryCompletionPopup::eventFilter(QObject *watched, QEvent *event)
             ? m_list->currentRow() - 1
             : m_list->count() - 1;
         m_list->setCurrentRow(next);
+        m_list->scrollToItem(m_list->currentItem());
         return true;
     }
     case Qt::Key_Return:
@@ -100,6 +149,7 @@ bool HistoryCompletionPopup::eventFilter(QObject *watched, QEvent *event)
         break;
     case Qt::Key_Escape:
         hide();
+        m_addressBar->setFocus(Qt::OtherFocusReason);
         return true;
     default:
         break;
@@ -114,6 +164,7 @@ void HistoryCompletionPopup::activateCurrent()
         return;
     const QUrl url(item->data(Qt::UserRole).toString(), QUrl::StrictMode);
     hide();
+    m_addressBar->setFocus(Qt::OtherFocusReason);
     if (url.isValid())
         emit urlActivated(url);
 }

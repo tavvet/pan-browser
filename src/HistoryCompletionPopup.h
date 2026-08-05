@@ -12,6 +12,7 @@ class HistoryCompletionPopup final : public QFrame {
 
 public:
     explicit HistoryCompletionPopup(QLineEdit *addressBar, QWidget *parent = nullptr);
+    ~HistoryCompletionPopup() override;
 
     void showSuggestions(const QList<HistorySuggestion> &suggestions);
 

@@ -74,7 +74,7 @@ QToolBar#navigationBar {
     padding: 8px 10px;
 }
 
-QToolBar#navigationBar QToolButton {
+QToolBar#navigationBar > QToolButton {
     background: transparent;
     border: none;
     border-radius: 8px;
@@ -85,15 +85,15 @@ QToolBar#navigationBar QToolButton {
     padding: 0;
 }
 
-QToolBar#navigationBar QToolButton:hover {
+QToolBar#navigationBar > QToolButton:hover {
     background: #292e37;
 }
 
-QToolBar#navigationBar QToolButton:pressed {
+QToolBar#navigationBar > QToolButton:pressed {
     background: #343b47;
 }
 
-QToolBar#navigationBar QToolButton:disabled {
+QToolBar#navigationBar > QToolButton:disabled {
     background: transparent;
     opacity: 0.35;
 }
@@ -159,6 +159,22 @@ QLineEdit#addressBar:hover {
 QLineEdit#addressBar:focus {
     background: #242932;
     border: 1px solid #5b8def;
+}
+
+QLineEdit#addressBar QToolButton {
+    min-width: 20px;
+    max-width: 20px;
+    min-height: 20px;
+    max-height: 20px;
+    margin: 0;
+    padding: 0;
+    background: transparent;
+    border: none;
+    border-radius: 5px;
+}
+
+QLineEdit#addressBar QToolButton:hover {
+    background: #343a45;
 }
 
 QFrame#historyCompletionPopup {
