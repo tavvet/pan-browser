@@ -7,6 +7,7 @@
 - [x] Certificate details and SHA-256 fingerprint viewer.
 - [x] Safe restoration of window size and position.
 - [x] Dedicated persistent WebEngine profile for cookies, site data, and cache.
+- [x] Movable browser tabs with per-tab navigation and TLS status.
 
 ## Browser essentials
 

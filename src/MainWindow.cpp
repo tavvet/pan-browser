@@ -24,12 +24,17 @@
 #include <QSaveFile>
 #include <QScreen>
 #include <QSettings>
+#include <QSizePolicy>
+#include <QStackedWidget>
 #include <QStandardPaths>
 #include <QStatusBar>
 #include <QStyle>
+#include <QTabBar>
 #include <QToolBar>
 #include <QToolButton>
 #include <QWebEngineCertificateError>
+#include <QWebEngineHistory>
+#include <QWebEngineNewWindowRequest>
 #include <QWebEnginePage>
 #include <QWebEngineView>
 
@@ -39,20 +44,20 @@ MainWindow::MainWindow(QWidget *parent)
     m_profile = new BrowserProfile();
     createInterface();
     restoreWindowPlacement();
-    connectBrowserSignals();
     reloadRules();
 
     const QStringList arguments = QApplication::arguments();
     const QUrl initialUrl = arguments.size() > 1
         ? QUrl::fromUserInput(arguments.at(1))
         : m_trustPolicy.startPage();
-    m_webView->setUrl(initialUrl);
+    createTab(initialUrl);
 }
 
 MainWindow::~MainWindow()
 {
-    delete m_webView;
-    m_webView = nullptr;
+    delete takeCentralWidget();
+    m_tabStack = nullptr;
+    m_tabStates.clear();
     delete m_profile;
     m_profile = nullptr;
 }
@@ -78,31 +83,59 @@ void MainWindow::createInterface()
     setWindowTitle(QStringLiteral("PanBrowser"));
     setWindowIcon(QIcon(QStringLiteral(":/assets/app-icon.svg")));
 
-    m_webView = new QWebEngineView(this);
-    m_webView->setPage(new QWebEnginePage(m_profile, m_webView));
-    setCentralWidget(m_webView);
+    m_tabStack = new QStackedWidget(this);
+    m_tabStack->setObjectName(QStringLiteral("browserTabs"));
+    setCentralWidget(m_tabStack);
 
-    QToolBar *toolbar = addToolBar(QStringLiteral("Navigation"));
+    QToolBar *tabsToolbar = new QToolBar(QStringLiteral("Tabs"), this);
+    tabsToolbar->setObjectName(QStringLiteral("tabsBar"));
+    tabsToolbar->setMovable(false);
+    tabsToolbar->setFloatable(false);
+    tabsToolbar->setIconSize(QSize(17, 17));
+
+    m_tabBar = new QTabBar(tabsToolbar);
+    m_tabBar->setObjectName(QStringLiteral("browserTabBar"));
+    m_tabBar->setDocumentMode(true);
+    m_tabBar->setTabsClosable(true);
+    m_tabBar->setMovable(true);
+    m_tabBar->setExpanding(false);
+    m_tabBar->setElideMode(Qt::ElideRight);
+    m_tabBar->setUsesScrollButtons(true);
+    m_tabBar->setSelectionBehaviorOnRemove(QTabBar::SelectPreviousTab);
+    m_tabBar->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
+    tabsToolbar->addWidget(m_tabBar);
+
+    QToolButton *newTabButton = new QToolButton(tabsToolbar);
+    newTabButton->setObjectName(QStringLiteral("newTabButton"));
+    newTabButton->setIcon(QIcon(QStringLiteral(":/assets/icons/plus.svg")));
+    newTabButton->setToolTip(QStringLiteral("New Tab (⌘T)"));
+    tabsToolbar->addWidget(newTabButton);
+
+    addToolBar(Qt::TopToolBarArea, tabsToolbar);
+    addToolBarBreak(Qt::TopToolBarArea);
+
+    QToolBar *toolbar = new QToolBar(QStringLiteral("Navigation"), this);
     toolbar->setObjectName(QStringLiteral("navigationBar"));
     toolbar->setMovable(false);
     toolbar->setFloatable(false);
     toolbar->setIconSize(QSize(19, 19));
     toolbar->setToolButtonStyle(Qt::ToolButtonIconOnly);
 
-    QAction *back = m_webView->pageAction(QWebEnginePage::Back);
-    back->setIcon(QIcon(QStringLiteral(":/assets/icons/arrow-left.svg")));
-    back->setText(QStringLiteral("Back"));
-    toolbar->addAction(back);
-
-    QAction *forward = m_webView->pageAction(QWebEnginePage::Forward);
-    forward->setIcon(QIcon(QStringLiteral(":/assets/icons/arrow-right.svg")));
-    forward->setText(QStringLiteral("Forward"));
-    toolbar->addAction(forward);
-
-    QAction *reload = m_webView->pageAction(QWebEnginePage::Reload);
-    reload->setIcon(QIcon(QStringLiteral(":/assets/icons/rotate-cw.svg")));
-    reload->setText(QStringLiteral("Reload"));
-    toolbar->addAction(reload);
+    m_backAction = toolbar->addAction(
+        QIcon(QStringLiteral(":/assets/icons/arrow-left.svg")),
+        QStringLiteral("Back")
+    );
+    m_forwardAction = toolbar->addAction(
+        QIcon(QStringLiteral(":/assets/icons/arrow-right.svg")),
+        QStringLiteral("Forward")
+    );
+    m_reloadAction = toolbar->addAction(
+        QIcon(QStringLiteral(":/assets/icons/rotate-cw.svg")),
+        QStringLiteral("Reload")
+    );
+    m_backAction->setEnabled(false);
+    m_forwardAction->setEnabled(false);
+    m_reloadAction->setEnabled(false);
 
     m_address = new QLineEdit(toolbar);
     m_address->setObjectName(QStringLiteral("addressBar"));
@@ -117,11 +150,57 @@ void MainWindow::createInterface()
         QIcon(QStringLiteral(":/assets/icons/arrow-right.svg")),
         QStringLiteral("Go")
     );
+    addToolBar(Qt::TopToolBarArea, toolbar);
 
+    connect(newTabButton, &QToolButton::clicked, this, [this] {
+        createTab(m_trustPolicy.startPage());
+    });
+    connect(m_tabBar, &QTabBar::currentChanged, this, [this](int index) {
+        if (index >= 0)
+            m_tabStack->setCurrentIndex(index);
+        updateCurrentTabUi();
+    });
+    connect(m_tabBar, &QTabBar::tabCloseRequested, this, &MainWindow::closeTab);
+    connect(m_tabBar, &QTabBar::tabMoved, this, [this](int from, int to) {
+        QWidget *webView = m_tabStack->widget(from);
+        if (!webView)
+            return;
+        m_tabStack->removeWidget(webView);
+        m_tabStack->insertWidget(to, webView);
+        m_tabStack->setCurrentIndex(m_tabBar->currentIndex());
+    });
+    connect(m_backAction, &QAction::triggered, this, [this] {
+        if (QWebEngineView *webView = currentWebView())
+            webView->back();
+    });
+    connect(m_forwardAction, &QAction::triggered, this, [this] {
+        if (QWebEngineView *webView = currentWebView())
+            webView->forward();
+    });
+    connect(m_reloadAction, &QAction::triggered, this, [this] {
+        if (QWebEngineView *webView = currentWebView())
+            webView->reload();
+    });
     connect(go, &QAction::triggered, this, &MainWindow::navigateFromAddressBar);
     connect(m_address, &QLineEdit::returnPressed, this, &MainWindow::navigateFromAddressBar);
 
     QMenu *fileMenu = menuBar()->addMenu(QStringLiteral("PanBrowser"));
+    QAction *newTabAction = fileMenu->addAction(
+        QIcon(QStringLiteral(":/assets/icons/plus.svg")),
+        QStringLiteral("New Tab")
+    );
+    newTabAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_T));
+    connect(newTabAction, &QAction::triggered, this, [this] {
+        createTab(m_trustPolicy.startPage());
+    });
+
+    QAction *closeTabAction = fileMenu->addAction(QStringLiteral("Close Tab"));
+    closeTabAction->setShortcut(QKeySequence::Close);
+    connect(closeTabAction, &QAction::triggered, this, [this] {
+        closeTab(m_tabBar->currentIndex());
+    });
+
+    fileMenu->addSeparator();
     QAction *editRulesAction = fileMenu->addAction(
         QIcon(QStringLiteral(":/assets/icons/shield-check.svg")),
         QStringLiteral("Trust Rules…")
@@ -165,35 +244,170 @@ void MainWindow::createInterface()
     statusBar()->addPermanentWidget(m_ruleCount);
 }
 
-void MainWindow::connectBrowserSignals()
+QWebEngineView *MainWindow::createTab(const QUrl &url, bool activate)
 {
-    connect(m_webView, &QWebEngineView::urlChanged, this, [this](const QUrl &url) {
-        m_address->setText(url.toString());
-    });
-    connect(m_webView, &QWebEngineView::titleChanged, this, [this](const QString &title) {
-        setWindowTitle(title.isEmpty() ? QStringLiteral("PanBrowser") : title + QStringLiteral(" — PanBrowser"));
-    });
-    connect(m_webView, &QWebEngineView::loadStarted, this, [this] {
-        m_lastAcceptedRule.clear();
-        m_progress->show();
-        setTrustStatus(QStringLiteral("Loading…"));
-    });
-    connect(m_webView, &QWebEngineView::loadProgress, m_progress, &QProgressBar::setValue);
-    connect(m_webView, &QWebEngineView::loadFinished, this, [this](bool ok) {
-        m_progress->hide();
-        if (ok) {
-            if (m_lastAcceptedRule.isEmpty())
-                setTrustStatus(QStringLiteral("Secure · Chromium system trust"));
-        } else if (m_lastAcceptedRule.isEmpty()) {
-            setTrustStatus(QStringLiteral("Page loading failed"), true);
+    QWebEngineView *webView = new QWebEngineView(m_tabStack);
+    webView->setPage(new QWebEnginePage(m_profile, webView));
+    m_tabStates.insert(webView, BrowserTabState());
+    connectBrowserSignals(webView);
+
+    const int stackIndex = m_tabStack->addWidget(webView);
+    const int tabIndex = m_tabBar->addTab(QStringLiteral("New Tab"));
+    Q_ASSERT(stackIndex == tabIndex);
+    m_tabBar->setTabToolTip(tabIndex, QStringLiteral("New Tab"));
+
+    if (activate)
+        m_tabBar->setCurrentIndex(tabIndex);
+    if (url.isValid() && !url.isEmpty())
+        webView->setUrl(url);
+
+    return webView;
+}
+
+void MainWindow::closeTab(int index)
+{
+    if (index < 0 || index >= m_tabBar->count())
+        return;
+
+    QWebEngineView *webView = qobject_cast<QWebEngineView *>(m_tabStack->widget(index));
+    if (!webView)
+        return;
+
+    disconnect(webView, nullptr, this, nullptr);
+    disconnect(webView->page(), nullptr, this, nullptr);
+    webView->stop();
+    m_tabStates.remove(webView);
+    m_tabStack->removeWidget(webView);
+    m_tabBar->removeTab(index);
+    webView->deleteLater();
+
+    if (m_tabBar->count() == 0) {
+        close();
+        return;
+    }
+
+    m_tabStack->setCurrentIndex(m_tabBar->currentIndex());
+    updateCurrentTabUi();
+}
+
+QWebEngineView *MainWindow::currentWebView() const
+{
+    return qobject_cast<QWebEngineView *>(m_tabStack->currentWidget());
+}
+
+void MainWindow::connectBrowserSignals(QWebEngineView *webView)
+{
+    connect(webView, &QWebEngineView::urlChanged, this, [this, webView](const QUrl &url) {
+        const int index = m_tabStack->indexOf(webView);
+        if (index >= 0 && webView->title().isEmpty()) {
+            const QString label = url.host().isEmpty() ? QStringLiteral("New Tab") : url.host();
+            m_tabBar->setTabText(index, label);
+            m_tabBar->setTabToolTip(index, url.toString());
         }
+        if (webView == currentWebView())
+            m_address->setText(url.toString());
+        updateNavigationActions();
+    });
+    connect(webView, &QWebEngineView::titleChanged, this, [this, webView](const QString &title) {
+        const int index = m_tabStack->indexOf(webView);
+        if (index >= 0) {
+            const QString label = title.isEmpty()
+                ? (webView->url().host().isEmpty() ? QStringLiteral("New Tab") : webView->url().host())
+                : title;
+            m_tabBar->setTabText(index, label);
+            m_tabBar->setTabToolTip(index, title.isEmpty() ? webView->url().toString() : title);
+        }
+        if (webView == currentWebView())
+            setWindowTitle(title.isEmpty() ? QStringLiteral("PanBrowser") : title + QStringLiteral(" — PanBrowser"));
+    });
+    connect(webView, &QWebEngineView::iconChanged, this, [this, webView](const QIcon &icon) {
+        const int index = m_tabStack->indexOf(webView);
+        if (index >= 0)
+            m_tabBar->setTabIcon(index, icon);
+    });
+    connect(webView, &QWebEngineView::loadStarted, this, [this, webView] {
+        BrowserTabState &state = m_tabStates[webView];
+        state.lastAcceptedRule.clear();
+        state.loading = true;
+        state.progress = 0;
+        setTabTrustStatus(webView, QStringLiteral("Loading…"));
+        if (webView == currentWebView()) {
+            m_progress->setValue(0);
+            m_progress->show();
+        }
+        updateNavigationActions();
+    });
+    connect(webView, &QWebEngineView::loadProgress, this, [this, webView](int progress) {
+        m_tabStates[webView].progress = progress;
+        if (webView == currentWebView())
+            m_progress->setValue(progress);
+    });
+    connect(webView, &QWebEngineView::loadFinished, this, [this, webView](bool ok) {
+        BrowserTabState &state = m_tabStates[webView];
+        state.loading = false;
+        state.progress = 100;
+        if (webView == currentWebView())
+            m_progress->hide();
+        if (ok) {
+            if (state.lastAcceptedRule.isEmpty())
+                setTabTrustStatus(webView, QStringLiteral("Secure · Chromium system trust"));
+        } else if (state.lastAcceptedRule.isEmpty()) {
+            setTabTrustStatus(webView, QStringLiteral("Page loading failed"), true);
+        }
+        updateNavigationActions();
     });
     connect(
-        m_webView->page(),
+        webView->page(),
         &QWebEnginePage::certificateError,
         this,
-        &MainWindow::handleCertificateError
+        [this, webView](const QWebEngineCertificateError &error) {
+            handleCertificateError(webView, error);
+        }
     );
+    connect(
+        webView->page(),
+        &QWebEnginePage::newWindowRequested,
+        this,
+        [this](QWebEngineNewWindowRequest &request) {
+            if (!request.isUserInitiated())
+                return;
+
+            const bool activate = request.destination()
+                != QWebEngineNewWindowRequest::InNewBackgroundTab;
+            QWebEngineView *newView = createTab(QUrl(), activate);
+            request.openIn(newView->page());
+        }
+    );
+}
+
+void MainWindow::updateCurrentTabUi()
+{
+    QWebEngineView *webView = currentWebView();
+    if (!webView) {
+        m_address->clear();
+        setWindowTitle(QStringLiteral("PanBrowser"));
+        m_progress->hide();
+        updateNavigationActions();
+        return;
+    }
+
+    m_address->setText(webView->url().toString());
+    const QString title = webView->title();
+    setWindowTitle(title.isEmpty() ? QStringLiteral("PanBrowser") : title + QStringLiteral(" — PanBrowser"));
+
+    const BrowserTabState state = m_tabStates.value(webView);
+    setTrustStatus(state.trustStatus, state.trustError);
+    m_progress->setValue(state.progress);
+    m_progress->setVisible(state.loading);
+    updateNavigationActions();
+}
+
+void MainWindow::updateNavigationActions()
+{
+    QWebEngineView *webView = currentWebView();
+    m_backAction->setEnabled(webView && webView->history()->canGoBack());
+    m_forwardAction->setEnabled(webView && webView->history()->canGoForward());
+    m_reloadAction->setEnabled(webView != nullptr);
 }
 
 void MainWindow::navigateFromAddressBar()
@@ -205,7 +419,8 @@ void MainWindow::navigateFromAddressBar()
         setTrustStatus(QStringLiteral("Only HTTP and HTTPS URLs are supported"), true);
         return;
     }
-    m_webView->setUrl(url);
+    if (QWebEngineView *webView = currentWebView())
+        webView->setUrl(url);
 }
 
 void MainWindow::openTrustRules()
@@ -238,7 +453,10 @@ void MainWindow::reloadRules()
     setTrustStatus(QStringLiteral("Trust rules loaded"));
 }
 
-void MainWindow::handleCertificateError(const QWebEngineCertificateError &error)
+void MainWindow::handleCertificateError(
+    QWebEngineView *webView,
+    const QWebEngineCertificateError &error
+)
 {
     QWebEngineCertificateError decision(error);
     const QString host = error.url().host();
@@ -248,7 +466,7 @@ void MainWindow::handleCertificateError(const QWebEngineCertificateError &error)
         qWarning().noquote() << "[PanBrowser TLS] rejected unconfigured host" << host
                              << error.description();
         decision.rejectCertificate();
-        setTrustStatus(
+        setTabTrustStatus(webView,
             QStringLiteral("Blocked %1: no matching trust rule").arg(host),
             true
         );
@@ -257,7 +475,7 @@ void MainWindow::handleCertificateError(const QWebEngineCertificateError &error)
 
     if (!error.isOverridable()) {
         decision.rejectCertificate();
-        setTrustStatus(
+        setTabTrustStatus(webView,
             QStringLiteral("Blocked %1: non-overridable certificate error").arg(host),
             true
         );
@@ -266,7 +484,7 @@ void MainWindow::handleCertificateError(const QWebEngineCertificateError &error)
 
     if (error.type() != QWebEngineCertificateError::CertificateAuthorityInvalid) {
         decision.rejectCertificate();
-        setTrustStatus(
+        setTabTrustStatus(webView,
             QStringLiteral("Blocked %1: only an unknown CA may be overridden").arg(host),
             true
         );
@@ -275,7 +493,7 @@ void MainWindow::handleCertificateError(const QWebEngineCertificateError &error)
 
     if (rule->mode == TrustMode::SystemOnly) {
         decision.rejectCertificate();
-        setTrustStatus(
+        setTabTrustStatus(webView,
             QStringLiteral("Blocked %1: system validation failed").arg(host),
             true
         );
@@ -291,19 +509,31 @@ void MainWindow::handleCertificateError(const QWebEngineCertificateError &error)
 
     if (result.trusted) {
         decision.acceptCertificate();
-        m_lastAcceptedRule = rule->name;
+        m_tabStates[webView].lastAcceptedRule = rule->name;
         qInfo().noquote() << "[PanBrowser TLS] accepted" << host << "using rule" << rule->name;
-        setTrustStatus(
+        setTabTrustStatus(webView,
             QStringLiteral("Secure · %1 · %2").arg(rule->name, result.explanation)
         );
     } else {
         decision.rejectCertificate();
         qWarning().noquote() << "[PanBrowser TLS] rejected" << host << result.explanation;
-        setTrustStatus(
+        setTabTrustStatus(webView,
             QStringLiteral("Blocked %1: %2").arg(host, result.explanation),
             true
         );
     }
+}
+
+void MainWindow::setTabTrustStatus(QWebEngineView *webView, const QString &text, bool error)
+{
+    if (!webView || !m_tabStates.contains(webView))
+        return;
+
+    BrowserTabState &state = m_tabStates[webView];
+    state.trustStatus = text;
+    state.trustError = error;
+    if (webView == currentWebView())
+        setTrustStatus(text, error);
 }
 
 void MainWindow::setTrustStatus(const QString &text, bool error)

@@ -2,6 +2,70 @@ QMainWindow {
     background: #111318;
 }
 
+QToolBar#tabsBar {
+    background: #15181e;
+    border: none;
+    border-bottom: 1px solid #292e37;
+    spacing: 6px;
+    padding: 5px 8px 0 8px;
+}
+
+QTabBar#browserTabBar {
+    background: transparent;
+}
+
+QTabBar#browserTabBar::tab {
+    min-width: 130px;
+    max-width: 230px;
+    min-height: 31px;
+    color: #929baa;
+    background: #1b1f26;
+    border: 1px solid #292e37;
+    border-bottom: none;
+    border-top-left-radius: 8px;
+    border-top-right-radius: 8px;
+    padding: 0 28px 0 11px;
+    margin-right: 3px;
+}
+
+QTabBar#browserTabBar::tab:hover:!selected {
+    color: #d7dce5;
+    background: #20242c;
+}
+
+QTabBar#browserTabBar::tab:selected {
+    color: #edf0f6;
+    background: #252a33;
+    border-color: #3a414d;
+}
+
+QTabBar#browserTabBar::close-button {
+    image: url(:/assets/icons/x.svg);
+    subcontrol-position: right;
+    width: 14px;
+    height: 14px;
+    margin-right: 8px;
+}
+
+QToolBar#tabsBar QToolButton#newTabButton {
+    min-width: 30px;
+    max-width: 30px;
+    min-height: 30px;
+    max-height: 30px;
+    margin-bottom: 1px;
+    background: transparent;
+    border: none;
+    border-radius: 7px;
+}
+
+QToolBar#tabsBar QToolButton#newTabButton:hover {
+    background: #292e37;
+}
+
+QToolBar#tabsBar QToolButton#newTabButton:pressed {
+    background: #343b47;
+}
+
 QToolBar#navigationBar {
     background: #181b21;
     border: none;

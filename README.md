@@ -47,6 +47,11 @@ storage are kept under `WebEngine/Profile`; session cookies are discarded when
 the application exits. The HTTP cache is isolated at
 `~/Library/Caches/PanBrowser/WebEngine/`.
 
+Tabs share that profile while keeping their own navigation history, loading
+progress, and TLS status. Press <kbd>⌘T</kbd> to open a tab and <kbd>⌘W</kbd> to
+close the current tab. User-initiated links that request a new tab are opened
+inside the same PanBrowser window; automatic popups remain blocked.
+
 Open **PanBrowser → Trust Rules…** or press <kbd>⌘,</kbd> to manage rules. The
 editor imports certificates into the application data directory, validates the
 complete configuration, saves it atomically, and reloads the active policy.
