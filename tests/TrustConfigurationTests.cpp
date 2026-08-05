@@ -50,6 +50,7 @@ private slots:
     void searchTermsAreEncodedExactlyOnce();
     void historySanitizesAndStoresSuccessfulWebVisits();
     void historySuggestionsPreferRelevanceThenRecency();
+    void historySuggestionsConsiderOlderExactMatches();
     void historyCanDeleteIndividualVisitsAndClearAll();
     void corruptHistoryIsPreservedAndDisabled();
     void ghostCompletionAcceptsOnlyAddressPrefixes();
@@ -640,6 +641,42 @@ void TrustConfigurationTests::historySuggestionsPreferRelevanceThenRecency()
     QCOMPARE(suggestions.at(0).url.host(), QStringLiteral("example.net"));
     QCOMPARE(suggestions.at(1).url.host(), QStringLiteral("example.com"));
     QCOMPARE(suggestions.at(2).url.host(), QStringLiteral("recent.test"));
+}
+
+void TrustConfigurationTests::historySuggestionsConsiderOlderExactMatches()
+{
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+    HistoryStore store(directory.filePath(QStringLiteral("history.sqlite")));
+    QString error;
+    QVERIFY2(store.open(&error), qPrintable(error));
+
+    const QUrl exactUrl(QStringLiteral("https://needle.example/"));
+    QVERIFY2(store.recordVisit(
+        exactUrl,
+        QStringLiteral("Old exact match"),
+        HistoryTransition::Typed,
+        QDateTime::fromSecsSinceEpoch(1000, QTimeZone::UTC),
+        &error
+    ), qPrintable(error));
+    for (int index = 0; index < 201; ++index) {
+        QVERIFY2(store.recordVisit(
+            QUrl(QStringLiteral("https://recent-%1.test/?q=needle.example").arg(index)),
+            QStringLiteral("Recent weak match"),
+            HistoryTransition::Link,
+            QDateTime::fromSecsSinceEpoch(2000 + index, QTimeZone::UTC),
+            &error
+        ), qPrintable(error));
+    }
+
+    const QList<HistorySuggestion> suggestions = store.suggestions(
+        QStringLiteral("needle.example"),
+        8,
+        &error
+    );
+    QVERIFY2(error.isEmpty(), qPrintable(error));
+    QCOMPARE(suggestions.size(), 8);
+    QCOMPARE(suggestions.first().url, exactUrl);
 }
 
 void TrustConfigurationTests::historyCanDeleteIndividualVisitsAndClearAll()

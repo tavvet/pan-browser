@@ -91,6 +91,11 @@ int matchClass(const HistorySuggestion &suggestion, const QString &query)
     return 0;
 }
 
+struct RankedHistorySuggestion {
+    HistorySuggestion suggestion;
+    int matchClass = 0;
+};
+
 } // namespace
 
 HistoryStore::HistoryStore(const QString &path, QObject *parent)
@@ -307,6 +312,8 @@ QList<HistorySuggestion> HistoryStore::suggestions(
         fail(error, QStringLiteral("History is unavailable"));
         return result;
     }
+    if (limit <= 0)
+        return result;
     QString input = normalizedText(sourceInput);
     if (input.startsWith(QStringLiteral("http://")))
         input.remove(0, 7);
@@ -320,7 +327,7 @@ QList<HistorySuggestion> HistoryStore::suggestions(
         "SELECT id, url, title, last_visited_at, visit_count, typed_count "
         "FROM pages "
         "WHERE normalized_url LIKE ? ESCAPE '\\' OR normalized_title LIKE ? ESCAPE '\\' "
-        "ORDER BY last_visited_at DESC LIMIT 200"
+        "ORDER BY last_visited_at DESC"
     ));
     const QString pattern = escapedLikePattern(input);
     query.addBindValue(pattern);
@@ -329,6 +336,7 @@ QList<HistorySuggestion> HistoryStore::suggestions(
         fail(error, databaseError(QStringLiteral("Cannot search history"), query));
         return result;
     }
+    QList<RankedHistorySuggestion> candidates;
     while (query.next()) {
         HistorySuggestion suggestion;
         suggestion.pageId = query.value(0).toLongLong();
@@ -340,25 +348,25 @@ QList<HistorySuggestion> HistoryStore::suggestions(
         );
         suggestion.visitCount = query.value(4).toInt();
         suggestion.typedCount = query.value(5).toInt();
-        result.append(suggestion);
+        candidates.append({suggestion, matchClass(suggestion, input)});
     }
 
-    std::stable_sort(result.begin(), result.end(), [&input](
-        const HistorySuggestion &left,
-        const HistorySuggestion &right
+    std::stable_sort(candidates.begin(), candidates.end(), [](
+        const RankedHistorySuggestion &left,
+        const RankedHistorySuggestion &right
     ) {
-        const int leftClass = matchClass(left, input);
-        const int rightClass = matchClass(right, input);
-        if (leftClass != rightClass)
-            return leftClass > rightClass;
-        if (left.lastVisitedAt != right.lastVisitedAt)
-            return left.lastVisitedAt > right.lastVisitedAt;
-        if (left.typedCount != right.typedCount)
-            return left.typedCount > right.typedCount;
-        return left.visitCount > right.visitCount;
+        if (left.matchClass != right.matchClass)
+            return left.matchClass > right.matchClass;
+        if (left.suggestion.lastVisitedAt != right.suggestion.lastVisitedAt)
+            return left.suggestion.lastVisitedAt > right.suggestion.lastVisitedAt;
+        if (left.suggestion.typedCount != right.suggestion.typedCount)
+            return left.suggestion.typedCount > right.suggestion.typedCount;
+        return left.suggestion.visitCount > right.suggestion.visitCount;
     });
-    if (result.size() > limit)
-        result.resize(std::max(limit, 0));
+    const qsizetype resultCount = std::min(candidates.size(), static_cast<qsizetype>(limit));
+    result.reserve(resultCount);
+    for (qsizetype index = 0; index < resultCount; ++index)
+        result.append(candidates.at(index).suggestion);
     return result;
 }
 
@@ -484,25 +492,36 @@ bool HistoryStore::pruneIfNeeded(QString *error)
     if (!m_database.transaction())
         return fail(error, QStringLiteral("Cannot start history cleanup"));
 
+    const int removalCount = count.value(0).toInt() - maximumVisits;
+    QSqlQuery affectedPages(m_database);
+    affectedPages.prepare(QStringLiteral(
+        "SELECT DISTINCT page_id FROM visits WHERE id IN ("
+        "SELECT id FROM visits ORDER BY visited_at ASC, id ASC LIMIT ?"
+        ")"
+    ));
+    affectedPages.addBindValue(removalCount);
+    if (!affectedPages.exec()) {
+        m_database.rollback();
+        return fail(
+            error,
+            databaseError(QStringLiteral("Cannot find history pages to prune"), affectedPages)
+        );
+    }
+    QList<qint64> pageIds;
+    while (affectedPages.next())
+        pageIds.append(affectedPages.value(0).toLongLong());
+
     QSqlQuery remove(m_database);
     remove.prepare(QStringLiteral(
         "DELETE FROM visits WHERE id IN ("
         "SELECT id FROM visits ORDER BY visited_at ASC, id ASC LIMIT ?"
         ")"
     ));
-    remove.addBindValue(count.value(0).toInt() - maximumVisits);
+    remove.addBindValue(removalCount);
     if (!remove.exec()) {
         m_database.rollback();
         return fail(error, databaseError(QStringLiteral("Cannot prune history"), remove));
     }
-    QSqlQuery pages(m_database);
-    if (!pages.exec(QStringLiteral("SELECT id FROM pages"))) {
-        m_database.rollback();
-        return fail(error, databaseError(QStringLiteral("Cannot rebuild history"), pages));
-    }
-    QList<qint64> pageIds;
-    while (pages.next())
-        pageIds.append(pages.value(0).toLongLong());
     if (!rebuildPageAggregates(pageIds, error)) {
         m_database.rollback();
         return false;
