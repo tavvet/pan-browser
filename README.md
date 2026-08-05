@@ -43,6 +43,7 @@ On first launch PanBrowser creates:
 ├── session.json        # when tab restoration is enabled
 ├── downloads.json      # download history
 ├── history.sqlite      # browsing history and autocomplete data
+├── bookmarks.sqlite    # bookmarks and their autocomplete data
 ├── search-engines.json # address-bar search configuration
 ├── rules.json
 └── Certificates/
@@ -84,20 +85,28 @@ of session restoration are not added. Credentials and URL fragments are
 removed before storage; query parameters are retained so pages can be reopened
 accurately. History is limited to the 50,000 most recent visits.
 
-Address-bar completion uses only this local history and never contacts a
-suggestion service. Match quality is ranked first; equally relevant results are
-ordered by the most recent visit, followed by a small preference for manually
-entered and frequently visited addresses. Use <kbd>↑</kbd>/<kbd>↓</kbd>, Enter,
-Escape, or the mouse to choose a result. When the best matching address begins
-with the text already entered, its remaining suffix is shown as a muted inline
-completion. Enter opens it; <kbd>Tab</kbd> or <kbd>→</kbd> accepts the suffix
-without navigating immediately.
+Address-bar completion combines local bookmarks and history and never contacts
+a suggestion service. Match quality is ranked first; a bookmark wins when two
+results are equally relevant, while history results are otherwise ordered by
+the most recent visit with a small preference for manually entered and
+frequently visited addresses. Duplicate URLs are shown once. Use
+<kbd>↑</kbd>/<kbd>↓</kbd>, Enter, Escape, or the mouse to choose a result. When
+the best matching address begins with the text already entered, its remaining
+suffix is shown as a muted inline completion. Enter opens it; <kbd>Tab</kbd> or
+<kbd>→</kbd> accepts the suffix without navigating immediately.
+
+Use the star in the address bar or press <kbd>⌘D</kbd> to add, edit, or remove
+the current HTTP or HTTPS page. Open **PanBrowser → Bookmarks…** or press
+<kbd>⌥⌘B</kbd> to filter bookmarks, edit their names and URLs, remove selected
+items, clear the list, or open an item in the current or a new tab. Bookmark
+completion remains available when browsing-history collection is disabled.
 
 Open **PanBrowser → Settings… → History** to filter visits, view their local
 dates, remove selected entries, clear all history, or stop saving new history.
-Disabling history also disables address-bar history completion but does not
-erase existing records. Clearing browsing history does not remove cookies,
-sign-ins, site data, downloads, or trust settings.
+Disabling history removes history results from address-bar completion but does
+not erase existing records or disable bookmark results. Clearing browsing
+history does not remove bookmarks, cookies, sign-ins, site data, downloads, or
+trust settings.
 
 Open **PanBrowser → Settings…** or press <kbd>⌘,</kbd> to choose the start page,
 restore previous tabs, or retain session-cookie sign-ins. Restored background

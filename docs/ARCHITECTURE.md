@@ -44,12 +44,14 @@ flowchart TD
 
     MW --> Trust["TrustPolicy"]
     MW --> History["HistoryStore / SQLite"]
+    MW --> Bookmarks["BookmarkStore / SQLite"]
     MW --> Downloads["DownloadManager"]
     MW --> Permissions["PermissionController"]
     MW --> Session["SessionStore"]
 
     Popup["Popup MainWindow"] --> Profile
     Popup --> History
+    Popup --> Bookmarks
     Popup --> Downloads
     MW --> Popup
 
@@ -60,9 +62,9 @@ flowchart TD
 ```
 
 The primary `MainWindow` is the composition root. It creates and owns the
-shared `BrowserProfile`, `DownloadManager`, and `HistoryStore`. Popup windows
-reuse those objects and the current trust/search/preferences state; they do not
-create independent browser profiles.
+shared `BrowserProfile`, `DownloadManager`, `HistoryStore`, and `BookmarkStore`.
+Popup windows reuse those objects and the current trust/search/preferences
+state; they do not create independent browser profiles.
 
 Each tab owns one `QWebEngineView` and one `BrowserPage`. `BrowserTabState` in
 `MainWindow` contains UI state that Qt WebEngine does not provide as a single
@@ -81,6 +83,7 @@ The primary window owns browser-wide resources:
   permissions policy, and download signals.
 - `DownloadManager` listens to the shared profile and outlives every tab.
 - `HistoryStore` owns one named Qt SQL connection on the GUI thread.
+- `BookmarkStore` owns a separate named Qt SQL connection on the GUI thread.
 - popup windows are children of the primary window and use
   `Qt::WA_DeleteOnClose`.
 
@@ -237,6 +240,7 @@ On macOS, application data is rooted at
 | `Certificates/` | `TrustRulesDialog` | Imported CA files referenced by paths relative to `rules.json`. |
 | `search-engines.json` | `SearchSettings` | Versioned engines and default selection; atomic write with `.backup`. |
 | `history.sqlite` | `HistoryStore` | WAL-mode SQLite browsing history, limited to 50,000 visits. |
+| `bookmarks.sqlite` | `BookmarkStore` | WAL-mode SQLite bookmarks with normalized URL and title fields for local lookup. |
 | `session.json` | `SessionStore` | Up to 30 restorable HTTP(S) tabs, atomically written. |
 | `downloads.json` | `DownloadHistoryStore` | Up to 200 download records; paths and source host, not complete source URLs. |
 | native `QSettings` | `BrowserPreferences`, window/download UI | Start page, startup/cookie/history choices, window geometry, last download directory, and pending data-reset marker. |
@@ -268,7 +272,7 @@ snapshots. If rollback itself is incomplete, the error dialog says so rather
 than claiming that nothing changed. Do not reorder these operations casually:
 trust expansion is the most security-sensitive mutation and must remain last.
 
-## 8. History and address-bar completion
+## 8. History, bookmarks, and address-bar completion
 
 Only successful top-level HTTP(S) loads are recorded. Failed loads, external
 schemes, and lazy tabs loaded solely because of session restoration are skipped.
@@ -302,11 +306,23 @@ and then orders candidates by:
 7. title substring;
 8. most recent visit, then typed count, then total visit count.
 
-All matching page rows participate before the final eight results are selected.
+All matching history rows participate before the history store returns its
+first eight candidates. Bookmark matches are then merged with those candidates,
+exact normalized-URL duplicates prefer the bookmark, and the combined list is
+ranked again before the final eight results are selected. At equal match class,
+bookmarks precede history; match quality always takes priority over source.
 Do not add a recency-only SQL limit before relevance sorting; doing so causes an
 old exact address to disappear behind newer weak matches.
 
-`HistoryCompletionPopup` is a non-activating tool window. Its application event
+`BookmarkStore` accepts only HTTP(S) URLs. It removes credentials, lowercases
+the scheme and host, removes default ports, and adds `/` when the path is empty
+before using the encoded URL as its unique key. Query strings and fragments
+remain
+part of a bookmark target. The address-bar star and the manager share this
+store across primary and popup windows, while the primary window owns its
+lifetime.
+
+`AddressCompletionPopup` is a non-activating tool window. Its application event
 filter handles Up/Down, Enter, Escape, Tab/Right for ghost completion, clicks,
 focus changes, and application deactivation while leaving text focus in
 `AddressLineEdit`.
@@ -348,7 +364,8 @@ Primary-window startup is ordered as follows:
 2. load trust rules and preferences;
 3. load or create search settings;
 4. apply a pending profile reset before Chromium opens the profile;
-5. create the shared browser profile, download manager, and history store;
+5. create the shared browser profile, download manager, history store, and
+   bookmark store;
 6. create the UI and permission controller;
 7. restore safe window geometry;
 8. reload runtime trust rules;
@@ -390,6 +407,7 @@ GPU status is not proof of the exact backend selected by Chromium.
 policy and persistence layers: domains and rule validation, settings backups,
 window placement, sessions, cleanup boundaries, downloads, permissions,
 external navigation, popup geometry, search parsing, history ranking/deletion,
+bookmark CRUD and normalization, combined suggestion ranking,
 corrupt-database behavior, and ghost completion.
 
 The test target deliberately excludes `MainWindow` and a live WebEngine process,
@@ -463,4 +481,3 @@ Increment the format or schema version, implement an explicit migration or fail
 closed while preserving the old file, retain atomic writes, and add a round-trip
 plus corrupt-input test. Never silently reinterpret security configuration from
 an unknown version.
-

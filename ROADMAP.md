@@ -22,6 +22,9 @@
 
 ## Browser essentials
 
+- [x] Bookmarks with an address-bar toggle, management UI, and autocomplete integration.
+- [ ] Find in page with `Command+F`, next/previous match navigation, and match count.
+- [ ] Page zoom controls with keyboard shortcuts, per-site persistence, and reset to 100%.
 
 ## Cross-platform
 
