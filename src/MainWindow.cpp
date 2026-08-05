@@ -52,6 +52,30 @@
 
 #include <utility>
 
+namespace {
+
+int effectivePort(const QUrl &url)
+{
+    if (url.port() >= 0)
+        return url.port();
+    if (url.scheme().compare(QStringLiteral("https"), Qt::CaseInsensitive) == 0)
+        return 443;
+    if (url.scheme().compare(QStringLiteral("http"), Qt::CaseInsensitive) == 0)
+        return 80;
+    return -1;
+}
+
+bool isSameWebOrigin(const QUrl &left, const QUrl &right)
+{
+    return left.isValid()
+        && right.isValid()
+        && left.scheme().compare(right.scheme(), Qt::CaseInsensitive) == 0
+        && left.host().compare(right.host(), Qt::CaseInsensitive) == 0
+        && effectivePort(left) == effectivePort(right);
+}
+
+} // namespace
+
 MainWindow::MainWindow(QWidget *parent)
     : MainWindow(nullptr, nullptr, nullptr, nullptr, WindowRole::Primary, parent)
 {
@@ -541,7 +565,9 @@ void MainWindow::activatePendingTab(QWebEngineView *webView)
 void MainWindow::connectBrowserSignals(QWebEngineView *webView)
 {
     connect(webView, &QWebEngineView::urlChanged, this, [this, webView](const QUrl &url) {
-        m_tabStates[webView].pendingUrl.clear();
+        BrowserTabState &state = m_tabStates[webView];
+        state.pendingUrl.clear();
+        state.topLevelUrl = url;
         const int index = m_tabStack->indexOf(webView);
         if (index >= 0 && webView->title().isEmpty()) {
             const QString label = url.host().isEmpty() ? QStringLiteral("New Tab") : url.host();
@@ -635,8 +661,16 @@ void MainWindow::connectBrowserSignals(QWebEngineView *webView)
                     qWarning().noquote() << "[PanBrowser history]" << historyError;
                 }
             }
-            if (state.lastAcceptedRule.isEmpty())
-                setTabTrustStatus(webView, QStringLiteral("Secure · Chromium system trust"));
+            const QString scheme = webView->url().scheme().toLower();
+            if (scheme == QStringLiteral("https")) {
+                if (state.lastAcceptedRule.isEmpty()) {
+                    setTabTrustStatus(webView, QStringLiteral("Secure · Chromium system trust"));
+                }
+            } else if (scheme == QStringLiteral("http")) {
+                setTabTrustStatus(webView, QStringLiteral("Not secure · HTTP connection"), true);
+            } else {
+                setTabTrustStatus(webView, QStringLiteral("No HTTPS security information"));
+            }
         } else if (state.lastAcceptedRule.isEmpty()) {
             setTabTrustStatus(webView, QStringLiteral("Page loading failed"), true);
         }
@@ -648,8 +682,9 @@ void MainWindow::connectBrowserSignals(QWebEngineView *webView)
         static_cast<BrowserPage *>(webView->page()),
         &BrowserPage::mainFrameNavigationRequested,
         this,
-        [this, webView](const QUrl &, int navigationType) {
+        [this, webView](const QUrl &url, int navigationType) {
             BrowserTabState &state = m_tabStates[webView];
+            state.topLevelUrl = url;
             const auto type = static_cast<QWebEnginePage::NavigationType>(navigationType);
             switch (type) {
             case QWebEnginePage::NavigationTypeLinkClicked:
@@ -1106,11 +1141,14 @@ void MainWindow::handleCertificateError(
 
     if (result.trusted) {
         decision.acceptCertificate();
-        m_tabStates[webView].lastAcceptedRule = rule->name;
         qInfo().noquote() << "[PanBrowser TLS] accepted" << host << "using rule" << rule->name;
-        setTabTrustStatus(webView,
-            QStringLiteral("Secure · %1 · %2").arg(rule->name, result.explanation)
-        );
+        BrowserTabState &state = m_tabStates[webView];
+        if (isSameWebOrigin(error.url(), state.topLevelUrl)) {
+            state.lastAcceptedRule = rule->name;
+            setTabTrustStatus(webView,
+                QStringLiteral("Secure · %1 · %2").arg(rule->name, result.explanation)
+            );
+        }
     } else {
         decision.rejectCertificate();
         qWarning().noquote() << "[PanBrowser TLS] rejected" << host << result.explanation;

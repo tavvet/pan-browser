@@ -58,6 +58,7 @@ private:
         bool suppressNextHistoryVisit = false;
         bool loading = false;
         int progress = 0;
+        QUrl topLevelUrl;
         QUrl pendingUrl;
         HistoryTransition pendingHistoryTransition = HistoryTransition::Other;
     };
