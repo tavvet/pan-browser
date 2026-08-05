@@ -11,6 +11,7 @@
 #include "DownloadManager.h"
 #include "DownloadsPanel.h"
 #include "ExternalNavigationPolicy.h"
+#include "FindBar.h"
 #include "AddressCompletionPopup.h"
 #include "PermissionController.h"
 #include "PermissionPrompt.h"
@@ -49,6 +50,7 @@
 #include <QToolBar>
 #include <QToolButton>
 #include <QWebEngineCertificateError>
+#include <QWebEngineFindTextResult>
 #include <QWebEngineHistory>
 #include <QWebEngineNewWindowRequest>
 #include <QWebEnginePage>
@@ -305,6 +307,16 @@ void MainWindow::createInterface()
     addToolBar(Qt::TopToolBarArea, toolbar);
 
     addToolBarBreak(Qt::TopToolBarArea);
+    m_findToolbar = new QToolBar(QStringLiteral("Find in page"), this);
+    m_findToolbar->setObjectName(QStringLiteral("findBar"));
+    m_findToolbar->setMovable(false);
+    m_findToolbar->setFloatable(false);
+    m_findBar = new FindBar(m_findToolbar);
+    m_findToolbar->addWidget(m_findBar);
+    addToolBar(Qt::TopToolBarArea, m_findToolbar);
+    m_findToolbar->hide();
+
+    addToolBarBreak(Qt::TopToolBarArea);
     QToolBar *permissionToolbar = new QToolBar(QStringLiteral("Permission request"), this);
     permissionToolbar->setObjectName(QStringLiteral("permissionBar"));
     permissionToolbar->setMovable(false);
@@ -313,6 +325,18 @@ void MainWindow::createInterface()
     permissionToolbar->addWidget(m_permissionPrompt);
     addToolBar(Qt::TopToolBarArea, permissionToolbar);
     permissionToolbar->hide();
+
+    connect(m_findBar, &FindBar::queryChanged, this, [this] {
+        findInPage(false);
+    });
+    connect(m_findBar, &FindBar::navigationRequested, this, &MainWindow::findInPage);
+    connect(m_findBar, &FindBar::closeRequested, this, &MainWindow::closeFindBar);
+    m_closeFindAction = new QAction(this);
+    m_closeFindAction->setShortcut(QKeySequence(Qt::Key_Escape));
+    m_closeFindAction->setShortcutContext(Qt::WindowShortcut);
+    m_closeFindAction->setEnabled(false);
+    addAction(m_closeFindAction);
+    connect(m_closeFindAction, &QAction::triggered, this, &MainWindow::closeFindBar);
 
     m_downloadsPanel = new DownloadsPanel(m_downloadManager, this);
     m_downloadButton->setActiveCount(m_downloadManager->activeCount());
@@ -347,6 +371,8 @@ void MainWindow::createInterface()
         if (m_externalUrlSource && m_externalUrlSource != currentWebView())
             cancelExternalUrlPrompt();
         updateCurrentTabUi();
+        if (m_findToolbar && m_findToolbar->isVisible())
+            findInPage(false);
         scheduleSessionSave();
     });
     connect(m_tabBar, &QTabBar::tabCloseRequested, this, &MainWindow::closeTab);
@@ -427,6 +453,30 @@ void MainWindow::createInterface()
     );
     bookmarksAction->setShortcut(QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_B));
     connect(bookmarksAction, &QAction::triggered, this, &MainWindow::openBookmarks);
+
+    fileMenu->addSeparator();
+    QAction *findAction = fileMenu->addAction(
+        QIcon(QStringLiteral(":/assets/icons/search.svg")),
+        QStringLiteral("Find in Page…")
+    );
+    findAction->setShortcut(QKeySequence::Find);
+    connect(findAction, &QAction::triggered, this, &MainWindow::openFindBar);
+    QAction *findNextAction = fileMenu->addAction(QStringLiteral("Find Next"));
+    findNextAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_G));
+    connect(findNextAction, &QAction::triggered, this, [this] {
+        if (!m_findToolbar->isVisible())
+            openFindBar();
+        else
+            findInPage(false);
+    });
+    QAction *findPreviousAction = fileMenu->addAction(QStringLiteral("Find Previous"));
+    findPreviousAction->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_G));
+    connect(findPreviousAction, &QAction::triggered, this, [this] {
+        if (!m_findToolbar->isVisible())
+            openFindBar();
+        else
+            findInPage(true);
+    });
 
     fileMenu->addSeparator();
     QAction *settingsAction = fileMenu->addAction(
@@ -563,6 +613,12 @@ void MainWindow::closeTab(int index)
 
     m_permissionController->cancelForView(webView);
     cancelExternalUrlPrompt(webView);
+    if (m_findView == webView) {
+        ++m_findRequestSerial;
+        m_findView.clear();
+        if (m_findBar)
+            m_findBar->clearResults();
+    }
     disconnect(webView, nullptr, this, nullptr);
     disconnect(webView->page(), nullptr, this, nullptr);
     webView->stop();
@@ -659,6 +715,15 @@ void MainWindow::connectBrowserSignals(QWebEngineView *webView)
         state.lastAcceptedRule.clear();
         state.loading = true;
         state.progress = 0;
+        if (webView == m_findView) {
+            ++m_findRequestSerial;
+            if (webView == currentWebView()
+                && m_findToolbar
+                && m_findToolbar->isVisible()
+                && !m_findBar->query().isEmpty()) {
+                m_findBar->setSearching();
+            }
+        }
         setTabTrustStatus(webView, QStringLiteral("Loading…"));
         if (webView == currentWebView()) {
             m_progress->setValue(0);
@@ -684,6 +749,12 @@ void MainWindow::connectBrowserSignals(QWebEngineView *webView)
             state.pendingHistoryTransition = HistoryTransition::Other;
             state.suppressNextHistoryVisit = false;
             updateNavigationActions();
+            if (webView == currentWebView()
+                && m_findToolbar
+                && m_findToolbar->isVisible()
+                && !m_findBar->query().isEmpty()) {
+                findInPage(false);
+            }
             return;
         }
         if (ok) {
@@ -719,6 +790,12 @@ void MainWindow::connectBrowserSignals(QWebEngineView *webView)
         state.pendingHistoryTransition = HistoryTransition::Other;
         state.suppressNextHistoryVisit = false;
         updateNavigationActions();
+        if (webView == currentWebView()
+            && m_findToolbar
+            && m_findToolbar->isVisible()
+            && !m_findBar->query().isEmpty()) {
+            findInPage(false);
+        }
     });
     connect(
         static_cast<BrowserPage *>(webView->page()),
@@ -1023,6 +1100,92 @@ void MainWindow::showAddressSuggestions()
     }
     const QList<AddressSuggestion> suggestions = rankedAddressSuggestions(candidates, input, 8);
     m_addressCompletionPopup->showSuggestions(suggestions);
+}
+
+void MainWindow::openFindBar()
+{
+    if (!m_findToolbar || !m_findBar)
+        return;
+    if (m_addressCompletionPopup)
+        m_addressCompletionPopup->hide();
+
+    QString selectedText;
+    if (QWebEngineView *webView = currentWebView()) {
+        selectedText = webView->page()->selectedText().trimmed();
+        if (selectedText.size() > 200
+            || selectedText.contains(QLatin1Char('\n'))
+            || selectedText.contains(QLatin1Char('\r'))) {
+            selectedText.clear();
+        }
+    }
+    const bool wasVisible = m_findToolbar->isVisible();
+    const bool queryWillChange = !selectedText.isEmpty()
+        && selectedText != m_findBar->query();
+    m_findToolbar->show();
+    m_closeFindAction->setEnabled(true);
+    m_findBar->focusInput(selectedText);
+    if (!wasVisible && !queryWillChange)
+        findInPage(false);
+}
+
+void MainWindow::closeFindBar()
+{
+    ++m_findRequestSerial;
+    if (m_findView)
+        m_findView->page()->findText(QString());
+    m_findView.clear();
+    if (m_findBar)
+        m_findBar->clearResults();
+    if (m_findToolbar)
+        m_findToolbar->hide();
+    if (m_closeFindAction)
+        m_closeFindAction->setEnabled(false);
+    if (QWebEngineView *webView = currentWebView())
+        webView->setFocus(Qt::OtherFocusReason);
+}
+
+void MainWindow::findInPage(bool backward)
+{
+    if (!m_findToolbar || !m_findToolbar->isVisible() || !m_findBar)
+        return;
+    QWebEngineView *webView = currentWebView();
+    if (!webView) {
+        m_findBar->clearResults();
+        return;
+    }
+
+    if (m_findView && m_findView != webView)
+        m_findView->page()->findText(QString());
+    m_findView = webView;
+
+    const QString query = m_findBar->query();
+    const quint64 requestSerial = ++m_findRequestSerial;
+    if (query.isEmpty()) {
+        webView->page()->findText(QString());
+        m_findBar->clearResults();
+        return;
+    }
+
+    m_findBar->setSearching();
+    QWebEnginePage::FindFlags flags;
+    if (backward)
+        flags.setFlag(QWebEnginePage::FindBackward);
+    const QPointer<MainWindow> window(this);
+    const QPointer<QWebEngineView> target(webView);
+    webView->page()->findText(query, flags, [window, target, requestSerial, query](
+        const QWebEngineFindTextResult &result
+    ) {
+        if (!window
+            || !target
+            || requestSerial != window->m_findRequestSerial
+            || target != window->currentWebView()
+            || target != window->m_findView
+            || !window->m_findToolbar->isVisible()
+            || query != window->m_findBar->query()) {
+            return;
+        }
+        window->m_findBar->setResults(result.activeMatch(), result.numberOfMatches());
+    });
 }
 
 void MainWindow::editCurrentBookmark()

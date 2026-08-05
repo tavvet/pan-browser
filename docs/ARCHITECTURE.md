@@ -344,6 +344,18 @@ once at substitution time. HTTP templates are permitted for user-controlled
 intranet cases but the UI and README must continue to explain that queries are
 visible in transit.
 
+### 9.1 Find in page
+
+`FindBar` owns only the input, result label, navigation buttons, and keyboard
+semantics. `MainWindow` sends the query to the current `QWebEnginePage` and
+tracks the page with a guarded pointer. Every request receives a monotonically
+increasing serial number, so callbacks from an older query, closed tab, previous
+tab, or completed navigation cannot overwrite the current match count.
+
+Closing the bar sends an empty query to WebEngine to clear highlights. While
+the bar remains visible, tab changes and completed navigations rerun its query
+against the new current page. Find state is window-local and is not persisted.
+
 ## 10. Downloads
 
 `DownloadManager` listens once to the shared profile. Every request opens a
@@ -408,7 +420,7 @@ policy and persistence layers: domains and rule validation, settings backups,
 window placement, sessions, cleanup boundaries, downloads, permissions,
 external navigation, popup geometry, search parsing, history ranking/deletion,
 bookmark CRUD and normalization, combined suggestion ranking,
-corrupt-database behavior, and ghost completion.
+corrupt-database behavior, ghost completion, and find-bar keyboard behavior.
 
 The test target deliberately excludes `MainWindow` and a live WebEngine process,
 so signal wiring and visual state still need a short manual smoke test after

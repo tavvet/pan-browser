@@ -5,6 +5,7 @@
 #include "BrowserDataCleanup.h"
 #include "DownloadHistoryStore.h"
 #include "ExternalNavigationPolicy.h"
+#include "FindBar.h"
 #include "HistoryStore.h"
 #include "PermissionPolicy.h"
 #include "SessionStore.h"
@@ -14,6 +15,9 @@
 #include "WindowPlacement.h"
 
 #include <QFile>
+#include <QLabel>
+#include <QLineEdit>
+#include <QSignalSpy>
 #include <QTemporaryDir>
 #include <QTest>
 #include <QTimeZone>
@@ -61,6 +65,7 @@ private slots:
     void corruptHistoryIsPreservedAndDisabled();
     void ghostCompletionAcceptsOnlyAddressPrefixes();
     void addressSuggestionsPreferRelevanceThenBookmarks();
+    void findBarSupportsKeyboardNavigationAndCounts();
 };
 
 void TrustConfigurationTests::exactDomainIsCaseInsensitive()
@@ -967,6 +972,36 @@ void TrustConfigurationTests::addressSuggestionsPreferRelevanceThenBookmarks()
     QCOMPARE(prefixRanked.size(), 2);
     QCOMPARE(prefixRanked.first().source, AddressSuggestionSource::Bookmark);
     QCOMPARE(prefixRanked.first().title, QStringLiteral("Prefix bookmark"));
+}
+
+void TrustConfigurationTests::findBarSupportsKeyboardNavigationAndCounts()
+{
+    FindBar bar;
+    auto *input = bar.findChild<QLineEdit *>(QStringLiteral("findInput"));
+    auto *result = bar.findChild<QLabel *>(QStringLiteral("findResult"));
+    QVERIFY(input);
+    QVERIFY(result);
+
+    QSignalSpy querySpy(&bar, &FindBar::queryChanged);
+    QSignalSpy navigationSpy(&bar, &FindBar::navigationRequested);
+    QSignalSpy closeSpy(&bar, &FindBar::closeRequested);
+    input->setText(QStringLiteral("needle"));
+    QCOMPARE(querySpy.count(), 1);
+
+    bar.setResults(2, 5);
+    QCOMPARE(result->text(), QStringLiteral("2 of 5"));
+    QTest::keyClick(input, Qt::Key_Return);
+    QCOMPARE(navigationSpy.count(), 1);
+    QCOMPARE(navigationSpy.takeFirst().at(0).toBool(), false);
+
+    QTest::keyClick(input, Qt::Key_Return, Qt::ShiftModifier);
+    QCOMPARE(navigationSpy.count(), 1);
+    QCOMPARE(navigationSpy.takeFirst().at(0).toBool(), true);
+
+    QTest::keyClick(input, Qt::Key_Escape);
+    QCOMPARE(closeSpy.count(), 1);
+    bar.setResults(0, 0);
+    QCOMPARE(result->text(), QStringLiteral("No matches"));
 }
 
 QTEST_MAIN(TrustConfigurationTests)

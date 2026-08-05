@@ -63,6 +63,8 @@ set(PANBROWSER_APP_SOURCES
     src/DiagnosticsPage.h
     src/ExternalNavigationPolicy.cpp
     src/ExternalNavigationPolicy.h
+    src/FindBar.cpp
+    src/FindBar.h
     src/HistoryStore.cpp
     src/HistoryStore.h
     src/AddressCompletionPopup.cpp
@@ -156,6 +158,8 @@ qt_add_executable(PanBrowserTests
     src/DownloadHistoryStore.h
     src/ExternalNavigationPolicy.cpp
     src/ExternalNavigationPolicy.h
+    src/FindBar.cpp
+    src/FindBar.h
     src/HistoryStore.cpp
     src/HistoryStore.h
     src/PermissionPolicy.cpp

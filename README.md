@@ -101,6 +101,13 @@ the current HTTP or HTTPS page. Open **PanBrowser → Bookmarks…** or press
 items, clear the list, or open an item in the current or a new tab. Bookmark
 completion remains available when browsing-history collection is disabled.
 
+Press <kbd>⌘F</kbd> to search within the current page. The find bar reports the
+active match and total count; Enter or <kbd>⌘G</kbd> moves forward, while
+<kbd>⇧</kbd>+Enter or <kbd>⇧⌘G</kbd> moves backward. Matches wrap at the end of
+the page. Escape closes the bar and clears WebEngine's match highlights. When
+the bar remains open, switching tabs or finishing a new navigation reruns the
+same query on the current page.
+
 Open **PanBrowser → Settings… → History** to filter visits, view their local
 dates, remove selected entries, clear all history, or stop saving new history.
 Disabling history removes history results from address-bar completion but does

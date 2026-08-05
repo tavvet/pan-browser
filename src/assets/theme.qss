@@ -105,6 +105,66 @@ QToolBar#permissionBar {
     padding: 0;
 }
 
+QToolBar#findBar {
+    background: #181b21;
+    border: none;
+    border-bottom: 1px solid #343a45;
+    padding: 0;
+}
+
+QWidget#findBarContent {
+    background: #181b21;
+}
+
+QLabel#findLabel {
+    color: #c5cbd5;
+    font-weight: 600;
+}
+
+QLineEdit#findInput {
+    min-height: 31px;
+    max-width: 520px;
+    color: #edf0f6;
+    background: #22262e;
+    border: 1px solid #343a45;
+    border-radius: 8px;
+    padding: 0 9px;
+    selection-background-color: #3d72d9;
+}
+
+QLineEdit#findInput:focus {
+    background: #242932;
+    border-color: #5b8def;
+}
+
+QLabel#findResult {
+    color: #929baa;
+}
+
+QWidget#findBarContent QToolButton {
+    min-width: 30px;
+    max-width: 30px;
+    min-height: 30px;
+    max-height: 30px;
+    background: transparent;
+    border: none;
+    border-radius: 7px;
+    padding: 0;
+}
+
+QWidget#findBarContent QToolButton:hover {
+    background: #292e37;
+}
+
+QWidget#findBarContent QToolButton:pressed {
+    background: #343b47;
+}
+
+QWidget#findBarContent QToolButton:disabled {
+    background: transparent;
+    opacity: 0.35;
+}
+
 QWidget#permissionPrompt {
     background: #20242c;
 }
