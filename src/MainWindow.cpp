@@ -370,30 +370,9 @@ void MainWindow::createInterface()
         QIcon(QStringLiteral(":/assets/icons/settings.svg")),
         QStringLiteral("Settings…")
     );
-    settingsAction->setMenuRole(QAction::PreferencesRole);
+    settingsAction->setMenuRole(QAction::NoRole);
     settingsAction->setShortcut(QKeySequence::Preferences);
-    connect(settingsAction, &QAction::triggered, this, [this] {
-        openSettings(false, false);
-    });
-
-    QAction *historyAction = fileMenu->addAction(
-        QIcon(QStringLiteral(":/assets/icons/history.svg")),
-        QStringLiteral("History…")
-    );
-    historyAction->setMenuRole(QAction::NoRole);
-    historyAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_Y));
-    connect(historyAction, &QAction::triggered, this, [this] {
-        openSettings(false, true);
-    });
-
-    QAction *editRulesAction = fileMenu->addAction(
-        QIcon(QStringLiteral(":/assets/icons/shield-check.svg")),
-        QStringLiteral("Trust Rules…")
-    );
-    editRulesAction->setMenuRole(QAction::NoRole);
-    connect(editRulesAction, &QAction::triggered, this, [this] {
-        openSettings(true, false);
-    });
+    connect(settingsAction, &QAction::triggered, this, &MainWindow::openSettings);
 
     fileMenu->addSeparator();
     QAction *reloadRulesAction = fileMenu->addAction(
@@ -911,13 +890,13 @@ void MainWindow::showHistorySuggestions()
     m_historyCompletionPopup->showSuggestions(suggestions);
 }
 
-void MainWindow::openSettings(bool trustRules, bool history)
+void MainWindow::openSettings()
 {
     if (!m_ownsBrowserResources && m_primaryWindow) {
         m_primaryWindow->show();
         m_primaryWindow->raise();
         m_primaryWindow->activateWindow();
-        m_primaryWindow->openSettings(trustRules, history);
+        m_primaryWindow->openSettings();
         return;
     }
 
@@ -929,9 +908,7 @@ void MainWindow::openSettings(bool trustRules, bool history)
         m_profile,
         m_historyStore,
         currentWebView() ? currentWebView()->url() : QUrl(),
-        trustRules ? SettingsDialog::Page::TrustRules
-                   : (history ? SettingsDialog::Page::History
-                              : SettingsDialog::Page::General),
+        SettingsDialog::Page::General,
         this
     );
     QString error;

@@ -11,6 +11,7 @@ class QLineEdit;
 class QListWidget;
 class QStackedWidget;
 class BrowserProfile;
+class DiagnosticsPage;
 class HistorySettingsPage;
 class HistoryStore;
 class SearchSettingsPage;
@@ -26,6 +27,7 @@ public:
         History,
         PrivacyData,
         TrustRules,
+        Diagnostics,
     };
 
     SettingsDialog(
@@ -62,5 +64,6 @@ private:
     QCheckBox *m_persistSessionCookies = nullptr;
     SearchSettingsPage *m_searchPage = nullptr;
     HistorySettingsPage *m_historyPage = nullptr;
+    DiagnosticsPage *m_diagnosticsPage = nullptr;
     TrustRulesDialog *m_trustRules = nullptr;
 };

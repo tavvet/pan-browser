@@ -91,11 +91,11 @@ with the text already entered, its remaining suffix is shown as a muted inline
 completion. Enter opens it; <kbd>Tab</kbd> or <kbd>→</kbd> accepts the suffix
 without navigating immediately.
 
-Open **PanBrowser → History…** or the **History** settings section to filter
-visits, view their local dates, remove selected entries, clear all history, or
-stop saving new history. Disabling history also disables address-bar history
-completion but does not erase existing records. Clearing browsing history does
-not remove cookies, sign-ins, site data, downloads, or trust settings.
+Open **PanBrowser → Settings… → History** to filter visits, view their local
+dates, remove selected entries, clear all history, or stop saving new history.
+Disabling history also disables address-bar history completion but does not
+erase existing records. Clearing browsing history does not remove cookies,
+sign-ins, site data, downloads, or trust settings.
 
 Open **PanBrowser → Settings…** or press <kbd>⌘,</kbd> to choose the start page,
 restore previous tabs, or retain session-cookie sign-ins. Restored background
@@ -131,11 +131,17 @@ scripted requests and background tabs are rejected. Local and executable
 schemes such as `file:` and `javascript:` are always blocked. PanBrowser passes
 an approved URL directly to the operating system without invoking a shell.
 
-Open **PanBrowser → Trust Rules…** to jump directly to the Trust Rules section
-of the same settings window. The editor imports certificates into the
+Open **PanBrowser → Settings… → Trust Rules** to edit domain trust policy. The
+editor imports certificates into the
 application data directory, validates the complete configuration, saves it
 atomically, and reloads the active policy. The previous file is retained as
 `rules.json.backup`.
+
+The **Diagnostics** settings section shows the PanBrowser, Qt WebEngine, and
+Chromium versions; operating-system details; configured graphics and sandbox
+state; runtime overrides; and profile paths. It can copy a plain-text report
+for troubleshooting. Exact active GPU and ANGLE/RHI backend information remains
+available through Qt WebEngine diagnostic logging.
 
 For advanced troubleshooting, use **PanBrowser → Show Configuration Folder**
 to reveal the files in Finder. After editing `rules.json` manually, select

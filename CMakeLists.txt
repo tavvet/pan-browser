@@ -51,6 +51,8 @@ set(PANBROWSER_APP_SOURCES
     src/DownloadManager.h
     src/DownloadsPanel.cpp
     src/DownloadsPanel.h
+    src/DiagnosticsPage.cpp
+    src/DiagnosticsPage.h
     src/ExternalNavigationPolicy.cpp
     src/ExternalNavigationPolicy.h
     src/HistoryStore.cpp

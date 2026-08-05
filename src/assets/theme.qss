@@ -335,6 +335,9 @@ QDialog#settingsDialog QListWidget#settingsSidebar::item:selected {
 QDialog#settingsDialog QWidget#generalSettingsPage,
 QDialog#settingsDialog QWidget#searchSettingsPage,
 QDialog#settingsDialog QWidget#historySettingsPage,
+QDialog#settingsDialog QWidget#diagnosticsSettingsPage,
+QDialog#settingsDialog QScrollArea#diagnosticsScroll,
+QDialog#settingsDialog QWidget#diagnosticsContent,
 QDialog#settingsDialog QWidget#privacyDataSettingsPage,
 QDialog#settingsDialog QStackedWidget#settingsPages {
     background: #15181e;
@@ -372,6 +375,10 @@ QDialog#settingsDialog QLabel#settingsCardTitle {
 
 QDialog#settingsDialog QLabel#dataActionStatus {
     color: #8ce0b4;
+}
+
+QDialog#settingsDialog QLabel#diagnosticValue {
+    color: #dce1e9;
 }
 
 QDialog#settingsDialog QFrame#settingsSeparator {

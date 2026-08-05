@@ -89,7 +89,7 @@ private:
     void updateAddressPlaceholder();
     void navigateFromAddressBar();
     void showHistorySuggestions();
-    void openSettings(bool trustRules = false, bool history = false);
+    void openSettings();
     void reloadRules();
     void reloadRulesLocal();
     void restoreInitialTabs();

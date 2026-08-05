@@ -18,6 +18,7 @@
 - [x] User-initiated popup windows with shared profile and trust policy.
 - [x] Address-bar search with configurable built-in and custom search engines.
 - [x] Local browsing history with management controls and ranked address-bar completion.
+- [x] Runtime diagnostics page with application, Chromium, graphics, and profile details.
 
 ## Browser essentials
 
@@ -31,7 +32,7 @@
 ## Packaging and maintenance
 
 - [ ] Audit the release bundle and remove unused Qt plugins and resources.
-- [ ] Add application version information to the UI.
+- [x] Add application version information to the UI.
 - [ ] Add a controlled update mechanism.
 
 ## Deferred distribution work

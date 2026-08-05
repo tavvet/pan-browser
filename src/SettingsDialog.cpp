@@ -1,6 +1,7 @@
 #include "SettingsDialog.h"
 
 #include "BrowserProfile.h"
+#include "DiagnosticsPage.h"
 #include "HistorySettingsPage.h"
 #include "SearchSettingsPage.h"
 #include "TrustRulesDialog.h"
@@ -45,6 +46,8 @@ SettingsDialog::SettingsDialog(
         m_pages
     );
     m_pages->insertWidget(static_cast<int>(Page::History), m_historyPage);
+    m_diagnosticsPage = new DiagnosticsPage(m_profile, m_pages);
+    m_pages->addWidget(m_diagnosticsPage);
     m_pages->setCurrentIndex(static_cast<int>(initialPage));
 }
 
@@ -115,6 +118,12 @@ void SettingsDialog::createInterface(const QUrl &currentUrl, Page initialPage)
         m_sidebar
     );
     trustItem->setData(Qt::UserRole, static_cast<int>(Page::TrustRules));
+    auto *diagnosticsItem = new QListWidgetItem(
+        QIcon(QStringLiteral(":/assets/icons/info.svg")),
+        QStringLiteral("Diagnostics"),
+        m_sidebar
+    );
+    diagnosticsItem->setData(Qt::UserRole, static_cast<int>(Page::Diagnostics));
     bodyLayout->addWidget(m_sidebar);
 
     m_pages = new QStackedWidget(body);
