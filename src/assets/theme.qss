@@ -228,6 +228,7 @@ QDialog#settingsDialog QListWidget#settingsSidebar::item:selected {
 }
 
 QDialog#settingsDialog QWidget#generalSettingsPage,
+QDialog#settingsDialog QWidget#privacyDataSettingsPage,
 QDialog#settingsDialog QStackedWidget#settingsPages {
     background: #15181e;
 }
@@ -254,6 +255,16 @@ QDialog#settingsDialog QFrame#settingsCard {
     background: #1b1f26;
     border: 1px solid #303641;
     border-radius: 10px;
+}
+
+QDialog#settingsDialog QLabel#settingsCardTitle {
+    color: #edf0f6;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+QDialog#settingsDialog QLabel#dataActionStatus {
+    color: #8ce0b4;
 }
 
 QDialog#settingsDialog QFrame#settingsSeparator {
@@ -302,6 +313,10 @@ QDialog#settingsDialog QPushButton:default {
     background: #3d72d9;
     border-color: #5689ea;
     color: #ffffff;
+}
+
+QDialog#settingsDialog QPushButton#dangerButton {
+    color: #ff9aaa;
 }
 
 QDialog#trustRulesDialog {

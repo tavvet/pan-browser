@@ -60,6 +60,13 @@ tabs are loaded only when selected. Tab URLs and titles are stored atomically in
 `session.json`; form contents, scroll position, and navigation history are not
 restored.
 
+The **Privacy & Data** section can clear the HTTP cache or all cookies
+immediately. A full site-data reset is scheduled for the next launch so the
+WebEngine profile can be removed before Chromium opens it. This reset removes
+cookies, local storage, IndexedDB, service workers, and cache while preserving
+settings, trust rules, certificates, and saved tabs; a scheduled reset can be
+cancelled before restarting.
+
 Open **PanBrowser → Trust Rules…** to jump directly to the Trust Rules section
 of the same settings window. The editor imports certificates into the
 application data directory, validates the complete configuration, saves it

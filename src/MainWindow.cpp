@@ -49,6 +49,9 @@ MainWindow::MainWindow(QWidget *parent)
     QString bootstrapError;
     m_trustPolicy.load(m_configurationPath, &bootstrapError);
     m_preferences = BrowserPreferences::load(m_trustPolicy.startPage());
+    QString dataResetError;
+    if (!BrowserProfile::applyPendingDataReset(&dataResetError))
+        qWarning().noquote() << "[PanBrowser data reset]" << dataResetError;
     m_profile = new BrowserProfile(m_preferences.persistSessionCookies());
     createInterface();
     restoreWindowPlacement();
@@ -486,6 +489,7 @@ void MainWindow::openSettings(bool trustRules)
     SettingsDialog dialog(
         m_configurationPath,
         m_preferences,
+        m_profile,
         currentWebView() ? currentWebView()->url() : QUrl(),
         trustRules ? SettingsDialog::Page::TrustRules : SettingsDialog::Page::General,
         this

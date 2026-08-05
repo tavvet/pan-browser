@@ -34,6 +34,8 @@ find_package(Qt6WebEngineCore 6.11 REQUIRED)
 find_package(Qt6WebEngineWidgets 6.11 REQUIRED)
 
 set(PANBROWSER_APP_SOURCES
+    src/BrowserDataCleanup.cpp
+    src/BrowserDataCleanup.h
     src/BrowserProfile.cpp
     src/BrowserProfile.h
     src/BrowserPreferences.cpp
@@ -97,6 +99,8 @@ endif()
 enable_testing()
 qt_add_executable(PanBrowserTests
     tests/TrustConfigurationTests.cpp
+    src/BrowserDataCleanup.cpp
+    src/BrowserDataCleanup.h
     src/BrowserPreferences.cpp
     src/BrowserPreferences.h
     src/SessionStore.cpp

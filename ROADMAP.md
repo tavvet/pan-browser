@@ -11,10 +11,10 @@
 - [x] Unified settings window with General and Trust Rules sections.
 - [x] Configurable start page and startup behavior.
 - [x] Optional session-cookie and tab restoration with lazy background tabs.
+- [x] Browsing data controls for cookies, site storage, and HTTP cache.
 
 ## Browser essentials
 
-- [ ] Browsing data controls: clear cookies, site storage, and HTTP cache.
 - [ ] Popup handling in a new PanBrowser window with the same profile and trust policy.
 - [ ] Downloads: destination picker, progress, completion, and error reporting.
 - [ ] Explicit permission prompts for camera, microphone, location, and notifications.

@@ -1,5 +1,6 @@
 #include "SettingsDialog.h"
 
+#include "BrowserProfile.h"
 #include "TrustRulesDialog.h"
 
 #include <QCheckBox>
@@ -20,6 +21,7 @@
 SettingsDialog::SettingsDialog(
     const QString &configurationPath,
     const BrowserPreferences &preferences,
+    BrowserProfile *profile,
     const QUrl &currentUrl,
     Page initialPage,
     QWidget *parent
@@ -27,6 +29,7 @@ SettingsDialog::SettingsDialog(
     : QDialog(parent)
     , m_configurationPath(configurationPath)
     , m_preferences(preferences)
+    , m_profile(profile)
 {
     createInterface(currentUrl, initialPage);
 }
@@ -69,6 +72,12 @@ void SettingsDialog::createInterface(const QUrl &currentUrl, Page initialPage)
         m_sidebar
     );
     generalItem->setData(Qt::UserRole, static_cast<int>(Page::General));
+    auto *privacyDataItem = new QListWidgetItem(
+        QIcon(QStringLiteral(":/assets/icons/database.svg")),
+        QStringLiteral("Privacy & Data"),
+        m_sidebar
+    );
+    privacyDataItem->setData(Qt::UserRole, static_cast<int>(Page::PrivacyData));
     auto *trustItem = new QListWidgetItem(
         QIcon(QStringLiteral(":/assets/icons/shield-check.svg")),
         QStringLiteral("Trust Rules"),
@@ -175,6 +184,106 @@ void SettingsDialog::createInterface(const QUrl &currentUrl, Page initialPage)
     generalLayout->addStretch();
     m_pages->addWidget(generalPage);
 
+    auto *privacyDataPage = new QWidget(m_pages);
+    privacyDataPage->setObjectName(QStringLiteral("privacyDataSettingsPage"));
+    auto *dataLayout = new QVBoxLayout(privacyDataPage);
+    dataLayout->setContentsMargins(30, 24, 30, 24);
+    dataLayout->setSpacing(14);
+
+    auto *dataTitle = new QLabel(QStringLiteral("Privacy & Data"), privacyDataPage);
+    dataTitle->setObjectName(QStringLiteral("dialogTitle"));
+    dataLayout->addWidget(dataTitle);
+    auto *dataSubtitle = new QLabel(
+        QStringLiteral("Remove browsing data kept in PanBrowser’s isolated WebEngine profile."),
+        privacyDataPage
+    );
+    dataSubtitle->setObjectName(QStringLiteral("dialogSubtitle"));
+    dataLayout->addWidget(dataSubtitle);
+
+    auto *storedDataLabel = new QLabel(QStringLiteral("STORED DATA"), privacyDataPage);
+    storedDataLabel->setObjectName(QStringLiteral("sectionLabel"));
+    dataLayout->addWidget(storedDataLabel);
+
+    auto *cacheCard = new QFrame(privacyDataPage);
+    cacheCard->setObjectName(QStringLiteral("settingsCard"));
+    auto *cacheLayout = new QHBoxLayout(cacheCard);
+    cacheLayout->setContentsMargins(18, 16, 18, 16);
+    cacheLayout->setSpacing(18);
+    auto *cacheTextLayout = new QVBoxLayout();
+    cacheTextLayout->setSpacing(5);
+    auto *cacheTitle = new QLabel(QStringLiteral("HTTP cache"), cacheCard);
+    cacheTitle->setObjectName(QStringLiteral("settingsCardTitle"));
+    cacheTextLayout->addWidget(cacheTitle);
+    auto *cacheDescription = new QLabel(
+        QStringLiteral("Remove temporary page resources. This does not sign you out."),
+        cacheCard
+    );
+    cacheDescription->setObjectName(QStringLiteral("fieldHint"));
+    cacheDescription->setWordWrap(true);
+    cacheTextLayout->addWidget(cacheDescription);
+    auto *cacheStatus = new QLabel(cacheCard);
+    cacheStatus->setObjectName(QStringLiteral("dataActionStatus"));
+    cacheStatus->hide();
+    cacheTextLayout->addWidget(cacheStatus);
+    cacheLayout->addLayout(cacheTextLayout, 1);
+    auto *clearCache = new QPushButton(QStringLiteral("Clear cache"), cacheCard);
+    cacheLayout->addWidget(clearCache);
+    dataLayout->addWidget(cacheCard);
+
+    auto *cookiesCard = new QFrame(privacyDataPage);
+    cookiesCard->setObjectName(QStringLiteral("settingsCard"));
+    auto *cookiesLayout = new QHBoxLayout(cookiesCard);
+    cookiesLayout->setContentsMargins(18, 16, 18, 16);
+    cookiesLayout->setSpacing(18);
+    auto *cookiesTextLayout = new QVBoxLayout();
+    cookiesTextLayout->setSpacing(5);
+    auto *cookiesTitle = new QLabel(QStringLiteral("Cookies"), cookiesCard);
+    cookiesTitle->setObjectName(QStringLiteral("settingsCardTitle"));
+    cookiesTextLayout->addWidget(cookiesTitle);
+    auto *cookiesDescription = new QLabel(
+        QStringLiteral("Remove persistent and session cookies. Most sites will ask you to sign in again."),
+        cookiesCard
+    );
+    cookiesDescription->setObjectName(QStringLiteral("fieldHint"));
+    cookiesDescription->setWordWrap(true);
+    cookiesTextLayout->addWidget(cookiesDescription);
+    auto *cookiesStatus = new QLabel(cookiesCard);
+    cookiesStatus->setObjectName(QStringLiteral("dataActionStatus"));
+    cookiesStatus->hide();
+    cookiesTextLayout->addWidget(cookiesStatus);
+    cookiesLayout->addLayout(cookiesTextLayout, 1);
+    auto *clearCookies = new QPushButton(QStringLiteral("Clear cookies…"), cookiesCard);
+    cookiesLayout->addWidget(clearCookies);
+    dataLayout->addWidget(cookiesCard);
+
+    auto *allDataCard = new QFrame(privacyDataPage);
+    allDataCard->setObjectName(QStringLiteral("settingsCard"));
+    auto *allDataLayout = new QHBoxLayout(allDataCard);
+    allDataLayout->setContentsMargins(18, 16, 18, 16);
+    allDataLayout->setSpacing(18);
+    auto *allDataTextLayout = new QVBoxLayout();
+    allDataTextLayout->setSpacing(5);
+    auto *allDataTitle = new QLabel(QStringLiteral("All site data"), allDataCard);
+    allDataTitle->setObjectName(QStringLiteral("settingsCardTitle"));
+    allDataTextLayout->addWidget(allDataTitle);
+    auto *allDataDescription = new QLabel(
+        QStringLiteral("Remove cookies, local storage, IndexedDB, service workers, and cache on the next launch. Settings, trust rules, certificates, and saved tabs are kept."),
+        allDataCard
+    );
+    allDataDescription->setObjectName(QStringLiteral("fieldHint"));
+    allDataDescription->setWordWrap(true);
+    allDataTextLayout->addWidget(allDataDescription);
+    auto *allDataStatus = new QLabel(allDataCard);
+    allDataStatus->setObjectName(QStringLiteral("dataActionStatus"));
+    allDataTextLayout->addWidget(allDataStatus);
+    allDataLayout->addLayout(allDataTextLayout, 1);
+    auto *resetAllData = new QPushButton(allDataCard);
+    resetAllData->setObjectName(QStringLiteral("dangerButton"));
+    allDataLayout->addWidget(resetAllData);
+    dataLayout->addWidget(allDataCard);
+    dataLayout->addStretch();
+    m_pages->addWidget(privacyDataPage);
+
     m_trustRules = new TrustRulesDialog(m_configurationPath, m_pages, true);
     m_pages->addWidget(m_trustRules);
 
@@ -196,6 +305,72 @@ void SettingsDialog::createInterface(const QUrl &currentUrl, Page initialPage)
     connect(useCurrent, &QPushButton::clicked, this, [this, currentUrl] {
         m_startPage->setText(currentUrl.toString());
     });
+    connect(clearCache, &QPushButton::clicked, this, [this, clearCache, cacheStatus] {
+        clearCache->setEnabled(false);
+        cacheStatus->setText(QStringLiteral("Clearing cache…"));
+        cacheStatus->show();
+        m_profile->clearHttpCache();
+    });
+    connect(
+        m_profile,
+        &QWebEngineProfile::clearHttpCacheCompleted,
+        this,
+        [clearCache, cacheStatus] {
+            clearCache->setEnabled(true);
+            cacheStatus->setText(QStringLiteral("Cache cleared."));
+            cacheStatus->show();
+        }
+    );
+    connect(clearCookies, &QPushButton::clicked, this, [this, cookiesStatus] {
+        if (QMessageBox::question(
+                this,
+                QStringLiteral("Clear cookies"),
+                QStringLiteral("Clear all cookies? Most sites will ask you to sign in again."),
+                QMessageBox::Yes | QMessageBox::Cancel,
+                QMessageBox::Cancel
+            ) != QMessageBox::Yes) {
+            return;
+        }
+        m_profile->clearAllCookies();
+        cookiesStatus->setText(
+            QStringLiteral("Cookie deletion requested. Reload open tabs to update their sign-in state.")
+        );
+        cookiesStatus->show();
+    });
+    const auto updateDataResetUi = [resetAllData, allDataStatus] {
+        const bool scheduled = BrowserProfile::dataResetScheduled();
+        resetAllData->setText(
+            scheduled ? QStringLiteral("Cancel scheduled reset")
+                      : QStringLiteral("Reset on next launch…")
+        );
+        allDataStatus->setText(
+            scheduled ? QStringLiteral("Full site-data reset is scheduled for the next launch.")
+                      : QString()
+        );
+        allDataStatus->setVisible(scheduled);
+    };
+    connect(resetAllData, &QPushButton::clicked, this, [this, updateDataResetUi] {
+        QString error;
+        if (BrowserProfile::dataResetScheduled()) {
+            if (!BrowserProfile::cancelDataReset(&error))
+                QMessageBox::warning(this, QStringLiteral("Cannot cancel reset"), error);
+            updateDataResetUi();
+            return;
+        }
+
+        if (QMessageBox::question(
+                this,
+                QStringLiteral("Reset all site data"),
+                QStringLiteral("Schedule deletion of all cookies and site storage the next time PanBrowser starts? Trust rules, certificates, settings, and saved tabs will be kept."),
+                QMessageBox::Yes | QMessageBox::Cancel,
+                QMessageBox::Cancel
+            ) != QMessageBox::Yes) {
+            return;
+        }
+        if (!BrowserProfile::scheduleDataReset(&error))
+            QMessageBox::warning(this, QStringLiteral("Cannot schedule reset"), error);
+        updateDataResetUi();
+    });
     const auto updateRestoreHint = [this, restoreSignInHint] {
         const bool restoringTabs = static_cast<StartupMode>(
             m_startupMode->currentData().toInt()
@@ -213,6 +388,7 @@ void SettingsDialog::createInterface(const QUrl &currentUrl, Page initialPage)
     connect(buttons, &QDialogButtonBox::accepted, this, &SettingsDialog::saveAndClose);
     connect(buttons, &QDialogButtonBox::rejected, this, &QDialog::reject);
     updateRestoreHint();
+    updateDataResetUi();
     selectPage(initialPage);
 }
 

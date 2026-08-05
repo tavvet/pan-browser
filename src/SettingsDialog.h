@@ -9,6 +9,7 @@ class QComboBox;
 class QLineEdit;
 class QListWidget;
 class QStackedWidget;
+class BrowserProfile;
 class TrustRulesDialog;
 
 class SettingsDialog final : public QDialog {
@@ -17,12 +18,14 @@ class SettingsDialog final : public QDialog {
 public:
     enum class Page {
         General,
+        PrivacyData,
         TrustRules,
     };
 
     SettingsDialog(
         const QString &configurationPath,
         const BrowserPreferences &preferences,
+        BrowserProfile *profile,
         const QUrl &currentUrl,
         Page initialPage,
         QWidget *parent = nullptr
@@ -39,6 +42,7 @@ private:
 
     QString m_configurationPath;
     BrowserPreferences m_preferences;
+    BrowserProfile *m_profile = nullptr;
     QListWidget *m_sidebar = nullptr;
     QStackedWidget *m_pages = nullptr;
     QLineEdit *m_startPage = nullptr;

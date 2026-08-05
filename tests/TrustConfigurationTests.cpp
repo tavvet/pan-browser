@@ -1,4 +1,5 @@
 #include "BrowserPreferences.h"
+#include "BrowserDataCleanup.h"
 #include "SessionStore.h"
 #include "TrustConfiguration.h"
 #include "TrustSettings.h"
@@ -26,6 +27,7 @@ private slots:
     void browserPreferencesValidateStartPage();
     void sessionRoundTripFiltersInvalidUrls();
     void invalidSessionFileFailsClosed();
+    void managedDataCleanupStaysInsideRoot();
 };
 
 void TrustConfigurationTests::exactDomainIsCaseInsensitive()
@@ -240,6 +242,30 @@ void TrustConfigurationTests::invalidSessionFileFailsClosed()
     const BrowserSession restored = store.load(&error);
     QVERIFY(restored.tabs.isEmpty());
     QVERIFY(!error.isEmpty());
+}
+
+void TrustConfigurationTests::managedDataCleanupStaysInsideRoot()
+{
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+    const QString managedRoot = directory.filePath(QStringLiteral("managed"));
+    const QString profile = QDir(managedRoot).filePath(QStringLiteral("WebEngine/Profile"));
+    QVERIFY(QDir().mkpath(profile));
+    QFile marker(QDir(profile).filePath(QStringLiteral("marker")));
+    QVERIFY(marker.open(QIODevice::WriteOnly));
+    marker.close();
+
+    QString error;
+    QVERIFY2(removeManagedDataDirectory(profile, managedRoot, &error), qPrintable(error));
+    QVERIFY(!QFile::exists(profile));
+
+    QVERIFY(!removeManagedDataDirectory(managedRoot, managedRoot, &error));
+    QVERIFY(!error.isEmpty());
+    QVERIFY(!removeManagedDataDirectory(
+        QDir(managedRoot).filePath(QStringLiteral("../outside")),
+        managedRoot,
+        &error
+    ));
 }
 
 QTEST_MAIN(TrustConfigurationTests)
