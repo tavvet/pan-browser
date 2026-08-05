@@ -3,6 +3,7 @@
 #include "BookmarkStore.h"
 #include "BrowserPreferences.h"
 #include "BrowserDataCleanup.h"
+#include "CertificateTrustValidator.h"
 #include "DownloadHistoryStore.h"
 #include "ExternalNavigationPolicy.h"
 #include "FindBar.h"
@@ -66,7 +67,86 @@ private slots:
     void ghostCompletionAcceptsOnlyAddressPrefixes();
     void addressSuggestionsPreferRelevanceThenBookmarks();
     void findBarSupportsKeyboardNavigationAndCounts();
+#if defined(Q_OS_WIN)
+    void nativeCertificateValidatorTrustsConfiguredAnchor();
+    void nativeCertificateValidatorRejectsWrongHostname();
+    void nativeCertificateValidatorRejectsWeakKey();
+#endif
 };
+
+#if defined(Q_OS_WIN)
+namespace {
+
+const QByteArray validatorRootCertificate = QByteArrayLiteral(R"CERT(
+-----BEGIN CERTIFICATE-----
+MIIC5zCCAc+gAwIBAgIJALlhRYB2pp4EMA0GCSqGSIb3DQEBCwUAMB8xHTAbBgNV
+BAMMFFBhbkJyb3dzZXItVGVzdC1Sb290MB4XDTI2MDgwNTEwNTc1M1oXDTQ2MDcz
+MTEwNTc1M1owHzEdMBsGA1UEAwwUUGFuQnJvd3Nlci1UZXN0LVJvb3QwggEiMA0G
+CSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQDtlJTlqxR72qb989fKSFrC3AE38U9R
+3RghQLKNGpLD9NBQnG5Y3JGqkpRsjinOgkdoXG0c0lkhWWYk11iJObCwjSpwU7J4
+Rv/DXLB+D0r8mHGWLMogU1nu76Qsc2XSztW7OUgq77CUJFp6ck3pcIyxlI/WwSzn
+h0i0C4mXCGcLaRgJR/gBbTUz64t4oBWSN+mZ5pkGqYGDQzSnIpzP4WeO4uIjcsB5
+HRrVRtHc0NSfdnxU2sVucbvxsYmaD7ER0jW3k2y9rOUj20/yyscYFDg0ZsZDazSk
+ZeOFFzFa3OBsO+EY2GMRFjcSFMP7wfw6uDS8LldydxNk2+Wcjprw2HKVAgMBAAGj
+JjAkMBIGA1UdEwEB/wQIMAYBAf8CAQAwDgYDVR0PAQH/BAQDAgEGMA0GCSqGSIb3
+DQEBCwUAA4IBAQBij4DvRdDZN9z+JMO7I5PUlhT1rnYQRrhmJh3Iy9qOhIuiTyX5
+2XktVEdqdO2XaaQOPsUFutSfuDch/2AHo9Ku7W2UdbByb75i46SFlND5qJfVbxLe
+j9sTE+nu0XeDn4dgceGXUgF+6Dnm3wzIhzIKOhxOv4KnEoj1ECJCMYVK8RIS6wBs
+fz9DznJnQeO0Lvpl/SdS1eM7Sw9yAWMb2m5iu4BctOub82wEn2TpsvkJavadUAvo
+gRHLzHtXvQm19EHsje4f+Hxoq7KfRD6lB9YttkBcFH6Ra1EoZ0+bYsxSCPkcD7bf
+vl6zW/rfqixwoVC+A9jBhWR4L75f9Iky2/kQ
+-----END CERTIFICATE-----
+)CERT");
+
+const QByteArray validatorLeafCertificate = QByteArrayLiteral(R"CERT(
+-----BEGIN CERTIFICATE-----
+MIIDITCCAgmgAwIBAgIJAPaaGMM/NUXkMA0GCSqGSIb3DQEBCwUAMB8xHTAbBgNV
+BAMMFFBhbkJyb3dzZXItVGVzdC1Sb290MB4XDTI2MDgwNTEwNTc1M1oXDTQ2MDcz
+MTEwNTc1M1owJDEiMCAGA1UEAwwZdmFsaWRhdG9yLnBhbmJyb3dzZXIudGVzdDCC
+ASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBAKF1bpqXC2kPpZHO40KCMs0Z
+lemBL1TiXlI3EMATpbe0ElrfH52euxFQBqd03N/qzInNkQzo+E0J0suNiqqABHxO
+ApcL3chr9CBNWTIHIraJdDN5rT/wunjaKmqOTd1z+MNSVppuDd+uyz6OOnpWy55U
+qaqZLCQ5rrljys68Leh3GeYsYUZqgI6BBvurnwAya4v4I7AIfCou/BfdisC68Ztx
+UkaKE6tP5rLQUAIad6ZZ+XOQs0dJMsO0Twg6q4bk3cJNF8MxLyzLbTu36deYnqHN
+NUdsBJftSwWptsMy7L1mTXG8ltHWAlLUBnRO4qwrLn4O6sq7eMU9fKqFWSyUsncC
+AwEAAaNbMFkwDAYDVR0TAQH/BAIwADAOBgNVHQ8BAf8EBAMCBaAwEwYDVR0lBAww
+CgYIKwYBBQUHAwEwJAYDVR0RBB0wG4IZdmFsaWRhdG9yLnBhbmJyb3dzZXIudGVz
+dDANBgkqhkiG9w0BAQsFAAOCAQEANrgnwy8lg/hoctsb3KQhimJvK6mk3sBZD55r
+os8IQxKpXE82ThB9ErovZxUQXQEFSBUrpm+fzKgnw6yWExgUEupQ1GWOKlQVcA/E
+XO7d8K5/LK7iugQq6Fg04uGaKYNk0U4DIf2MgE2MzVjwbhAgWmGpWWkDA2a1Uool
+3IURhK8ckIicbLlYhWySiHrasNnomHAAgfgGDVKlaniLzScxDPTDFyKm6aiu2EOM
+T9Ytdqvku0TuB5SG72H1+FAPK3Hh2rrMiQ9F5LDUrQiupevL5LhUnpgPPVnN/g0z
+9Mmb1t5xhRozbtGwVDirlE4ii9KGLO5RwBYI4HuYnvC2EyqtmQ==
+-----END CERTIFICATE-----
+)CERT");
+
+const QByteArray validatorWeakLeafCertificate = QByteArrayLiteral(R"CERT(
+-----BEGIN CERTIFICATE-----
+MIICnTCCAYWgAwIBAgIJAPaaGMM/NUXlMA0GCSqGSIb3DQEBCwUAMB8xHTAbBgNV
+BAMMFFBhbkJyb3dzZXItVGVzdC1Sb290MB4XDTI2MDgwNTExMTg0MFoXDTQ2MDcz
+MTExMTg0MFowJDEiMCAGA1UEAwwZdmFsaWRhdG9yLnBhbmJyb3dzZXIudGVzdDCB
+nzANBgkqhkiG9w0BAQEFAAOBjQAwgYkCgYEA6T6A60CuAoGBxGS0zj5PjnnRf0am
+Cc3rVHDf1fy1QiX34AN5kYhjYrsu1Bbdyfx8PFqIVTdmxAbeSMI5LI286J/g6rAQ
+S7iBmwWnYtTWHtMHFUm7uQRzrKbwiN60wEu+3RvJIChxm+V+IKpqp5j8IO/DcuhO
+/z/mgS0KjpaUXrkCAwEAAaNbMFkwDAYDVR0TAQH/BAIwADAOBgNVHQ8BAf8EBAMC
+BaAwEwYDVR0lBAwwCgYIKwYBBQUHAwEwJAYDVR0RBB0wG4IZdmFsaWRhdG9yLnBh
+bmJyb3dzZXIudGVzdDANBgkqhkiG9w0BAQsFAAOCAQEApBZWvURYeYXnsnkXufwl
+09BqDi0VE0XaCJRViwaFk4bUatmDOAY6Ppq6jAptzwKmJUxabjG1qEKPJEbgjbH0
+MwWFs7TKcf4Ijur3/+yBI7N1VeRSZZfnjszUYtPaNspcGKeU9l9wAUdz4OeXEsdm
+eJkkeBuqtQrqsgvZFRXWSxDIbwQ8axsf5O/qGVO7/k7Sj8wtlC0YqHGnoCZCziOb
+jjSi4ubOJE86RRh+mbXbGeV+WPfKS6UeI+CLAqIgFycJBKXcxTr50eZIN2+jcCk2
+Dn48apJHhbEOUgUhjTB5MSNfZYy0xl4ihVs5vHBYGpVFURm/G5nfsfaQciv8iAoe
+/w==
+-----END CERTIFICATE-----
+)CERT");
+
+QList<QSslCertificate> testCertificates(const QByteArray &pem)
+{
+    return QSslCertificate::fromData(pem, QSsl::Pem);
+}
+
+} // namespace
+#endif
 
 void TrustConfigurationTests::exactDomainIsCaseInsensitive()
 {
@@ -1003,6 +1083,48 @@ void TrustConfigurationTests::findBarSupportsKeyboardNavigationAndCounts()
     bar.setResults(0, 0);
     QCOMPARE(result->text(), QStringLiteral("No matches"));
 }
+
+#if defined(Q_OS_WIN)
+void TrustConfigurationTests::nativeCertificateValidatorTrustsConfiguredAnchor()
+{
+    const QList<QSslCertificate> chain = testCertificates(validatorLeafCertificate);
+    const QList<QSslCertificate> anchors = testCertificates(validatorRootCertificate);
+    QCOMPARE(chain.size(), 1);
+    QCOMPARE(anchors.size(), 1);
+
+    const CertificateValidationResult result = CertificateTrustValidator::evaluate(
+        chain,
+        anchors,
+        QStringLiteral("validator.panbrowser.test"),
+        true
+    );
+    QVERIFY2(result.trusted, qPrintable(result.explanation));
+}
+
+void TrustConfigurationTests::nativeCertificateValidatorRejectsWrongHostname()
+{
+    const CertificateValidationResult result = CertificateTrustValidator::evaluate(
+        testCertificates(validatorLeafCertificate),
+        testCertificates(validatorRootCertificate),
+        QStringLiteral("wrong.panbrowser.test"),
+        true
+    );
+    QVERIFY(!result.trusted);
+    QVERIFY(!result.explanation.isEmpty());
+}
+
+void TrustConfigurationTests::nativeCertificateValidatorRejectsWeakKey()
+{
+    const CertificateValidationResult result = CertificateTrustValidator::evaluate(
+        testCertificates(validatorWeakLeafCertificate),
+        testCertificates(validatorRootCertificate),
+        QStringLiteral("validator.panbrowser.test"),
+        true
+    );
+    QVERIFY(!result.trusted);
+    QVERIFY(!result.explanation.isEmpty());
+}
+#endif
 
 QTEST_MAIN(TrustConfigurationTests)
 #include "TrustConfigurationTests.moc"

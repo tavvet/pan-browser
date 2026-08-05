@@ -4,11 +4,11 @@ PanBrowser is a small Qt WebEngine viewer with domain-scoped TLS trust rules.
 Normal sites use Chromium's ordinary trust configuration. If Chromium rejects a
 certificate solely because its CA is unknown, PanBrowser can verify that chain
 against CA certificates selected by a matching domain rule. It never installs
-those certificates in the macOS Keychain.
+those certificates in the macOS Keychain or Windows certificate stores.
 
-The current implementation uses Qt 6.11 or newer and Security.framework on
-macOS. The certificate validator has an explicit platform boundary so Windows
-and Linux implementations can be added next.
+The current implementation uses Qt 6.11 or newer, Security.framework on macOS,
+and Windows CryptoAPI on Windows 10 or newer. Linux retains an explicit
+fail-closed platform boundary until its native validator is implemented.
 
 ## Run
 
@@ -27,6 +27,21 @@ cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug
 cmake --build build --parallel
 ctest --test-dir build --output-on-failure
 ```
+
+On Windows, use a Qt 6.11 MSVC installation and a matching Visual Studio 2022
+toolchain. Configure `CMAKE_PREFIX_PATH` if Qt is not already discoverable:
+
+```powershell
+cmake -S . -B build -G Ninja `
+  -DCMAKE_BUILD_TYPE=Debug `
+  -DCMAKE_PREFIX_PATH=C:\Qt\6.11.0\msvc2022_64
+cmake --build build --parallel
+ctest --test-dir build --output-on-failure
+```
+
+The Windows build evaluates configured anchors in temporary memory stores. It
+does not require administrator rights and does not modify the user or machine
+certificate stores.
 
 The deploy script creates a self-contained, ad-hoc signed application at
 `dist/PanBrowser.app`. Qt WebEngine makes the bundle approximately 300 MB.

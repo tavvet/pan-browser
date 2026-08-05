@@ -109,6 +109,8 @@ if(APPLE)
         src/CertificateTrustValidatorMac.mm
         ${PANBROWSER_APP_ICON}
     )
+elseif(WIN32)
+    list(APPEND PANBROWSER_APP_SOURCES src/CertificateTrustValidatorWindows.cpp)
 else()
     list(APPEND PANBROWSER_APP_SOURCES src/CertificateTrustValidatorFallback.cpp)
 endif()
@@ -139,6 +141,17 @@ if(APPLE)
     )
     find_library(SECURITY_FRAMEWORK Security REQUIRED)
     target_link_libraries(PanBrowser PRIVATE ${SECURITY_FRAMEWORK})
+endif()
+
+if(WIN32)
+    target_compile_definitions(PanBrowser PRIVATE
+        NOMINMAX
+        WIN32_LEAN_AND_MEAN
+        CERT_CHAIN_PARA_HAS_EXTRA_FIELDS
+        WINVER=0x0A00
+        _WIN32_WINNT=0x0A00
+    )
+    target_link_libraries(PanBrowser PRIVATE Crypt32)
 endif()
 
 enable_testing()
@@ -183,4 +196,17 @@ target_link_libraries(PanBrowserTests PRIVATE
     Qt6::Test
     Qt6::Widgets
 )
+
+if(WIN32)
+    target_sources(PanBrowserTests PRIVATE src/CertificateTrustValidatorWindows.cpp)
+    target_compile_definitions(PanBrowserTests PRIVATE
+        NOMINMAX
+        WIN32_LEAN_AND_MEAN
+        CERT_CHAIN_PARA_HAS_EXTRA_FIELDS
+        WINVER=0x0A00
+        _WIN32_WINNT=0x0A00
+    )
+    target_link_libraries(PanBrowserTests PRIVATE Crypt32)
+endif()
+
 add_test(NAME PanBrowserTests COMMAND PanBrowserTests)

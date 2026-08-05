@@ -121,7 +121,7 @@ sequenceDiagram
     participant MainWindow
     participant Policy as TrustPolicy
     participant Validator as CertificateTrustValidator
-    participant Security as macOS Security.framework
+    participant Native as Native trust API
 
     Chromium->>MainWindow: certificateError(error, URL, chain)
     MainWindow->>Policy: ruleForHost(error.url.host)
@@ -133,8 +133,8 @@ sequenceDiagram
         MainWindow-->>Chromium: rejectCertificate
     else custom validation allowed
         MainWindow->>Validator: evaluate(chain, anchors, host, customOnly)
-        Validator->>Security: SecTrust with SSL hostname policy
-        Security-->>Validator: trusted / rejected
+        Validator->>Native: SecTrust or CryptoAPI SSL policy
+        Native-->>Validator: trusted / rejected
         alt trusted
             Validator-->>MainWindow: trusted with explanation
             MainWindow-->>Chromium: acceptCertificate
@@ -150,13 +150,30 @@ The recovery path has several mandatory checks:
 2. The Chromium error must be overridable.
 3. The only accepted error type is `CertificateAuthorityInvalid`.
 4. `system-only` rules never override a Chromium rejection.
-5. Security.framework reevaluates the complete server chain using an SSL policy
-   bound to the requested hostname.
-6. `custom-only` passes only configured anchors to `SecTrust` for this recovery
-   evaluation; `system-plus-custom` also permits system anchors.
+5. The native backend reevaluates the complete server chain using an SSL policy
+   bound to the requested hostname and Server Authentication usage.
+6. `custom-only` permits only configured anchors for this recovery evaluation;
+   `system-plus-custom` also permits native system anchors.
 
 All other certificate failures remain rejected, including hostname mismatch,
 expiration, revocation, certificate transparency, and pinning failures.
+
+On macOS, the backend uses `SecTrust` with explicit anchors. On Windows, it
+converts the Qt DER chain into temporary `CERT_STORE_PROV_MEMORY` stores and
+uses `CertGetCertificateChain` plus `CERT_CHAIN_POLICY_SSL`. Custom validation
+runs in an application chain engine whose `hExclusiveRoot` contains only the
+configured anchors; `CERT_CHAIN_EXCLUSIVE_ENABLE_CA_FLAG` also permits an
+explicit non-self-signed CA to terminate the chain. `system-plus-custom` first
+tries the default Windows engine, then the exclusive custom engine. Temporary
+stores are destroyed after evaluation and are never persisted.
+
+The Windows backend enables the OS strong-signature policy, which rejects weak
+hash algorithms and undersized server keys. Chain building is cache-only: the
+certificate-error callback never waits for AIA, CRL, OCSP, or root downloads.
+A positive cached revoked result fails validation, while unavailable revocation
+data remains unknown. Servers must therefore send required intermediates in the
+TLS chain. Chromium still controls the original connection and PanBrowser only
+enters this path for an overridable unknown-CA error.
 
 ### 4.3 Important limitation
 
@@ -390,8 +407,9 @@ only then destroys shared browser resources.
 ## 12. Build, packaging, and diagnostics
 
 The project requires CMake, Ninja, Qt 6.11 or newer, and C++20. macOS adds the
-Objective-C++ validator and links Security.framework; other platforms compile a
-fail-closed validator stub until their native validators are implemented.
+Objective-C++ validator and links Security.framework. Windows 10 or newer adds
+the CryptoAPI validator and links Crypt32. Linux compiles a fail-closed
+validator stub until its native backend is implemented.
 
 Development verification:
 
@@ -420,7 +438,8 @@ policy and persistence layers: domains and rule validation, settings backups,
 window placement, sessions, cleanup boundaries, downloads, permissions,
 external navigation, popup geometry, search parsing, history ranking/deletion,
 bookmark CRUD and normalization, combined suggestion ranking,
-corrupt-database behavior, ghost completion, and find-bar keyboard behavior.
+corrupt-database behavior, ghost completion, find-bar keyboard behavior, and
+native custom-anchor/hostname validation on Windows.
 
 The test target deliberately excludes `MainWindow` and a live WebEngine process,
 so signal wiring and visual state still need a short manual smoke test after
@@ -472,8 +491,9 @@ Before merging a change, verify the relevant invariants:
 
 Implement the `CertificateTrustValidator::evaluate()` contract using the
 platform trust API, keep hostname verification inside that evaluation, wire the
-source in CMake, and add platform tests. The fallback must continue to reject,
-never accept by assumption.
+source in CMake, and add platform tests. Windows and macOS provide the reference
+implementations; the Linux fallback must continue to reject, never accept by
+assumption.
 
 ### Adding a preference
 

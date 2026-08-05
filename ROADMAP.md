@@ -28,7 +28,7 @@
 
 ## Cross-platform
 
-- [ ] Windows certificate validator using the platform trust APIs.
+- [x] Windows certificate validator using the platform trust APIs.
 - [ ] Linux certificate validator with an explicit trust backend.
 - [ ] Platform-specific build and packaging scripts.
 
