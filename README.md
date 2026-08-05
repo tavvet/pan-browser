@@ -40,6 +40,7 @@ On first launch PanBrowser creates:
 ├── WebEngine/
 ├── session.json        # when tab restoration is enabled
 ├── downloads.json      # download history
+├── history.sqlite      # browsing history and autocomplete data
 ├── search-engines.json # address-bar search configuration
 ├── rules.json
 └── Certificates/
@@ -74,6 +75,24 @@ exactly once. HTTP templates are allowed but expose search queries in transit.
 Search suggestions are deliberately not requested. Configuration is saved
 atomically in `search-engines.json`, with the previous version retained as
 `search-engines.json.backup`.
+
+Successful top-level HTTP and HTTPS visits are stored locally in
+`history.sqlite`. Failed loads, external schemes, and tabs loaded only as part
+of session restoration are not added. Credentials and URL fragments are
+removed before storage; query parameters are retained so pages can be reopened
+accurately. History is limited to the 50,000 most recent visits.
+
+Address-bar completion uses only this local history and never contacts a
+suggestion service. Match quality is ranked first; equally relevant results are
+ordered by the most recent visit, followed by a small preference for manually
+entered and frequently visited addresses. Use <kbd>↑</kbd>/<kbd>↓</kbd>, Enter,
+Escape, or the mouse to choose a result.
+
+Open **PanBrowser → History…** or the **History** settings section to filter
+visits, view their local dates, remove selected entries, clear all history, or
+stop saving new history. Disabling history also disables address-bar history
+completion but does not erase existing records. Clearing browsing history does
+not remove cookies, sign-ins, site data, downloads, or trust settings.
 
 Open **PanBrowser → Settings…** or press <kbd>⌘,</kbd> to choose the start page,
 restore previous tabs, or retain session-cookie sign-ins. Restored background

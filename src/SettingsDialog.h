@@ -11,6 +11,8 @@ class QLineEdit;
 class QListWidget;
 class QStackedWidget;
 class BrowserProfile;
+class HistorySettingsPage;
+class HistoryStore;
 class SearchSettingsPage;
 class TrustRulesDialog;
 
@@ -21,6 +23,7 @@ public:
     enum class Page {
         General,
         Search,
+        History,
         PrivacyData,
         TrustRules,
     };
@@ -31,6 +34,7 @@ public:
         const BrowserPreferences &preferences,
         const SearchSettings &searchSettings,
         BrowserProfile *profile,
+        HistoryStore *historyStore,
         const QUrl &currentUrl,
         Page initialPage,
         QWidget *parent = nullptr
@@ -57,5 +61,6 @@ private:
     QComboBox *m_startupMode = nullptr;
     QCheckBox *m_persistSessionCookies = nullptr;
     SearchSettingsPage *m_searchPage = nullptr;
+    HistorySettingsPage *m_historyPage = nullptr;
     TrustRulesDialog *m_trustRules = nullptr;
 };

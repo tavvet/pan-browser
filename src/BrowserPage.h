@@ -10,6 +10,7 @@ public:
 
 signals:
     void externalUrlRequested(const QUrl &url);
+    void mainFrameNavigationRequested(const QUrl &url, int navigationType);
 
 protected:
     bool acceptNavigationRequest(

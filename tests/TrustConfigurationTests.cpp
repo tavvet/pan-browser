@@ -2,6 +2,7 @@
 #include "BrowserDataCleanup.h"
 #include "DownloadHistoryStore.h"
 #include "ExternalNavigationPolicy.h"
+#include "HistoryStore.h"
 #include "PermissionPolicy.h"
 #include "SessionStore.h"
 #include "SearchSettings.h"
@@ -45,6 +46,10 @@ private slots:
     void addressInputDistinguishesUrlsAndSearches();
     void addressInputSupportsSearchKeywords();
     void searchTermsAreEncodedExactlyOnce();
+    void historySanitizesAndStoresSuccessfulWebVisits();
+    void historySuggestionsPreferRelevanceThenRecency();
+    void historyCanDeleteIndividualVisitsAndClearAll();
+    void corruptHistoryIsPreservedAndDisabled();
 };
 
 void TrustConfigurationTests::exactDomainIsCaseInsensitive()
@@ -521,6 +526,143 @@ void TrustConfigurationTests::searchTermsAreEncodedExactlyOnce()
     const QString encoded = url.toString(QUrl::FullyEncoded);
     QVERIFY(encoded.contains(QStringLiteral("C%2B%2B%20100%25%20")));
     QVERIFY(!encoded.contains(QStringLiteral("%252B")));
+}
+
+void TrustConfigurationTests::historySanitizesAndStoresSuccessfulWebVisits()
+{
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+    HistoryStore store(directory.filePath(QStringLiteral("history.sqlite")));
+    QString error;
+    QVERIFY2(store.open(&error), qPrintable(error));
+
+    const QUrl source(QStringLiteral("https://user:secret@example.com/path?q=one#token"));
+    QVERIFY2(store.recordVisit(
+        source,
+        QStringLiteral("Example Page"),
+        HistoryTransition::Typed,
+        QDateTime::fromSecsSinceEpoch(1000, QTimeZone::UTC),
+        &error
+    ), qPrintable(error));
+
+    const QList<HistoryVisit> visits = store.visits({}, 10, &error);
+    QVERIFY2(error.isEmpty(), qPrintable(error));
+    QCOMPARE(visits.size(), 1);
+    QCOMPARE(visits.first().url.userName(), QString());
+    QCOMPARE(visits.first().url.password(), QString());
+    QCOMPARE(visits.first().url.fragment(), QString());
+    QCOMPARE(visits.first().url.query(), QStringLiteral("q=one"));
+    QCOMPARE(visits.first().title, QStringLiteral("Example Page"));
+
+    QVERIFY(!store.recordVisit(
+        QUrl(QStringLiteral("file:///tmp/private")),
+        QStringLiteral("Private"),
+        HistoryTransition::Other,
+        QDateTime::currentDateTimeUtc(),
+        &error
+    ));
+}
+
+void TrustConfigurationTests::historySuggestionsPreferRelevanceThenRecency()
+{
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+    HistoryStore store(directory.filePath(QStringLiteral("history.sqlite")));
+    QString error;
+    QVERIFY2(store.open(&error), qPrintable(error));
+
+    QVERIFY2(store.recordVisit(
+        QUrl(QStringLiteral("https://example.com/old")),
+        QStringLiteral("Example"),
+        HistoryTransition::Typed,
+        QDateTime::fromSecsSinceEpoch(1000, QTimeZone::UTC),
+        &error
+    ), qPrintable(error));
+    QVERIFY2(store.recordVisit(
+        QUrl(QStringLiteral("https://recent.test/path?source=example")),
+        QStringLiteral("Recent page"),
+        HistoryTransition::Link,
+        QDateTime::fromSecsSinceEpoch(3000, QTimeZone::UTC),
+        &error
+    ), qPrintable(error));
+    QVERIFY2(store.recordVisit(
+        QUrl(QStringLiteral("https://example.net/new")),
+        QStringLiteral("New example"),
+        HistoryTransition::Link,
+        QDateTime::fromSecsSinceEpoch(2000, QTimeZone::UTC),
+        &error
+    ), qPrintable(error));
+
+    const QList<HistorySuggestion> suggestions = store.suggestions(
+        QStringLiteral("example"),
+        8,
+        &error
+    );
+    QVERIFY2(error.isEmpty(), qPrintable(error));
+    QCOMPARE(suggestions.size(), 3);
+    QCOMPARE(suggestions.at(0).url.host(), QStringLiteral("example.net"));
+    QCOMPARE(suggestions.at(1).url.host(), QStringLiteral("example.com"));
+    QCOMPARE(suggestions.at(2).url.host(), QStringLiteral("recent.test"));
+}
+
+void TrustConfigurationTests::historyCanDeleteIndividualVisitsAndClearAll()
+{
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+    HistoryStore store(directory.filePath(QStringLiteral("history.sqlite")));
+    QString error;
+    QVERIFY2(store.open(&error), qPrintable(error));
+    const QUrl url(QStringLiteral("https://example.com/"));
+    QVERIFY2(store.recordVisit(
+        url,
+        QStringLiteral("First title"),
+        HistoryTransition::Typed,
+        QDateTime::fromSecsSinceEpoch(1000, QTimeZone::UTC),
+        &error
+    ), qPrintable(error));
+    QVERIFY2(store.recordVisit(
+        url,
+        QStringLiteral("Updated title"),
+        HistoryTransition::Link,
+        QDateTime::fromSecsSinceEpoch(2000, QTimeZone::UTC),
+        &error
+    ), qPrintable(error));
+
+    QList<HistoryVisit> visits = store.visits({}, 10, &error);
+    QCOMPARE(visits.size(), 2);
+    QVERIFY2(store.removeVisits({visits.first().id}, &error), qPrintable(error));
+    visits = store.visits({}, 10, &error);
+    QCOMPARE(visits.size(), 1);
+    const QList<HistorySuggestion> suggestions = store.suggestions(
+        QStringLiteral("example"),
+        8,
+        &error
+    );
+    QCOMPARE(suggestions.size(), 1);
+    QCOMPARE(suggestions.first().visitCount, 1);
+    QCOMPARE(suggestions.first().typedCount, 1);
+
+    QVERIFY2(store.clear(&error), qPrintable(error));
+    QVERIFY(store.visits({}, 10, &error).isEmpty());
+}
+
+void TrustConfigurationTests::corruptHistoryIsPreservedAndDisabled()
+{
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+    const QString path = directory.filePath(QStringLiteral("history.sqlite"));
+    QFile file(path);
+    QVERIFY(file.open(QIODevice::WriteOnly));
+    QCOMPARE(file.write("not a sqlite database"), 21);
+    file.close();
+
+    HistoryStore store(path);
+    QString error;
+    QVERIFY(!store.open(&error));
+    QVERIFY(!error.isEmpty());
+    QVERIFY(!store.isOpen());
+    QVERIFY(QFile::exists(path));
+    QCOMPARE(QFileInfo(path).size(), 21);
 }
 
 QTEST_MAIN(TrustConfigurationTests)

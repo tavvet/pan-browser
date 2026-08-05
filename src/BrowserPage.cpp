@@ -20,6 +20,8 @@ bool BrowserPage::acceptNavigationRequest(
 {
     switch (externalNavigationDisposition(url, isMainFrame)) {
     case ExternalNavigationDisposition::Browse:
+        if (isMainFrame)
+            emit mainFrameNavigationRequested(url, static_cast<int>(type));
         return QWebEnginePage::acceptNavigationRequest(url, type, isMainFrame);
     case ExternalNavigationDisposition::Prompt:
         if (type != NavigationTypeLinkClicked

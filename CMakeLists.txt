@@ -26,6 +26,7 @@ endif()
 find_package(Qt6 6.11 REQUIRED COMPONENTS
     Core
     Network
+    Sql
     Svg
     Test
     Widgets
@@ -50,6 +51,12 @@ set(PANBROWSER_APP_SOURCES
     src/DownloadsPanel.h
     src/ExternalNavigationPolicy.cpp
     src/ExternalNavigationPolicy.h
+    src/HistoryStore.cpp
+    src/HistoryStore.h
+    src/HistoryCompletionPopup.cpp
+    src/HistoryCompletionPopup.h
+    src/HistorySettingsPage.cpp
+    src/HistorySettingsPage.h
     src/PermissionController.cpp
     src/PermissionController.h
     src/PermissionPolicy.cpp
@@ -105,6 +112,7 @@ target_include_directories(PanBrowser PRIVATE src)
 target_link_libraries(PanBrowser PRIVATE
     Qt6::Core
     Qt6::Network
+    Qt6::Sql
     Qt6::Svg
     Qt6::WebEngineCore
     Qt6::WebEngineWidgets
@@ -130,6 +138,8 @@ qt_add_executable(PanBrowserTests
     src/DownloadHistoryStore.h
     src/ExternalNavigationPolicy.cpp
     src/ExternalNavigationPolicy.h
+    src/HistoryStore.cpp
+    src/HistoryStore.h
     src/PermissionPolicy.cpp
     src/PermissionPolicy.h
     src/SessionStore.cpp
@@ -147,6 +157,7 @@ target_include_directories(PanBrowserTests PRIVATE src)
 target_link_libraries(PanBrowserTests PRIVATE
     Qt6::Core
     Qt6::Network
+    Qt6::Sql
     Qt6::Test
 )
 add_test(NAME PanBrowserTests COMMAND PanBrowserTests)

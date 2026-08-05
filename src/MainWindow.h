@@ -1,6 +1,7 @@
 #pragma once
 
 #include "BrowserPreferences.h"
+#include "HistoryStore.h"
 #include "SessionStore.h"
 #include "SearchSettings.h"
 #include "TrustConfiguration.h"
@@ -23,6 +24,7 @@ class BrowserProfile;
 class DownloadButton;
 class DownloadManager;
 class DownloadsPanel;
+class HistoryCompletionPopup;
 class PermissionController;
 class PermissionPrompt;
 class QCloseEvent;
@@ -53,14 +55,17 @@ private:
         bool trustError = false;
         bool previousTrustError = false;
         bool externalNavigationDelegated = false;
+        bool suppressNextHistoryVisit = false;
         bool loading = false;
         int progress = 0;
         QUrl pendingUrl;
+        HistoryTransition pendingHistoryTransition = HistoryTransition::Other;
     };
 
     MainWindow(
         BrowserProfile *sharedProfile,
         DownloadManager *sharedDownloadManager,
+        HistoryStore *sharedHistoryStore,
         MainWindow *primaryWindow,
         WindowRole role,
         QWidget *parent
@@ -83,7 +88,8 @@ private:
     void updateNavigationActions();
     void updateAddressPlaceholder();
     void navigateFromAddressBar();
-    void openSettings(bool trustRules = false);
+    void showHistorySuggestions();
+    void openSettings(bool trustRules = false, bool history = false);
     void reloadRules();
     void reloadRulesLocal();
     void restoreInitialTabs();
@@ -104,8 +110,10 @@ private:
 
     BrowserProfile *m_profile = nullptr;
     DownloadManager *m_downloadManager = nullptr;
+    HistoryStore *m_historyStore = nullptr;
     DownloadsPanel *m_downloadsPanel = nullptr;
     DownloadButton *m_downloadButton = nullptr;
+    HistoryCompletionPopup *m_historyCompletionPopup = nullptr;
     PermissionController *m_permissionController = nullptr;
     PermissionPrompt *m_permissionPrompt = nullptr;
     QPointer<QMessageBox> m_externalUrlDialog;
@@ -121,6 +129,7 @@ private:
     QLabel *m_ruleCount = nullptr;
     QProgressBar *m_progress = nullptr;
     QTimer *m_sessionSaveTimer = nullptr;
+    QTimer *m_historySuggestionTimer = nullptr;
     QHash<QWebEngineView *, BrowserTabState> m_tabStates;
     BrowserPreferences m_preferences;
     SearchSettings m_searchSettings;
@@ -128,6 +137,7 @@ private:
     TrustPolicy m_trustPolicy;
     QString m_configurationPath;
     QString m_searchConfigurationPath;
+    QString m_historyError;
     MainWindow *m_primaryWindow = nullptr;
     QList<QPointer<MainWindow>> m_popupWindows;
     bool m_ownsBrowserResources = true;

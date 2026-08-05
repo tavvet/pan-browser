@@ -14,5 +14,6 @@
         <file>assets/icons/database.svg</file>
         <file>assets/icons/download.svg</file>
         <file>assets/icons/search.svg</file>
+        <file>assets/icons/history.svg</file>
     </qresource>
 </RCC>

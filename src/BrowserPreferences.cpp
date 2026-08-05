@@ -50,6 +50,10 @@ BrowserPreferences BrowserPreferences::load(const QUrl &legacyStartPage)
         QStringLiteral("Browser/persistSessionCookies"),
         false
     ).toBool();
+    preferences.m_saveBrowsingHistory = settings.value(
+        QStringLiteral("Browser/saveBrowsingHistory"),
+        true
+    ).toBool();
     settings.sync();
     return preferences;
 }
@@ -68,6 +72,7 @@ bool BrowserPreferences::save(QString *error) const
             : QStringLiteral("start-page")
     );
     settings.setValue(QStringLiteral("Browser/persistSessionCookies"), m_persistSessionCookies);
+    settings.setValue(QStringLiteral("Browser/saveBrowsingHistory"), m_saveBrowsingHistory);
     settings.sync();
     if (settings.status() != QSettings::NoError)
         return fail(error, QStringLiteral("Cannot write application settings"));
@@ -109,4 +114,14 @@ bool BrowserPreferences::persistSessionCookies() const
 void BrowserPreferences::setPersistSessionCookies(bool persist)
 {
     m_persistSessionCookies = persist;
+}
+
+bool BrowserPreferences::saveBrowsingHistory() const
+{
+    return m_saveBrowsingHistory;
+}
+
+void BrowserPreferences::setSaveBrowsingHistory(bool save)
+{
+    m_saveBrowsingHistory = save;
 }

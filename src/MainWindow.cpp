@@ -6,6 +6,7 @@
 #include "DownloadManager.h"
 #include "DownloadsPanel.h"
 #include "ExternalNavigationPolicy.h"
+#include "HistoryCompletionPopup.h"
 #include "PermissionController.h"
 #include "PermissionPrompt.h"
 #include "SettingsDialog.h"
@@ -15,6 +16,7 @@
 #include <QApplication>
 #include <QCloseEvent>
 #include <QDesktopServices>
+#include <QDateTime>
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
@@ -50,13 +52,14 @@
 #include <utility>
 
 MainWindow::MainWindow(QWidget *parent)
-    : MainWindow(nullptr, nullptr, nullptr, WindowRole::Primary, parent)
+    : MainWindow(nullptr, nullptr, nullptr, nullptr, WindowRole::Primary, parent)
 {
 }
 
 MainWindow::MainWindow(
     BrowserProfile *sharedProfile,
     DownloadManager *sharedDownloadManager,
+    HistoryStore *sharedHistoryStore,
     MainWindow *primaryWindow,
     WindowRole role,
     QWidget *parent
@@ -86,12 +89,21 @@ MainWindow::MainWindow(
                 .filePath(QStringLiteral("downloads.json")),
             this
         );
+        m_historyStore = new HistoryStore(
+            QDir(QStandardPaths::writableLocation(QStandardPaths::AppDataLocation))
+                .filePath(QStringLiteral("history.sqlite")),
+            this
+        );
+        if (!m_historyStore->open(&m_historyError))
+            qWarning().noquote() << "[PanBrowser history]" << m_historyError;
     } else {
         Q_ASSERT(sharedProfile);
         Q_ASSERT(sharedDownloadManager);
+        Q_ASSERT(sharedHistoryStore);
         Q_ASSERT(primaryWindow);
         m_profile = sharedProfile;
         m_downloadManager = sharedDownloadManager;
+        m_historyStore = sharedHistoryStore;
         m_configurationPath = primaryWindow->m_configurationPath;
         m_searchConfigurationPath = primaryWindow->m_searchConfigurationPath;
         m_trustPolicy = primaryWindow->m_trustPolicy;
@@ -101,6 +113,8 @@ MainWindow::MainWindow(
     }
 
     createInterface();
+    if (!m_historyError.isEmpty())
+        setTrustStatus(QStringLiteral("History unavailable: %1").arg(m_historyError), true);
     m_permissionController = new PermissionController(m_permissionPrompt, this);
     if (m_ownsBrowserResources) {
         restoreWindowPlacement();
@@ -132,6 +146,7 @@ MainWindow::~MainWindow()
         delete m_profile;
     }
     m_downloadManager = nullptr;
+    m_historyStore = nullptr;
     m_profile = nullptr;
 }
 
@@ -227,6 +242,10 @@ void MainWindow::createInterface()
         QIcon(),
         QLineEdit::LeadingPosition
     );
+    m_historyCompletionPopup = new HistoryCompletionPopup(m_address, this);
+    m_historySuggestionTimer = new QTimer(this);
+    m_historySuggestionTimer->setSingleShot(true);
+    m_historySuggestionTimer->setInterval(100);
     toolbar->addWidget(m_address);
     QAction *go = toolbar->addAction(
         QIcon(QStringLiteral(":/assets/icons/arrow-right.svg")),
@@ -308,6 +327,25 @@ void MainWindow::createInterface()
     });
     connect(go, &QAction::triggered, this, &MainWindow::navigateFromAddressBar);
     connect(m_address, &QLineEdit::returnPressed, this, &MainWindow::navigateFromAddressBar);
+    connect(m_address, &QLineEdit::textEdited, this, [this] {
+        if (!m_preferences.saveBrowsingHistory()
+            || !m_historyStore
+            || !m_historyStore->isOpen()) {
+            m_historyCompletionPopup->hide();
+            return;
+        }
+        m_historySuggestionTimer->start();
+    });
+    connect(m_historySuggestionTimer, &QTimer::timeout, this, &MainWindow::showHistorySuggestions);
+    connect(
+        m_historyCompletionPopup,
+        &HistoryCompletionPopup::urlActivated,
+        this,
+        [this](const QUrl &url) {
+            m_address->setText(url.toString());
+            navigateFromAddressBar();
+        }
+    );
 
     QMenu *fileMenu = menuBar()->addMenu(QStringLiteral("PanBrowser"));
     QAction *newTabAction = fileMenu->addAction(
@@ -333,7 +371,17 @@ void MainWindow::createInterface()
     settingsAction->setMenuRole(QAction::PreferencesRole);
     settingsAction->setShortcut(QKeySequence::Preferences);
     connect(settingsAction, &QAction::triggered, this, [this] {
-        openSettings(false);
+        openSettings(false, false);
+    });
+
+    QAction *historyAction = fileMenu->addAction(
+        QIcon(QStringLiteral(":/assets/icons/history.svg")),
+        QStringLiteral("History…")
+    );
+    historyAction->setMenuRole(QAction::NoRole);
+    historyAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_Y));
+    connect(historyAction, &QAction::triggered, this, [this] {
+        openSettings(false, true);
     });
 
     QAction *editRulesAction = fileMenu->addAction(
@@ -342,7 +390,7 @@ void MainWindow::createInterface()
     );
     editRulesAction->setMenuRole(QAction::NoRole);
     connect(editRulesAction, &QAction::triggered, this, [this] {
-        openSettings(true);
+        openSettings(true, false);
     });
 
     fileMenu->addSeparator();
@@ -395,6 +443,7 @@ MainWindow *MainWindow::createPopupWindow(
     auto *popup = new MainWindow(
         m_profile,
         m_downloadManager,
+        m_historyStore,
         primary,
         role,
         primary
@@ -433,8 +482,10 @@ QWebEngineView *MainWindow::createTab(
     QWebEngineView *webView = new QWebEngineView(m_tabStack);
     webView->setPage(new BrowserPage(m_profile, webView));
     BrowserTabState state;
-    if (deferred)
+    if (deferred) {
         state.pendingUrl = url;
+        state.suppressNextHistoryVisit = true;
+    }
     m_tabStates.insert(webView, state);
     connectBrowserSignals(webView);
 
@@ -518,6 +569,10 @@ void MainWindow::connectBrowserSignals(QWebEngineView *webView)
         }
         if (webView == currentWebView())
             m_address->setText(url.toString());
+        if (m_historySuggestionTimer)
+            m_historySuggestionTimer->stop();
+        if (m_historyCompletionPopup)
+            m_historyCompletionPopup->hide();
         updateNavigationActions();
         scheduleSessionSave();
     });
@@ -532,6 +587,11 @@ void MainWindow::connectBrowserSignals(QWebEngineView *webView)
         }
         if (webView == currentWebView())
             setWindowTitle(title.isEmpty() ? QStringLiteral("PanBrowser") : title + QStringLiteral(" — PanBrowser"));
+        if (m_preferences.saveBrowsingHistory() && m_historyStore && m_historyStore->isOpen()) {
+            QString error;
+            if (!m_historyStore->updateTitle(webView->url(), title, &error))
+                qWarning().noquote() << "[PanBrowser history]" << error;
+        }
         scheduleSessionSave();
     });
     connect(webView, &QWebEngineView::iconChanged, this, [this, webView](const QIcon &icon) {
@@ -572,17 +632,62 @@ void MainWindow::connectBrowserSignals(QWebEngineView *webView)
             state.externalNavigationDelegated = false;
             state.lastAcceptedRule = state.previousAcceptedRule;
             setTabTrustStatus(webView, state.previousTrustStatus, state.previousTrustError);
+            state.pendingHistoryTransition = HistoryTransition::Other;
+            state.suppressNextHistoryVisit = false;
             updateNavigationActions();
             return;
         }
         if (ok) {
+            if (!state.suppressNextHistoryVisit
+                && m_preferences.saveBrowsingHistory()
+                && m_historyStore
+                && m_historyStore->isOpen()
+                && HistoryStore::sanitizedUrl(webView->url()).isValid()) {
+                QString historyError;
+                if (!m_historyStore->recordVisit(
+                        webView->url(),
+                        webView->title(),
+                        state.pendingHistoryTransition,
+                        QDateTime::currentDateTimeUtc(),
+                        &historyError
+                    )) {
+                    qWarning().noquote() << "[PanBrowser history]" << historyError;
+                }
+            }
             if (state.lastAcceptedRule.isEmpty())
                 setTabTrustStatus(webView, QStringLiteral("Secure · Chromium system trust"));
         } else if (state.lastAcceptedRule.isEmpty()) {
             setTabTrustStatus(webView, QStringLiteral("Page loading failed"), true);
         }
+        state.pendingHistoryTransition = HistoryTransition::Other;
+        state.suppressNextHistoryVisit = false;
         updateNavigationActions();
     });
+    connect(
+        static_cast<BrowserPage *>(webView->page()),
+        &BrowserPage::mainFrameNavigationRequested,
+        this,
+        [this, webView](const QUrl &, int navigationType) {
+            BrowserTabState &state = m_tabStates[webView];
+            const auto type = static_cast<QWebEnginePage::NavigationType>(navigationType);
+            switch (type) {
+            case QWebEnginePage::NavigationTypeLinkClicked:
+                state.pendingHistoryTransition = HistoryTransition::Link;
+                break;
+            case QWebEnginePage::NavigationTypeFormSubmitted:
+                state.pendingHistoryTransition = HistoryTransition::Form;
+                break;
+            case QWebEnginePage::NavigationTypeBackForward:
+                state.pendingHistoryTransition = HistoryTransition::BackForward;
+                break;
+            case QWebEnginePage::NavigationTypeReload:
+                state.pendingHistoryTransition = HistoryTransition::Reload;
+                break;
+            default:
+                break;
+            }
+        }
+    );
     connect(
         static_cast<BrowserPage *>(webView->page()),
         &BrowserPage::externalUrlRequested,
@@ -763,22 +868,54 @@ void MainWindow::updateAddressPlaceholder()
 
 void MainWindow::navigateFromAddressBar()
 {
+    if (m_historySuggestionTimer)
+        m_historySuggestionTimer->stop();
+    if (m_historyCompletionPopup)
+        m_historyCompletionPopup->hide();
     const ResolvedAddressInput result = resolveAddressInput(m_address->text(), m_searchSettings);
     if (result.kind == AddressInputKind::Error) {
         setTrustStatus(result.error, true);
         return;
     }
-    if (QWebEngineView *webView = currentWebView())
+    if (QWebEngineView *webView = currentWebView()) {
+        m_tabStates[webView].pendingHistoryTransition = HistoryTransition::Typed;
+        m_tabStates[webView].suppressNextHistoryVisit = false;
         webView->setUrl(result.url);
+    }
 }
 
-void MainWindow::openSettings(bool trustRules)
+void MainWindow::showHistorySuggestions()
+{
+    if (!m_historyCompletionPopup
+        || !m_preferences.saveBrowsingHistory()
+        || !m_historyStore
+        || !m_historyStore->isOpen()) {
+        return;
+    }
+    const QString input = m_address->text().trimmed();
+    if (input.isEmpty()
+        || input.startsWith(QLatin1Char('?'))
+        || input.startsWith(QLatin1Char('@'))) {
+        m_historyCompletionPopup->hide();
+        return;
+    }
+    QString error;
+    const QList<HistorySuggestion> suggestions = m_historyStore->suggestions(input, 8, &error);
+    if (!error.isEmpty()) {
+        qWarning().noquote() << "[PanBrowser history]" << error;
+        m_historyCompletionPopup->hide();
+        return;
+    }
+    m_historyCompletionPopup->showSuggestions(suggestions);
+}
+
+void MainWindow::openSettings(bool trustRules, bool history)
 {
     if (!m_ownsBrowserResources && m_primaryWindow) {
         m_primaryWindow->show();
         m_primaryWindow->raise();
         m_primaryWindow->activateWindow();
-        m_primaryWindow->openSettings(trustRules);
+        m_primaryWindow->openSettings(trustRules, history);
         return;
     }
 
@@ -788,8 +925,11 @@ void MainWindow::openSettings(bool trustRules)
         m_preferences,
         m_searchSettings,
         m_profile,
+        m_historyStore,
         currentWebView() ? currentWebView()->url() : QUrl(),
-        trustRules ? SettingsDialog::Page::TrustRules : SettingsDialog::Page::General,
+        trustRules ? SettingsDialog::Page::TrustRules
+                   : (history ? SettingsDialog::Page::History
+                              : SettingsDialog::Page::General),
         this
     );
     QString error;
@@ -801,6 +941,8 @@ void MainWindow::openSettings(bool trustRules)
     if (dialog.exec() == QDialog::Accepted) {
         m_preferences = dialog.preferences();
         m_searchSettings = dialog.searchSettings();
+        if (!m_preferences.saveBrowsingHistory() && m_historyCompletionPopup)
+            m_historyCompletionPopup->hide();
         updateAddressPlaceholder();
         m_profile->setPersistSessionCookies(m_preferences.persistSessionCookies());
         if (m_preferences.startupMode() == StartupMode::RestoreTabs)
@@ -812,6 +954,10 @@ void MainWindow::openSettings(bool trustRules)
                 popup->m_preferences = m_preferences;
                 popup->m_searchSettings = m_searchSettings;
                 popup->updateAddressPlaceholder();
+                if (!m_preferences.saveBrowsingHistory()
+                    && popup->m_historyCompletionPopup) {
+                    popup->m_historyCompletionPopup->hide();
+                }
             }
         }
         reloadRules();

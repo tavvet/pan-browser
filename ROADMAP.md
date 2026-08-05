@@ -17,6 +17,7 @@
 - [x] Safe confirmation for external URL schemes and application deep links.
 - [x] User-initiated popup windows with shared profile and trust policy.
 - [x] Address-bar search with configurable built-in and custom search engines.
+- [x] Local browsing history with management controls and ranked address-bar completion.
 
 ## Browser essentials
 

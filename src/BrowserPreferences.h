@@ -25,8 +25,12 @@ public:
     [[nodiscard]] bool persistSessionCookies() const;
     void setPersistSessionCookies(bool persist);
 
+    [[nodiscard]] bool saveBrowsingHistory() const;
+    void setSaveBrowsingHistory(bool save);
+
 private:
     QUrl m_startPage = QUrl(QStringLiteral("https://example.com"));
     StartupMode m_startupMode = StartupMode::StartPage;
     bool m_persistSessionCookies = false;
+    bool m_saveBrowsingHistory = true;
 };

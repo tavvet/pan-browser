@@ -161,6 +161,31 @@ QLineEdit#addressBar:focus {
     border: 1px solid #5b8def;
 }
 
+QFrame#historyCompletionPopup {
+    background: #181b21;
+    border: 1px solid #3a414d;
+    border-radius: 10px;
+}
+
+QListWidget#historyCompletionList {
+    background: transparent;
+    color: #e7eaf0;
+    border: none;
+    outline: none;
+    padding: 0;
+}
+
+QListWidget#historyCompletionList::item {
+    border-radius: 7px;
+    padding: 4px 10px;
+}
+
+QListWidget#historyCompletionList::item:hover,
+QListWidget#historyCompletionList::item:selected {
+    color: #ffffff;
+    background: #315ea8;
+}
+
 QStatusBar {
     min-height: 31px;
     background: #15181e;
@@ -273,6 +298,7 @@ QDialog#settingsDialog QListWidget#settingsSidebar::item:selected {
 
 QDialog#settingsDialog QWidget#generalSettingsPage,
 QDialog#settingsDialog QWidget#searchSettingsPage,
+QDialog#settingsDialog QWidget#historySettingsPage,
 QDialog#settingsDialog QWidget#privacyDataSettingsPage,
 QDialog#settingsDialog QStackedWidget#settingsPages {
     background: #15181e;
@@ -371,6 +397,37 @@ QDialog#settingsDialog QListWidget#searchEnginesList {
     border-radius: 9px;
     outline: none;
     padding: 4px;
+}
+
+QDialog#settingsDialog QListWidget#historyVisits {
+    background: #1b1f26;
+    color: #e3e7ee;
+    border: 1px solid #303641;
+    border-radius: 9px;
+    outline: none;
+    padding: 4px;
+}
+
+QDialog#settingsDialog QListWidget#historyVisits::item {
+    border-radius: 7px;
+    padding: 4px 8px;
+}
+
+QDialog#settingsDialog QListWidget#historyVisits::item:disabled {
+    min-height: 25px;
+    color: #778295;
+    background: transparent;
+    font-size: 11px;
+    font-weight: 700;
+}
+
+QDialog#settingsDialog QListWidget#historyVisits::item:hover:!disabled {
+    background: #262c35;
+}
+
+QDialog#settingsDialog QListWidget#historyVisits::item:selected {
+    color: #ffffff;
+    background: #315ea8;
 }
 
 QDialog#settingsDialog QListWidget#searchEnginesList::item {

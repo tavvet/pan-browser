@@ -1,6 +1,7 @@
 #include "SettingsDialog.h"
 
 #include "BrowserProfile.h"
+#include "HistorySettingsPage.h"
 #include "SearchSettingsPage.h"
 #include "TrustRulesDialog.h"
 
@@ -25,6 +26,7 @@ SettingsDialog::SettingsDialog(
     const BrowserPreferences &preferences,
     const SearchSettings &searchSettings,
     BrowserProfile *profile,
+    HistoryStore *historyStore,
     const QUrl &currentUrl,
     Page initialPage,
     QWidget *parent
@@ -37,6 +39,13 @@ SettingsDialog::SettingsDialog(
     , m_profile(profile)
 {
     createInterface(currentUrl, initialPage);
+    m_historyPage = new HistorySettingsPage(
+        historyStore,
+        m_preferences.saveBrowsingHistory(),
+        m_pages
+    );
+    m_pages->insertWidget(static_cast<int>(Page::History), m_historyPage);
+    m_pages->setCurrentIndex(static_cast<int>(initialPage));
 }
 
 bool SettingsDialog::load(QString *error)
@@ -88,6 +97,12 @@ void SettingsDialog::createInterface(const QUrl &currentUrl, Page initialPage)
         m_sidebar
     );
     searchItem->setData(Qt::UserRole, static_cast<int>(Page::Search));
+    auto *historyItem = new QListWidgetItem(
+        QIcon(QStringLiteral(":/assets/icons/history.svg")),
+        QStringLiteral("History"),
+        m_sidebar
+    );
+    historyItem->setData(Qt::UserRole, static_cast<int>(Page::History));
     auto *privacyDataItem = new QListWidgetItem(
         QIcon(QStringLiteral(":/assets/icons/database.svg")),
         QStringLiteral("Privacy & Data"),
@@ -286,7 +301,7 @@ void SettingsDialog::createInterface(const QUrl &currentUrl, Page initialPage)
     allDataTitle->setObjectName(QStringLiteral("settingsCardTitle"));
     allDataTextLayout->addWidget(allDataTitle);
     auto *allDataDescription = new QLabel(
-        QStringLiteral("Remove cookies, local storage, IndexedDB, service workers, and cache on the next launch. Settings, trust rules, certificates, and saved tabs are kept."),
+        QStringLiteral("Remove cookies, local storage, IndexedDB, service workers, and cache on the next launch. Settings, history, trust rules, certificates, and saved tabs are kept."),
         allDataCard
     );
     allDataDescription->setObjectName(QStringLiteral("fieldHint"));
@@ -380,7 +395,7 @@ void SettingsDialog::createInterface(const QUrl &currentUrl, Page initialPage)
         if (QMessageBox::question(
                 this,
                 QStringLiteral("Reset all site data"),
-                QStringLiteral("Schedule deletion of all cookies and site storage the next time PanBrowser starts? Trust rules, certificates, settings, and saved tabs will be kept."),
+                QStringLiteral("Schedule deletion of all cookies and site storage the next time PanBrowser starts? History, trust rules, certificates, settings, and saved tabs will be kept."),
                 QMessageBox::Yes | QMessageBox::Cancel,
                 QMessageBox::Cancel
             ) != QMessageBox::Yes) {
@@ -429,6 +444,7 @@ BrowserPreferences SettingsDialog::preferencesFromControls() const
         static_cast<StartupMode>(m_startupMode->currentData().toInt())
     );
     preferences.setPersistSessionCookies(m_persistSessionCookies->isChecked());
+    preferences.setSaveBrowsingHistory(m_historyPage->saveHistoryEnabled());
     return preferences;
 }
 
