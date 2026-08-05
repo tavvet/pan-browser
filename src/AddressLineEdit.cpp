@@ -4,6 +4,8 @@
 #include <QPaintEvent>
 #include <QPalette>
 
+#include <limits>
+
 AddressLineEdit::AddressLineEdit(QWidget *parent)
     : QLineEdit(parent)
 {
@@ -53,7 +55,8 @@ bool AddressLineEdit::acceptGhostCompletion()
     const QString completion = m_ghostText;
     clearGhostCompletion();
     setText(completion);
-    setCursorPosition(completion.size());
+    const qsizetype maximumCursorPosition = std::numeric_limits<int>::max();
+    setCursorPosition(static_cast<int>(qMin(completion.size(), maximumCursorPosition)));
     return true;
 }
 

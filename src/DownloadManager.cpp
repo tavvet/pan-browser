@@ -87,7 +87,7 @@ const QList<DownloadRecord> &DownloadManager::records() const
 
 DownloadRecord DownloadManager::record(const QString &id) const
 {
-    const int index = indexOf(id);
+    const qsizetype index = indexOf(id);
     return index >= 0 ? m_records.at(index) : DownloadRecord();
 }
 
@@ -146,7 +146,7 @@ void DownloadManager::removeFromHistory(const QString &id)
 {
     if (m_requests.contains(id))
         return;
-    const int index = indexOf(id);
+    const qsizetype index = indexOf(id);
     if (index < 0)
         return;
     m_records.removeAt(index);
@@ -223,7 +223,7 @@ void DownloadManager::handleDownload(QWebEngineDownloadRequest *download)
         updateFromRequest(id, download);
     });
     connect(download, &QObject::destroyed, this, [this, id = record.id] {
-        const int index = indexOf(id);
+        const qsizetype index = indexOf(id);
         if (index >= 0 && isActive(m_records.at(index).status)) {
             DownloadRecord &item = m_records[index];
             item.status = DownloadStatus::Interrupted;
@@ -247,7 +247,7 @@ void DownloadManager::updateFromRequest(
     QWebEngineDownloadRequest *download
 )
 {
-    const int index = indexOf(id);
+    const qsizetype index = indexOf(id);
     if (index < 0 || !download)
         return;
 
@@ -289,7 +289,7 @@ void DownloadManager::updateFromRequest(
         saveNow();
 }
 
-int DownloadManager::indexOf(const QString &id) const
+qsizetype DownloadManager::indexOf(const QString &id) const
 {
     for (qsizetype index = 0; index < m_records.size(); ++index) {
         if (m_records.at(index).id == id)

@@ -591,8 +591,11 @@ void TrustRulesDialog::removeRule()
         return;
     }
 
-    const int nextRow = qMin(m_currentRule, m_settings.rules().size() - 2);
     m_settings.rules().removeAt(m_currentRule);
+    const int nextRow = qMin(
+        m_currentRule,
+        static_cast<int>(m_settings.rules().size()) - 1
+    );
     rebuildRuleList();
     if (!m_settings.rules().isEmpty())
         m_ruleList->setCurrentRow(qMax(0, nextRow));

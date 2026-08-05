@@ -45,7 +45,7 @@ signals:
 private:
     void handleDownload(QWebEngineDownloadRequest *download);
     void updateFromRequest(const QString &id, QWebEngineDownloadRequest *download);
-    int indexOf(const QString &id) const;
+    qsizetype indexOf(const QString &id) const;
     void scheduleSave();
     void saveNow();
     QString downloadsDirectory() const;

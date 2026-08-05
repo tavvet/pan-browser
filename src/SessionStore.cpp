@@ -91,7 +91,7 @@ bool SessionStore::save(const BrowserSession &session, QString *error) const
         if (!isRestorableUrl(tab.url))
             continue;
         if (index <= session.activeIndex)
-            persistedActiveIndex = tabs.size();
+            persistedActiveIndex = static_cast<int>(tabs.size());
         QJsonObject object;
         object.insert(QStringLiteral("url"), tab.url.toString());
         object.insert(QStringLiteral("title"), tab.title);
