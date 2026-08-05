@@ -27,6 +27,7 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QGuiApplication>
+#include <QHBoxLayout>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -232,7 +233,13 @@ void MainWindow::createInterface()
     tabsToolbar->setFloatable(false);
     tabsToolbar->setIconSize(QSize(17, 17));
 
-    m_tabBar = new QTabBar(tabsToolbar);
+    QWidget *tabsContainer = new QWidget(tabsToolbar);
+    tabsContainer->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
+    QHBoxLayout *tabsLayout = new QHBoxLayout(tabsContainer);
+    tabsLayout->setContentsMargins(0, 0, 0, 0);
+    tabsLayout->setSpacing(4);
+
+    m_tabBar = new QTabBar(tabsContainer);
     m_tabBar->setObjectName(QStringLiteral("browserTabBar"));
     m_tabBar->setDocumentMode(true);
     m_tabBar->setTabsClosable(true);
@@ -241,14 +248,16 @@ void MainWindow::createInterface()
     m_tabBar->setElideMode(Qt::ElideRight);
     m_tabBar->setUsesScrollButtons(true);
     m_tabBar->setSelectionBehaviorOnRemove(QTabBar::SelectPreviousTab);
-    m_tabBar->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
-    tabsToolbar->addWidget(m_tabBar);
+    m_tabBar->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Preferred);
+    tabsLayout->addWidget(m_tabBar, 0, Qt::AlignBottom);
 
-    QToolButton *newTabButton = new QToolButton(tabsToolbar);
+    QToolButton *newTabButton = new QToolButton(tabsContainer);
     newTabButton->setObjectName(QStringLiteral("newTabButton"));
     newTabButton->setIcon(QIcon(QStringLiteral(":/assets/icons/plus.svg")));
     newTabButton->setToolTip(QStringLiteral("New Tab (⌘T)"));
-    tabsToolbar->addWidget(newTabButton);
+    tabsLayout->addWidget(newTabButton, 0, Qt::AlignBottom);
+    tabsLayout->addStretch(1);
+    tabsToolbar->addWidget(tabsContainer);
 
     addToolBar(Qt::TopToolBarArea, tabsToolbar);
     addToolBarBreak(Qt::TopToolBarArea);
