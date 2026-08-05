@@ -1,20 +1,54 @@
 #include "HistoryCompletionPopup.h"
 
+#include "AddressLineEdit.h"
+
 #include <QApplication>
 #include <QDate>
 #include <QGuiApplication>
 #include <QHideEvent>
 #include <QKeyEvent>
-#include <QLineEdit>
 #include <QListWidget>
 #include <QLocale>
+#include <QRegularExpression>
 #include <QScreen>
 #include <QStyle>
 #include <QVBoxLayout>
 
 #include <algorithm>
 
-HistoryCompletionPopup::HistoryCompletionPopup(QLineEdit *addressBar, QWidget *parent)
+namespace {
+
+QString inlineCompletionText(const QString &sourceInput, const QUrl &url)
+{
+    const QString input = sourceInput.trimmed();
+    if (input.isEmpty() || input.contains(QRegularExpression(QStringLiteral("\\s"))))
+        return {};
+
+    const QString full = url.toDisplayString(QUrl::RemovePassword | QUrl::RemoveFragment);
+    QString withoutScheme = full;
+    const qsizetype schemeEnd = withoutScheme.indexOf(QStringLiteral("://"));
+    if (schemeEnd >= 0)
+        withoutScheme.remove(0, schemeEnd + 3);
+    QString withoutWww = withoutScheme;
+    if (withoutWww.startsWith(QStringLiteral("www."), Qt::CaseInsensitive))
+        withoutWww.remove(0, 4);
+
+    const QStringList variants = {full, withoutScheme, withoutWww};
+    for (const QString &variant : variants) {
+        if (variant.size() > input.size()
+            && variant.startsWith(input, Qt::CaseInsensitive)) {
+            return input + variant.sliced(input.size());
+        }
+    }
+    return {};
+}
+
+} // namespace
+
+HistoryCompletionPopup::HistoryCompletionPopup(
+    AddressLineEdit *addressBar,
+    QWidget *parent
+)
     : QFrame(
         parent,
         Qt::Tool
@@ -78,6 +112,14 @@ void HistoryCompletionPopup::showSuggestions(
         item->setSizeHint(QSize(0, 52));
         item->setToolTip(address);
     }
+    m_addressBar->clearGhostCompletion();
+    for (const HistorySuggestion &suggestion : suggestions) {
+        const QString completion = inlineCompletionText(m_addressBar->text(), suggestion.url);
+        if (completion.isEmpty())
+            continue;
+        m_addressBar->setGhostCompletion(completion, suggestion.url);
+        break;
+    }
     m_list->setCurrentRow(-1);
     positionBelowAddressBar();
     show();
@@ -126,6 +168,7 @@ bool HistoryCompletionPopup::eventFilter(QObject *watched, QEvent *event)
     auto *keyEvent = static_cast<QKeyEvent *>(event);
     switch (keyEvent->key()) {
     case Qt::Key_Down: {
+        m_addressBar->clearGhostCompletion();
         const int next = m_list->currentRow() < m_list->count() - 1
             ? m_list->currentRow() + 1
             : 0;
@@ -134,6 +177,7 @@ bool HistoryCompletionPopup::eventFilter(QObject *watched, QEvent *event)
         return true;
     }
     case Qt::Key_Up: {
+        m_addressBar->clearGhostCompletion();
         const int next = m_list->currentRow() > 0
             ? m_list->currentRow() - 1
             : m_list->count() - 1;
@@ -147,7 +191,23 @@ bool HistoryCompletionPopup::eventFilter(QObject *watched, QEvent *event)
             activateCurrent();
             return true;
         }
+        if (m_addressBar->hasGhostCompletion()) {
+            const QUrl url = m_addressBar->ghostCompletionUrl();
+            hide();
+            emit urlActivated(url);
+            return true;
+        }
         hide();
+        break;
+    case Qt::Key_Tab:
+    case Qt::Key_Right:
+        if (m_addressBar->hasGhostCompletion()
+            && m_addressBar->cursorPosition() == m_addressBar->text().size()
+            && !m_addressBar->hasSelectedText()) {
+            m_addressBar->acceptGhostCompletion();
+            hide();
+            return true;
+        }
         break;
     case Qt::Key_Escape:
         hide();
@@ -161,6 +221,7 @@ bool HistoryCompletionPopup::eventFilter(QObject *watched, QEvent *event)
 
 void HistoryCompletionPopup::hideEvent(QHideEvent *event)
 {
+    m_addressBar->clearGhostCompletion();
     updatePlacementStyle(QString());
     QFrame::hideEvent(event);
 }

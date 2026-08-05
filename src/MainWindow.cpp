@@ -1,5 +1,6 @@
 #include "MainWindow.h"
 
+#include "AddressLineEdit.h"
 #include "BrowserPage.h"
 #include "BrowserProfile.h"
 #include "CertificateTrustValidator.h"
@@ -234,7 +235,7 @@ void MainWindow::createInterface()
     m_forwardAction->setEnabled(false);
     m_reloadAction->setEnabled(false);
 
-    m_address = new QLineEdit(toolbar);
+    m_address = new AddressLineEdit(toolbar);
     m_address->setObjectName(QStringLiteral("addressBar"));
     updateAddressPlaceholder();
     m_address->setClearButtonEnabled(true);
@@ -328,6 +329,7 @@ void MainWindow::createInterface()
     connect(go, &QAction::triggered, this, &MainWindow::navigateFromAddressBar);
     connect(m_address, &QLineEdit::returnPressed, this, &MainWindow::navigateFromAddressBar);
     connect(m_address, &QLineEdit::textEdited, this, [this] {
+        m_address->clearGhostCompletion();
         if (!m_preferences.saveBrowsingHistory()
             || !m_historyStore
             || !m_historyStore->isOpen()) {

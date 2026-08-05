@@ -13,7 +13,7 @@
 #include <QString>
 
 class QLabel;
-class QLineEdit;
+class AddressLineEdit;
 class QMessageBox;
 class QProgressBar;
 class QStackedWidget;
@@ -120,7 +120,7 @@ private:
     QPointer<QWebEngineView> m_externalUrlSource;
     QTabBar *m_tabBar = nullptr;
     QStackedWidget *m_tabStack = nullptr;
-    QLineEdit *m_address = nullptr;
+    AddressLineEdit *m_address = nullptr;
     QAction *m_backAction = nullptr;
     QAction *m_forwardAction = nullptr;
     QAction *m_reloadAction = nullptr;

@@ -1,3 +1,4 @@
+#include "AddressLineEdit.h"
 #include "BrowserPreferences.h"
 #include "BrowserDataCleanup.h"
 #include "DownloadHistoryStore.h"
@@ -50,6 +51,7 @@ private slots:
     void historySuggestionsPreferRelevanceThenRecency();
     void historyCanDeleteIndividualVisitsAndClearAll();
     void corruptHistoryIsPreservedAndDisabled();
+    void ghostCompletionAcceptsOnlyAddressPrefixes();
 };
 
 void TrustConfigurationTests::exactDomainIsCaseInsensitive()
@@ -663,6 +665,24 @@ void TrustConfigurationTests::corruptHistoryIsPreservedAndDisabled()
     QVERIFY(!store.isOpen());
     QVERIFY(QFile::exists(path));
     QCOMPARE(QFileInfo(path).size(), 21);
+}
+
+void TrustConfigurationTests::ghostCompletionAcceptsOnlyAddressPrefixes()
+{
+    AddressLineEdit address;
+    const QUrl url(QStringLiteral("https://sports.example/news"));
+    address.setText(QStringLiteral("spo"));
+    address.setGhostCompletion(QStringLiteral("sports.example/news"), url);
+    QVERIFY(address.hasGhostCompletion());
+    QCOMPARE(address.ghostCompletionUrl(), url);
+    QVERIFY(address.acceptGhostCompletion());
+    QCOMPARE(address.text(), QStringLiteral("sports.example/news"));
+
+    address.setText(QStringLiteral("news"));
+    address.setGhostCompletion(QStringLiteral("sports.example/news"), url);
+    QVERIFY(!address.hasGhostCompletion());
+    QVERIFY(!address.acceptGhostCompletion());
+    QCOMPARE(address.text(), QStringLiteral("news"));
 }
 
 QTEST_MAIN(TrustConfigurationTests)

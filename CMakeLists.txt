@@ -35,6 +35,8 @@ find_package(Qt6WebEngineCore 6.11 REQUIRED)
 find_package(Qt6WebEngineWidgets 6.11 REQUIRED)
 
 set(PANBROWSER_APP_SOURCES
+    src/AddressLineEdit.cpp
+    src/AddressLineEdit.h
     src/BrowserDataCleanup.cpp
     src/BrowserDataCleanup.h
     src/BrowserProfile.cpp
@@ -130,6 +132,8 @@ endif()
 enable_testing()
 qt_add_executable(PanBrowserTests
     tests/TrustConfigurationTests.cpp
+    src/AddressLineEdit.cpp
+    src/AddressLineEdit.h
     src/BrowserDataCleanup.cpp
     src/BrowserDataCleanup.h
     src/BrowserPreferences.cpp
@@ -159,5 +163,6 @@ target_link_libraries(PanBrowserTests PRIVATE
     Qt6::Network
     Qt6::Sql
     Qt6::Test
+    Qt6::Widgets
 )
 add_test(NAME PanBrowserTests COMMAND PanBrowserTests)

@@ -86,7 +86,10 @@ Address-bar completion uses only this local history and never contacts a
 suggestion service. Match quality is ranked first; equally relevant results are
 ordered by the most recent visit, followed by a small preference for manually
 entered and frequently visited addresses. Use <kbd>↑</kbd>/<kbd>↓</kbd>, Enter,
-Escape, or the mouse to choose a result.
+Escape, or the mouse to choose a result. When the best matching address begins
+with the text already entered, its remaining suffix is shown as a muted inline
+completion. Enter opens it; <kbd>Tab</kbd> or <kbd>→</kbd> accepts the suffix
+without navigating immediately.
 
 Open **PanBrowser → History…** or the **History** settings section to filter
 visits, view their local dates, remove selected entries, clear all history, or

@@ -4,7 +4,7 @@
 
 #include <QFrame>
 
-class QLineEdit;
+class AddressLineEdit;
 class QListWidget;
 class QHideEvent;
 
@@ -12,7 +12,7 @@ class HistoryCompletionPopup final : public QFrame {
     Q_OBJECT
 
 public:
-    explicit HistoryCompletionPopup(QLineEdit *addressBar, QWidget *parent = nullptr);
+    explicit HistoryCompletionPopup(AddressLineEdit *addressBar, QWidget *parent = nullptr);
     ~HistoryCompletionPopup() override;
 
     void showSuggestions(const QList<HistorySuggestion> &suggestions);
@@ -29,6 +29,6 @@ private:
     void positionBelowAddressBar();
     void updatePlacementStyle(const QString &placement);
 
-    QLineEdit *m_addressBar = nullptr;
+    AddressLineEdit *m_addressBar = nullptr;
     QListWidget *m_list = nullptr;
 };
