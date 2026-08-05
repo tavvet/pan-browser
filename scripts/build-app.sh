@@ -34,14 +34,15 @@ if [[ ! -e "$helper_contents/Frameworks" ]]; then
     ln -s ../../../../../.. "$helper_contents/Frameworks"
 fi
 
-/usr/bin/codesign --force --deep --sign - "$build_dir/PanBrowser.app"
-# A second pass seals dylibs that macdeployqt may have touched while signing
-# their containing frameworks.
-/usr/bin/codesign --force --deep --sign - "$build_dir/PanBrowser.app"
-/usr/bin/codesign --verify --deep --strict "$build_dir/PanBrowser.app"
-
 mkdir -p "$project_dir/dist"
 cmake -E remove_directory "$destination"
 /usr/bin/ditto "$build_dir/PanBrowser.app" "$destination"
+
+# Sign the final copied bundle so ditto cannot invalidate a sealed helper link.
+/usr/bin/codesign --force --deep --sign - "$destination"
+# A second pass seals dylibs signed during the first deep traversal inside
+# their containing Qt frameworks.
+/usr/bin/codesign --force --deep --sign - "$destination"
+/usr/bin/codesign --verify --deep --strict "$destination"
 
 echo "$destination"

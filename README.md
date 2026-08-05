@@ -6,13 +6,13 @@ certificate solely because its CA is unknown, PanBrowser can verify that chain
 against CA certificates selected by a matching domain rule. It never installs
 those certificates in the macOS Keychain.
 
-The current implementation uses Qt 6.10 or newer and Security.framework on
+The current implementation uses Qt 6.11 or newer and Security.framework on
 macOS. The certificate validator has an explicit platform boundary so Windows
 and Linux implementations can be added next.
 
 ## Run
 
-Requirements: macOS, Xcode command-line tools, Homebrew, and Qt 6.10 or newer.
+Requirements: macOS, Xcode command-line tools, Homebrew, and Qt 6.11 or newer.
 
 ```sh
 brew install qtwebengine cmake ninja
@@ -31,13 +31,21 @@ ctest --test-dir build --output-on-failure
 The deploy script creates a self-contained, ad-hoc signed application at
 `dist/PanBrowser.app`. Qt WebEngine makes the bundle approximately 300 MB.
 
+See [ROADMAP.md](ROADMAP.md) for completed work and planned browser features.
+
 On first launch PanBrowser creates:
 
 ```text
 ~/Library/Application Support/PanBrowser/
+├── WebEngine/
 ├── rules.json
 └── Certificates/
 ```
+
+Web content uses a dedicated disk-backed profile. Persistent cookies and site
+storage are kept under `WebEngine/Profile`; session cookies are discarded when
+the application exits. The HTTP cache is isolated at
+`~/Library/Caches/PanBrowser/WebEngine/`.
 
 Open **PanBrowser → Trust Rules…** or press <kbd>⌘,</kbd> to manage rules. The
 editor imports certificates into the application data directory, validates the

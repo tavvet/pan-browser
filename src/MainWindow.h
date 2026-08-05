@@ -8,6 +8,7 @@ class QLabel;
 class QLineEdit;
 class QProgressBar;
 class QAction;
+class BrowserProfile;
 class QCloseEvent;
 class QWebEngineCertificateError;
 class QWebEngineView;
@@ -17,6 +18,7 @@ class MainWindow final : public QMainWindow {
 
 public:
     explicit MainWindow(QWidget *parent = nullptr);
+    ~MainWindow() override;
 
 protected:
     void closeEvent(QCloseEvent *event) override;
@@ -33,6 +35,7 @@ private:
     QString ensureConfiguration();
 
     QWebEngineView *m_webView = nullptr;
+    BrowserProfile *m_profile = nullptr;
     QLineEdit *m_address = nullptr;
     QAction *m_securityIndicator = nullptr;
     QLabel *m_trustStatus = nullptr;

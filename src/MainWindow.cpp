@@ -1,5 +1,6 @@
 #include "MainWindow.h"
 
+#include "BrowserProfile.h"
 #include "CertificateTrustValidator.h"
 #include "TrustRulesDialog.h"
 #include "WindowPlacement.h"
@@ -35,6 +36,7 @@
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
 {
+    m_profile = new BrowserProfile();
     createInterface();
     restoreWindowPlacement();
     connectBrowserSignals();
@@ -47,9 +49,17 @@ MainWindow::MainWindow(QWidget *parent)
     m_webView->setUrl(initialUrl);
 }
 
+MainWindow::~MainWindow()
+{
+    delete m_webView;
+    m_webView = nullptr;
+    delete m_profile;
+    m_profile = nullptr;
+}
+
 void MainWindow::closeEvent(QCloseEvent *event)
 {
-    QSettings settings;
+    QSettings settings(QStringLiteral("PanBrowser"), QStringLiteral("PanBrowser"));
     settings.beginGroup(QStringLiteral("MainWindow"));
     settings.setValue(QStringLiteral("geometry"), saveGeometry());
     settings.setValue(QStringLiteral("state"), saveState(1));
@@ -69,6 +79,7 @@ void MainWindow::createInterface()
     setWindowIcon(QIcon(QStringLiteral(":/assets/app-icon.svg")));
 
     m_webView = new QWebEngineView(this);
+    m_webView->setPage(new QWebEnginePage(m_profile, m_webView));
     setCentralWidget(m_webView);
 
     QToolBar *toolbar = addToolBar(QStringLiteral("Navigation"));
@@ -315,7 +326,7 @@ void MainWindow::setTrustStatus(const QString &text, bool error)
 
 void MainWindow::restoreWindowPlacement()
 {
-    QSettings settings;
+    QSettings settings(QStringLiteral("PanBrowser"), QStringLiteral("PanBrowser"));
     settings.beginGroup(QStringLiteral("MainWindow"));
     const QByteArray geometryData = settings.value(QStringLiteral("geometry")).toByteArray();
     const QByteArray stateData = settings.value(QStringLiteral("state")).toByteArray();

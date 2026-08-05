@@ -23,17 +23,19 @@ if(APPLE AND EXISTS "/opt/homebrew/opt/qtbase")
     )
 endif()
 
-find_package(Qt6 6.10 REQUIRED COMPONENTS
+find_package(Qt6 6.11 REQUIRED COMPONENTS
     Core
     Network
     Svg
     Test
     Widgets
 )
-find_package(Qt6WebEngineCore 6.10 REQUIRED)
-find_package(Qt6WebEngineWidgets 6.10 REQUIRED)
+find_package(Qt6WebEngineCore 6.11 REQUIRED)
+find_package(Qt6WebEngineWidgets 6.11 REQUIRED)
 
 set(PANBROWSER_APP_SOURCES
+    src/BrowserProfile.cpp
+    src/BrowserProfile.h
     src/main.cpp
     src/MainWindow.cpp
     src/MainWindow.h
