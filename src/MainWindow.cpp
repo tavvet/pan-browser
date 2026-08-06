@@ -17,6 +17,7 @@
 #include "PermissionPrompt.h"
 #include "SettingsDialog.h"
 #include "WindowPlacement.h"
+#include "WebAppStore.h"
 
 #include <QAction>
 #include <QApplication>
@@ -31,12 +32,15 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QBuffer>
 #include <QLabel>
 #include <QLineEdit>
 #include <QMenuBar>
+#include <QMenu>
 #include <QMessageBox>
 #include <QIcon>
 #include <QProgressBar>
+#include <QPixmap>
 #include <QPushButton>
 #include <QSaveFile>
 #include <QScreen>
@@ -50,11 +54,13 @@
 #include <QTimer>
 #include <QToolBar>
 #include <QToolButton>
+#include <QUuid>
 #include <QWebEngineCertificateError>
 #include <QWebEngineFindTextResult>
 #include <QWebEngineHistory>
 #include <QWebEngineNewWindowRequest>
 #include <QWebEnginePage>
+#include <QWebEngineScript>
 #include <QWebEngineView>
 
 #include <utility>
@@ -84,7 +90,17 @@ bool isSameWebOrigin(const QUrl &left, const QUrl &right)
 } // namespace
 
 MainWindow::MainWindow(QWidget *parent)
-    : MainWindow(nullptr, nullptr, nullptr, nullptr, nullptr, WindowRole::Primary, parent)
+    : MainWindow(
+        nullptr,
+        nullptr,
+        nullptr,
+        nullptr,
+        nullptr,
+        nullptr,
+        WindowRole::Primary,
+        WebApp(),
+        parent
+    )
 {
 }
 
@@ -93,8 +109,10 @@ MainWindow::MainWindow(
     DownloadManager *sharedDownloadManager,
     HistoryStore *sharedHistoryStore,
     BookmarkStore *sharedBookmarkStore,
+    WebAppStore *sharedWebAppStore,
     MainWindow *primaryWindow,
     WindowRole role,
+    const WebApp &webApp,
     QWidget *parent
 )
     : QMainWindow(parent, role == WindowRole::Primary ? Qt::WindowFlags() : Qt::Window)
@@ -103,6 +121,8 @@ MainWindow::MainWindow(
     ).filePath(QStringLiteral("session.json")))
 {
     m_primaryWindow = primaryWindow ? primaryWindow : this;
+    m_windowRole = role;
+    m_webApp = webApp;
     m_ownsBrowserResources = role == WindowRole::Primary;
 
     if (m_ownsBrowserResources) {
@@ -136,16 +156,26 @@ MainWindow::MainWindow(
         );
         if (!m_bookmarkStore->open(&m_bookmarkError))
             qWarning().noquote() << "[PanBrowser bookmarks]" << m_bookmarkError;
+        m_webAppStore = new WebAppStore(
+            QDir(QStandardPaths::writableLocation(QStandardPaths::AppDataLocation))
+                .filePath(QStringLiteral("web-apps.json")),
+            this
+        );
+        QString webAppsError;
+        if (!m_webAppStore->load(&webAppsError))
+            qWarning().noquote() << "[PanBrowser web apps]" << webAppsError;
     } else {
         Q_ASSERT(sharedProfile);
         Q_ASSERT(sharedDownloadManager);
         Q_ASSERT(sharedHistoryStore);
         Q_ASSERT(sharedBookmarkStore);
+        Q_ASSERT(sharedWebAppStore);
         Q_ASSERT(primaryWindow);
         m_profile = sharedProfile;
         m_downloadManager = sharedDownloadManager;
         m_historyStore = sharedHistoryStore;
         m_bookmarkStore = sharedBookmarkStore;
+        m_webAppStore = sharedWebAppStore;
         m_configurationPath = primaryWindow->m_configurationPath;
         m_searchConfigurationPath = primaryWindow->m_searchConfigurationPath;
         m_trustPolicy = primaryWindow->m_trustPolicy;
@@ -164,7 +194,7 @@ MainWindow::MainWindow(
         restoreInitialTabs();
     } else {
         reloadRulesLocal();
-        createTab(QUrl());
+        createTab(role == WindowRole::WebApp ? m_webApp.startUrl : QUrl());
     }
 }
 
@@ -190,6 +220,7 @@ MainWindow::~MainWindow()
     m_downloadManager = nullptr;
     m_historyStore = nullptr;
     m_bookmarkStore = nullptr;
+    m_webAppStore = nullptr;
     m_profile = nullptr;
 }
 
@@ -220,8 +251,16 @@ void MainWindow::createInterface()
         qApp->setStyleSheet(QString::fromUtf8(themeFile.readAll()));
 
     resize(1180, 760);
-    setWindowTitle(QStringLiteral("PanBrowser"));
-    setWindowIcon(QIcon(QStringLiteral(":/assets/app-icon.svg")));
+    setWindowTitle(
+        m_windowRole == WindowRole::WebApp ? m_webApp.name : QStringLiteral("PanBrowser")
+    );
+    QIcon windowIcon(QStringLiteral(":/assets/app-icon.svg"));
+    if (m_windowRole == WindowRole::WebApp && !m_webApp.iconPng.isEmpty()) {
+        QPixmap pixmap;
+        if (pixmap.loadFromData(m_webApp.iconPng, "PNG"))
+            windowIcon = QIcon(pixmap);
+    }
+    setWindowIcon(windowIcon);
 
     m_tabStack = new QStackedWidget(this);
     m_tabStack->setObjectName(QStringLiteral("browserTabs"));
@@ -303,7 +342,7 @@ void MainWindow::createInterface()
     m_addressSuggestionTimer = new QTimer(this);
     m_addressSuggestionTimer->setSingleShot(true);
     m_addressSuggestionTimer->setInterval(100);
-    toolbar->addWidget(m_address);
+    QAction *addressWidgetAction = toolbar->addWidget(m_address);
     QAction *go = toolbar->addAction(
         QIcon(QStringLiteral(":/assets/icons/arrow-right.svg")),
         tr("Go")
@@ -362,7 +401,7 @@ void MainWindow::createInterface()
         &DownloadButton::setActiveCount
     );
     connect(m_downloadManager, &DownloadManager::recordAdded, this, [this] {
-        if (isActiveWindow())
+        if (isActiveWindow() && m_windowRole != WindowRole::WebApp)
             m_downloadsPanel->showBelow(m_downloadButton);
     });
 
@@ -463,6 +502,23 @@ void MainWindow::createInterface()
     bookmarksAction->setShortcut(QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_B));
     connect(bookmarksAction, &QAction::triggered, this, &MainWindow::openBookmarks);
 
+    m_installWebAppAction = fileMenu->addAction(
+        QIcon(QStringLiteral(":/assets/icons/layout-grid.svg")),
+        tr("Install Web App…")
+    );
+    m_installWebAppAction->setEnabled(false);
+    connect(
+        m_installWebAppAction,
+        &QAction::triggered,
+        this,
+        &MainWindow::installCurrentWebApp
+    );
+    m_webAppsMenu = fileMenu->addMenu(
+        QIcon(QStringLiteral(":/assets/icons/layout-grid.svg")),
+        tr("Web Apps")
+    );
+    connect(m_webAppsMenu, &QMenu::aboutToShow, this, &MainWindow::rebuildWebAppsMenu);
+
     fileMenu->addSeparator();
     QAction *findAction = fileMenu->addAction(
         QIcon(QStringLiteral(":/assets/icons/search.svg")),
@@ -535,6 +591,30 @@ void MainWindow::createInterface()
     m_sessionSaveTimer->setInterval(750);
     connect(m_sessionSaveTimer, &QTimer::timeout, this, &MainWindow::saveSession);
 
+    if (m_webAppStore) {
+        connect(m_webAppStore, &WebAppStore::appsChanged, this, [this] {
+            updateInstallWebAppAction();
+            if (m_windowRole == WindowRole::WebApp && !m_webAppStore->app(m_webApp.id))
+                close();
+        });
+    }
+
+    if (m_windowRole == WindowRole::WebApp) {
+        tabsToolbar->hide();
+        addressWidgetAction->setVisible(false);
+        go->setVisible(false);
+        newTabAction->setVisible(false);
+        closeTabAction->setText(tr("Close Window"));
+        addBookmarkAction->setVisible(false);
+        bookmarksAction->setVisible(false);
+        m_installWebAppAction->setVisible(false);
+        m_webAppsMenu->menuAction()->setVisible(false);
+        settingsAction->setVisible(false);
+        reloadRulesAction->setVisible(false);
+        showConfiguration->setVisible(false);
+        m_ruleCount->hide();
+    }
+
 }
 
 MainWindow *MainWindow::createPopupWindow(
@@ -548,8 +628,10 @@ MainWindow *MainWindow::createPopupWindow(
         m_downloadManager,
         m_historyStore,
         m_bookmarkStore,
+        m_webAppStore,
         primary,
         role,
+        WebApp(),
         primary
     );
     primary->m_popupWindows.append(popup);
@@ -558,6 +640,42 @@ MainWindow *MainWindow::createPopupWindow(
     });
     popup->applyPopupGeometry(requestedGeometry);
     return popup;
+}
+
+MainWindow *MainWindow::createWebAppWindow(const WebApp &app)
+{
+    MainWindow *primary = m_primaryWindow ? m_primaryWindow : this;
+    for (MainWindow *window : std::as_const(primary->m_popupWindows)) {
+        if (window
+            && window->m_windowRole == WindowRole::WebApp
+            && window->m_webApp.id == app.id) {
+            window->show();
+            window->raise();
+            window->activateWindow();
+            return window;
+        }
+    }
+
+    auto *window = new MainWindow(
+        m_profile,
+        m_downloadManager,
+        m_historyStore,
+        m_bookmarkStore,
+        m_webAppStore,
+        primary,
+        WindowRole::WebApp,
+        app,
+        primary
+    );
+    primary->m_popupWindows.append(window);
+    connect(window, &QObject::destroyed, primary, [primary, window] {
+        primary->m_popupWindows.removeAll(window);
+    });
+    window->applyPopupGeometry(QRect());
+    window->show();
+    window->raise();
+    window->activateWindow();
+    return window;
 }
 
 void MainWindow::applyPopupGeometry(const QRect &requestedGeometry)
@@ -584,7 +702,10 @@ QWebEngineView *MainWindow::createTab(
 )
 {
     QWebEngineView *webView = new QWebEngineView(m_tabStack);
-    webView->setPage(new BrowserPage(m_profile, webView));
+    auto *page = new BrowserPage(m_profile, webView);
+    if (m_windowRole == WindowRole::WebApp)
+        page->setWebApp(m_webApp);
+    webView->setPage(page);
     BrowserTabState state;
     if (deferred) {
         state.pendingUrl = url;
@@ -688,6 +809,8 @@ void MainWindow::connectBrowserSignals(QWebEngineView *webView)
         if (m_addressCompletionPopup)
             m_addressCompletionPopup->hide();
         updateNavigationActions();
+        if (webView == currentWebView())
+            updateInstallWebAppAction();
         scheduleSessionSave();
     });
     connect(webView, &QWebEngineView::titleChanged, this, [this, webView](const QString &title) {
@@ -699,8 +822,12 @@ void MainWindow::connectBrowserSignals(QWebEngineView *webView)
             m_tabBar->setTabText(index, label);
             m_tabBar->setTabToolTip(index, title.isEmpty() ? webView->url().toString() : title);
         }
-        if (webView == currentWebView())
-            setWindowTitle(title.isEmpty() ? QStringLiteral("PanBrowser") : title + QStringLiteral(" — PanBrowser"));
+        if (webView == currentWebView()) {
+            if (m_windowRole == WindowRole::WebApp)
+                setWindowTitle(m_webApp.name);
+            else
+                setWindowTitle(title.isEmpty() ? QStringLiteral("PanBrowser") : title + QStringLiteral(" — PanBrowser"));
+        }
         if (m_preferences.saveBrowsingHistory() && m_historyStore && m_historyStore->isOpen()) {
             QString error;
             if (!m_historyStore->updateTitle(webView->url(), title, &error))
@@ -722,6 +849,8 @@ void MainWindow::connectBrowserSignals(QWebEngineView *webView)
         state.previousAcceptedRule = state.lastAcceptedRule;
         state.externalNavigationDelegated = false;
         state.lastAcceptedRule.clear();
+        state.manifestUrl = QUrl();
+        state.manifestTitle.clear();
         state.loading = true;
         state.progress = 0;
         if (webView == m_findView) {
@@ -739,6 +868,8 @@ void MainWindow::connectBrowserSignals(QWebEngineView *webView)
             m_progress->show();
         }
         updateNavigationActions();
+        if (webView == currentWebView())
+            updateInstallWebAppAction();
     });
     connect(webView, &QWebEngineView::loadProgress, this, [this, webView](int progress) {
         m_tabStates[webView].progress = progress;
@@ -793,6 +924,8 @@ void MainWindow::connectBrowserSignals(QWebEngineView *webView)
             } else {
                 setTabTrustStatus(webView, tr("No HTTPS security information"));
             }
+            if (m_windowRole != WindowRole::WebApp)
+                detectWebAppManifest(webView);
         } else if (state.lastAcceptedRule.isEmpty()) {
             setTabTrustStatus(webView, tr("Page loading failed"), true);
         }
@@ -831,6 +964,38 @@ void MainWindow::connectBrowserSignals(QWebEngineView *webView)
                 break;
             }
         }
+    );
+    connect(
+        static_cast<BrowserPage *>(webView->page()),
+        &BrowserPage::outOfScopeNavigationRequested,
+        this,
+        [this](const QUrl &url, int navigationType) {
+            if (m_windowRole != WindowRole::WebApp)
+                return;
+            const auto type = static_cast<QWebEnginePage::NavigationType>(navigationType);
+            if (type == QWebEnginePage::NavigationTypeLinkClicked
+                || type == QWebEnginePage::NavigationTypeTyped) {
+                openUrlInPrimaryWindow(url);
+                return;
+            }
+            if (type == QWebEnginePage::NavigationTypeFormSubmitted) {
+                statusBar()->showMessage(
+                    tr("Blocked a form submission outside this web app's scope"),
+                    6000
+                );
+                return;
+            }
+            statusBar()->showMessage(
+                tr("Blocked automatic navigation outside this web app's scope"),
+                6000
+            );
+        }
+    );
+    connect(
+        static_cast<BrowserPage *>(webView->page()),
+        &BrowserPage::webAppManifestFetched,
+        this,
+        &MainWindow::handleFetchedWebAppManifest
     );
     connect(
         static_cast<BrowserPage *>(webView->page()),
@@ -876,6 +1041,11 @@ void MainWindow::connectBrowserSignals(QWebEngineView *webView)
                 case ExternalNavigationDisposition::Browse:
                     break;
                 }
+            }
+
+            if (m_windowRole == WindowRole::WebApp) {
+                openWindowRequestInPrimary(request);
+                return;
             }
 
             const bool separateWindow = request.destination()
@@ -972,10 +1142,13 @@ void MainWindow::updateCurrentTabUi()
     QWebEngineView *webView = currentWebView();
     if (!webView) {
         m_address->clear();
-        setWindowTitle(QStringLiteral("PanBrowser"));
+        setWindowTitle(
+            m_windowRole == WindowRole::WebApp ? m_webApp.name : QStringLiteral("PanBrowser")
+        );
         m_progress->hide();
         updateNavigationActions();
         updateBookmarkAction();
+        updateInstallWebAppAction();
         return;
     }
 
@@ -983,7 +1156,10 @@ void MainWindow::updateCurrentTabUi()
     if (webView->url().isEmpty() && !m_tabStates.value(webView).pendingUrl.isEmpty())
         m_address->setText(m_tabStates.value(webView).pendingUrl.toString());
     const QString title = webView->title();
-    setWindowTitle(title.isEmpty() ? QStringLiteral("PanBrowser") : title + QStringLiteral(" — PanBrowser"));
+    if (m_windowRole == WindowRole::WebApp)
+        setWindowTitle(m_webApp.name);
+    else
+        setWindowTitle(title.isEmpty() ? QStringLiteral("PanBrowser") : title + QStringLiteral(" — PanBrowser"));
 
     const BrowserTabState state = m_tabStates.value(webView);
     setTrustStatus(state.trustStatus, state.trustError);
@@ -991,6 +1167,7 @@ void MainWindow::updateCurrentTabUi()
     m_progress->setVisible(state.loading);
     updateNavigationActions();
     updateBookmarkAction();
+    updateInstallWebAppAction();
 }
 
 void MainWindow::updateNavigationActions()
@@ -1251,13 +1428,306 @@ void MainWindow::openBookmarks()
     dialog.exec();
 }
 
+void MainWindow::detectWebAppManifest(QWebEngineView *webView)
+{
+    if (!webView || !m_tabStates.contains(webView))
+        return;
+    const QUrl documentUrl = webView->url();
+    if (documentUrl.scheme().compare(QStringLiteral("https"), Qt::CaseInsensitive) != 0) {
+        m_tabStates[webView].manifestUrl = QUrl();
+        if (webView == currentWebView())
+            updateInstallWebAppAction();
+        return;
+    }
+
+    const QPointer<MainWindow> window(this);
+    const QPointer<QWebEngineView> target(webView);
+    webView->page()->runJavaScript(
+        QStringLiteral(R"JS(
+(() => {
+    const link = document.querySelector('link[rel~="manifest"]');
+    if (!link || !link.href)
+        return null;
+    return { url: link.href, title: document.title || "" };
+})()
+)JS"),
+        QWebEngineScript::ApplicationWorld,
+        [window, target, documentUrl](const QVariant &result) {
+            if (!window || !target || !window->m_tabStates.contains(target))
+                return;
+            BrowserTabState &state = window->m_tabStates[target];
+            state.manifestUrl = QUrl();
+            state.manifestTitle.clear();
+            if (target->url() == documentUrl) {
+                const QVariantMap object = result.toMap();
+                const QUrl manifestUrl(object.value(QStringLiteral("url")).toString());
+                if (manifestUrl.scheme().compare(QStringLiteral("https"), Qt::CaseInsensitive) == 0
+                    && manifestUrl.userInfo().isEmpty()
+                    && isSameWebOrigin(manifestUrl, documentUrl)) {
+                    state.manifestUrl = manifestUrl.adjusted(QUrl::NormalizePathSegments);
+                    state.manifestTitle = object.value(QStringLiteral("title")).toString().simplified();
+                }
+            }
+            if (target == window->currentWebView())
+                window->updateInstallWebAppAction();
+        }
+    );
+}
+
+void MainWindow::updateInstallWebAppAction()
+{
+    if (!m_installWebAppAction || m_windowRole == WindowRole::WebApp)
+        return;
+    QWebEngineView *webView = currentWebView();
+    const BrowserTabState state = webView ? m_tabStates.value(webView) : BrowserTabState();
+    if (!webView
+        || state.manifestUrl.isEmpty()
+        || !m_webAppStore
+        || !m_webAppStore->isAvailable()) {
+        m_installWebAppAction->setText(tr("Install Web App…"));
+        m_installWebAppAction->setEnabled(false);
+        return;
+    }
+    const std::optional<WebApp> installed = m_webAppStore->appForManifest(state.manifestUrl);
+    if (installed) {
+        m_installWebAppAction->setText(tr("Open “%1”").arg(installed->name));
+        m_installWebAppAction->setEnabled(true);
+        return;
+    }
+    const QString name = state.manifestTitle.isEmpty()
+        ? webView->url().host()
+        : state.manifestTitle.left(80);
+    m_installWebAppAction->setText(tr("Install “%1”…").arg(name));
+    m_installWebAppAction->setEnabled(true);
+}
+
+void MainWindow::installCurrentWebApp()
+{
+    if (!m_webAppStore || m_windowRole == WindowRole::WebApp)
+        return;
+    QWebEngineView *webView = currentWebView();
+    if (!webView || !m_tabStates.contains(webView))
+        return;
+    const BrowserTabState state = m_tabStates.value(webView);
+    if (state.manifestUrl.isEmpty())
+        return;
+
+    if (const std::optional<WebApp> installed = m_webAppStore->appForManifest(state.manifestUrl)) {
+        openInstalledWebApp(installed->id);
+        return;
+    }
+
+    const QString requestId = QUuid::createUuid().toString(QUuid::WithoutBraces);
+    m_manifestRequests.insert(requestId, {
+        webView,
+        state.manifestUrl,
+        webView->url(),
+        state.manifestTitle,
+    });
+    m_installWebAppAction->setEnabled(false);
+    m_installWebAppAction->setText(tr("Reading web app manifest…"));
+    static_cast<BrowserPage *>(webView->page())->fetchWebAppManifest(
+        requestId,
+        state.manifestUrl,
+        WebAppStore::maximumManifestBytes
+    );
+    QTimer::singleShot(15000, this, [this, requestId] {
+        const auto found = m_manifestRequests.find(requestId);
+        if (found == m_manifestRequests.end())
+            return;
+        const QPointer<QWebEngineView> webView = found->webView;
+        m_manifestRequests.erase(found);
+        if (webView) {
+            static_cast<BrowserPage *>(webView->page())->cancelWebAppManifestFetch(requestId);
+        }
+        updateInstallWebAppAction();
+        statusBar()->showMessage(tr("Timed out while reading the web app manifest"), 5000);
+    });
+}
+
+void MainWindow::handleFetchedWebAppManifest(
+    const QString &requestId,
+    const QByteArray &contents,
+    const QString &fetchError
+)
+{
+    const auto found = m_manifestRequests.find(requestId);
+    if (found == m_manifestRequests.end())
+        return;
+    const PendingManifestRequest request = found.value();
+    m_manifestRequests.erase(found);
+    updateInstallWebAppAction();
+    if (!request.webView
+        || !m_tabStates.contains(request.webView)
+        || m_tabStates.value(request.webView).manifestUrl != request.manifestUrl) {
+        return;
+    }
+    if (!fetchError.isEmpty()) {
+        QMessageBox::warning(
+            this,
+            tr("Cannot install web app"),
+            tr("PanBrowser could not read the web app manifest: %1").arg(fetchError)
+        );
+        return;
+    }
+
+    QString error;
+    std::optional<WebApp> app = WebAppStore::parseManifest(
+        contents,
+        request.manifestUrl,
+        request.documentUrl,
+        request.fallbackTitle,
+        &error
+    );
+    if (!app) {
+        QMessageBox::warning(this, tr("Cannot install web app"), error);
+        return;
+    }
+
+    const QPixmap pixmap = request.webView->icon().pixmap(256, 256);
+    if (!pixmap.isNull()) {
+        QByteArray iconPng;
+        QBuffer buffer(&iconPng);
+        if (buffer.open(QIODevice::WriteOnly)
+            && pixmap.save(&buffer, "PNG")
+            && iconPng.size() <= WebAppStore::maximumIconBytes) {
+            app->iconPng = iconPng;
+        }
+    }
+
+    QMessageBox dialog(this);
+    dialog.setWindowTitle(tr("Install web app"));
+    dialog.setIcon(QMessageBox::Question);
+    if (!pixmap.isNull())
+        dialog.setIconPixmap(pixmap.scaled(72, 72, Qt::KeepAspectRatio, Qt::SmoothTransformation));
+    dialog.setText(tr("Install “%1”?").arg(app->name));
+    dialog.setInformativeText(
+        tr("The app will open in its own window and share PanBrowser cookies, site data, permissions, and trust rules.\n\nStart page: %1\nAllowed scope: %2")
+            .arg(
+                app->startUrl.toDisplayString(QUrl::RemovePassword),
+                app->scope.toDisplayString(QUrl::RemovePassword)
+            )
+    );
+    QPushButton *installButton = dialog.addButton(tr("Install"), QMessageBox::AcceptRole);
+    dialog.addButton(tr("Cancel"), QMessageBox::RejectRole);
+    dialog.setDefaultButton(installButton);
+    dialog.exec();
+    if (dialog.clickedButton() != installButton)
+        return;
+
+    if (!m_webAppStore->install(*app, &error)) {
+        QMessageBox::warning(this, tr("Cannot install web app"), error);
+        return;
+    }
+    statusBar()->showMessage(tr("“%1” installed").arg(app->name), 4000);
+    openInstalledWebApp(app->id);
+}
+
+void MainWindow::rebuildWebAppsMenu()
+{
+    if (!m_webAppsMenu || !m_webAppStore)
+        return;
+    m_webAppsMenu->clear();
+    const QList<WebApp> apps = m_webAppStore->apps();
+    for (const WebApp &app : apps) {
+        QIcon icon(QStringLiteral(":/assets/app-icon.svg"));
+        QPixmap pixmap;
+        if (!app.iconPng.isEmpty() && pixmap.loadFromData(app.iconPng, "PNG"))
+            icon = QIcon(pixmap);
+        QAction *action = m_webAppsMenu->addAction(icon, app.name);
+        connect(action, &QAction::triggered, this, [this, id = app.id] {
+            openInstalledWebApp(id);
+        });
+    }
+    if (apps.isEmpty()) {
+        QAction *empty = m_webAppsMenu->addAction(tr("No web apps installed"));
+        empty->setEnabled(false);
+    }
+    m_webAppsMenu->addSeparator();
+    QAction *manage = m_webAppsMenu->addAction(
+        QIcon(QStringLiteral(":/assets/icons/settings.svg")),
+        tr("Manage Web Apps…")
+    );
+    connect(manage, &QAction::triggered, this, &MainWindow::openWebAppsSettings);
+}
+
+void MainWindow::openInstalledWebApp(const QString &id)
+{
+    if (!m_ownsBrowserResources && m_primaryWindow) {
+        m_primaryWindow->openInstalledWebApp(id);
+        return;
+    }
+    if (!m_webAppStore)
+        return;
+    const std::optional<WebApp> app = m_webAppStore->app(id);
+    if (!app) {
+        statusBar()->showMessage(tr("The web app is no longer installed"), 4000);
+        return;
+    }
+    createWebAppWindow(*app);
+}
+
+void MainWindow::openUrlInPrimaryWindow(const QUrl &url)
+{
+    MainWindow *primary = m_primaryWindow ? m_primaryWindow : this;
+    if (primary != this) {
+        primary->openUrlInPrimaryWindow(url);
+        return;
+    }
+    primary->show();
+    primary->raise();
+    primary->activateWindow();
+    primary->createTab(url, true);
+}
+
+void MainWindow::openWindowRequestInPrimary(QWebEngineNewWindowRequest &request)
+{
+    MainWindow *primary = m_primaryWindow ? m_primaryWindow : this;
+    if (primary != this) {
+        primary->openWindowRequestInPrimary(request);
+        return;
+    }
+
+    primary->show();
+    primary->raise();
+    primary->activateWindow();
+    const bool separateWindow = request.destination() == QWebEngineNewWindowRequest::InNewWindow
+        || request.destination() == QWebEngineNewWindowRequest::InNewDialog;
+    if (separateWindow) {
+        MainWindow *popup = primary->createPopupWindow(
+            WindowRole::Popup,
+            request.requestedGeometry()
+        );
+        request.openIn(popup->currentWebView()->page());
+        popup->show();
+        popup->raise();
+        popup->activateWindow();
+        return;
+    }
+
+    const bool activate = request.destination()
+        != QWebEngineNewWindowRequest::InNewBackgroundTab;
+    QWebEngineView *newView = primary->createTab(QUrl(), activate);
+    request.openIn(newView->page());
+}
+
 void MainWindow::openSettings()
+{
+    openSettingsPage(static_cast<int>(SettingsDialog::Page::General));
+}
+
+void MainWindow::openWebAppsSettings()
+{
+    openSettingsPage(static_cast<int>(SettingsDialog::Page::WebApps));
+}
+
+void MainWindow::openSettingsPage(int page)
 {
     if (!m_ownsBrowserResources && m_primaryWindow) {
         m_primaryWindow->show();
         m_primaryWindow->raise();
         m_primaryWindow->activateWindow();
-        m_primaryWindow->openSettings();
+        m_primaryWindow->openSettingsPage(page);
         return;
     }
 
@@ -1268,10 +1738,15 @@ void MainWindow::openSettings()
         m_searchSettings,
         m_profile,
         m_historyStore,
+        m_webAppStore,
         currentWebView() ? currentWebView()->url() : QUrl(),
-        SettingsDialog::Page::General,
+        static_cast<SettingsDialog::Page>(page),
         this
     );
+    QString webAppToOpen;
+    connect(&dialog, &SettingsDialog::webAppOpenRequested, &dialog, [&](const QString &id) {
+        webAppToOpen = id;
+    });
     QString error;
     if (!dialog.load(&error)) {
         setTrustStatus(tr("Rules error: %1").arg(error), true);
@@ -1311,6 +1786,8 @@ void MainWindow::openSettings()
             );
         }
     }
+    if (!webAppToOpen.isEmpty())
+        openInstalledWebApp(webAppToOpen);
 }
 
 void MainWindow::restoreInitialTabs()

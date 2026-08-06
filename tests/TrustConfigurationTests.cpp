@@ -14,6 +14,7 @@
 #include "SearchSettings.h"
 #include "TrustConfiguration.h"
 #include "TrustSettings.h"
+#include "WebAppStore.h"
 #include "WindowPlacement.h"
 
 #include <QFile>
@@ -75,6 +76,12 @@ private slots:
     void ghostCompletionAcceptsOnlyAddressPrefixes();
     void addressSuggestionsPreferRelevanceThenBookmarks();
     void findBarSupportsKeyboardNavigationAndCounts();
+    void webAppManifestIsValidatedAndNormalized();
+    void webAppManifestIdUsesStartOrigin();
+    void webAppManifestRejectsUnsafeOriginsAndScopes();
+    void webAppStoreRoundTripsAndRemovesApps();
+    void corruptWebAppStoreIsPreservedAndDisabled();
+    void webAppStoreRejectsNonArrayApps();
 #if defined(Q_OS_WIN) || defined(Q_OS_LINUX)
     void nativeCertificateValidatorTrustsConfiguredAnchor();
     void nativeCertificateValidatorRejectsWrongHostname();
@@ -748,6 +755,7 @@ void TrustConfigurationTests::invalidSessionFileFailsClosed()
     const BrowserSession restored = store.load(&error);
     QVERIFY(restored.tabs.isEmpty());
     QVERIFY(!error.isEmpty());
+
 }
 
 void TrustConfigurationTests::managedDataCleanupStaysInsideRoot()
@@ -1285,6 +1293,204 @@ void TrustConfigurationTests::findBarSupportsKeyboardNavigationAndCounts()
     QCOMPARE(closeSpy.count(), 1);
     bar.setResults(0, 0);
     QCOMPARE(result->text(), QStringLiteral("No matches"));
+}
+
+void TrustConfigurationTests::webAppManifestIsValidatedAndNormalized()
+{
+    const QByteArray manifest = QByteArray(
+        "{\"id\":\"/apps/mail/\","
+        "\"name\":\"  Example   Mail  \","
+        "\"short_name\":\"Mail\","
+        "\"description\":\"A focused mail app\","
+        "\"start_url\":\"./inbox?source=install#ignored\","
+        "\"scope\":\"./\","
+        "\"display\":\"minimal-ui\"}"
+    );
+    QString error;
+    const std::optional<WebApp> app = WebAppStore::parseManifest(
+        manifest,
+        QUrl(QStringLiteral("https://example.com/apps/mail/manifest.webmanifest")),
+        QUrl(QStringLiteral("https://example.com/apps/mail/welcome")),
+        QStringLiteral("Fallback"),
+        &error
+    );
+    QVERIFY2(app.has_value(), qPrintable(error));
+    QCOMPARE(app->id.size(), 64);
+    QCOMPARE(app->name, QStringLiteral("Example Mail"));
+    QCOMPARE(app->shortName, QStringLiteral("Mail"));
+    QCOMPARE(app->displayMode, QStringLiteral("minimal-ui"));
+    QCOMPARE(app->startUrl, QUrl(QStringLiteral("https://example.com/apps/mail/inbox?source=install")));
+    QCOMPARE(app->scope, QUrl(QStringLiteral("https://example.com/apps/mail/")));
+    QVERIFY(WebAppStore::containsUrl(
+        *app,
+        QUrl(QStringLiteral("https://example.com/apps/mail/settings"))
+    ));
+    QVERIFY(!WebAppStore::containsUrl(
+        *app,
+        QUrl(QStringLiteral("https://example.com/apps/calendar/"))
+    ));
+    QVERIFY(!WebAppStore::containsUrl(
+        *app,
+        QUrl(QStringLiteral("http://example.com/apps/mail/"))
+    ));
+}
+
+void TrustConfigurationTests::webAppManifestIdUsesStartOrigin()
+{
+    const QByteArray manifest = QByteArrayLiteral(
+        "{\"id\":\"mail\",\"name\":\"Mail\","
+        "\"start_url\":\"/apps/mail/start\",\"scope\":\"/apps/mail/\"}"
+    );
+    QString error;
+    const std::optional<WebApp> first = WebAppStore::parseManifest(
+        manifest,
+        QUrl(QStringLiteral("https://example.com/assets/first/manifest.webmanifest")),
+        QUrl(QStringLiteral("https://example.com/apps/mail/")),
+        QString(),
+        &error
+    );
+    QVERIFY2(first.has_value(), qPrintable(error));
+
+    const std::optional<WebApp> second = WebAppStore::parseManifest(
+        manifest,
+        QUrl(QStringLiteral("https://example.com/other/manifest.webmanifest")),
+        QUrl(QStringLiteral("https://example.com/apps/mail/")),
+        QString(),
+        &error
+    );
+    QVERIFY2(second.has_value(), qPrintable(error));
+    QCOMPARE(first->id, second->id);
+}
+
+void TrustConfigurationTests::webAppManifestRejectsUnsafeOriginsAndScopes()
+{
+    QString error;
+    QVERIFY(!WebAppStore::parseManifest(
+        QByteArray("{\"name\":\"Bad\",\"start_url\":\"https://evil.example/\"}"),
+        QUrl(QStringLiteral("https://example.com/manifest.webmanifest")),
+        QUrl(QStringLiteral("https://example.com/")),
+        QString(),
+        &error
+    ));
+    QVERIFY(!error.isEmpty());
+
+    error.clear();
+    QVERIFY(!WebAppStore::parseManifest(
+        QByteArray("{\"name\":\"Bad\",\"scope\":\"https://evil.example/\"}"),
+        QUrl(QStringLiteral("https://example.com/manifest.webmanifest")),
+        QUrl(QStringLiteral("https://example.com/")),
+        QString(),
+        &error
+    ));
+    QVERIFY(!error.isEmpty());
+
+    error.clear();
+    QVERIFY(!WebAppStore::parseManifest(
+        QByteArray("{\"name\":\"Bad\"}"),
+        QUrl(QStringLiteral("http://example.com/manifest.webmanifest")),
+        QUrl(QStringLiteral("http://example.com/")),
+        QString(),
+        &error
+    ));
+    QVERIFY(!error.isEmpty());
+
+    error.clear();
+    QVERIFY(!WebAppStore::parseManifest(
+        QByteArray("{\"name\":\"Bad\"}"),
+        QUrl(QStringLiteral("https://user:secret@example.com/manifest.webmanifest")),
+        QUrl(QStringLiteral("https://example.com/")),
+        QString(),
+        &error
+    ));
+    QVERIFY(!error.isEmpty());
+}
+
+void TrustConfigurationTests::webAppStoreRoundTripsAndRemovesApps()
+{
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+    const QString path = directory.filePath(QStringLiteral("web-apps.json"));
+    WebAppStore store(path);
+    QString error;
+    QVERIFY2(store.load(&error), qPrintable(error));
+
+    std::optional<WebApp> app = WebAppStore::parseManifest(
+        QByteArray("{\"name\":\"Example App\",\"start_url\":\"/app/home\",\"scope\":\"/app/\"}"),
+        QUrl(QStringLiteral("https://example.com/app/manifest.webmanifest")),
+        QUrl(QStringLiteral("https://example.com/app/")),
+        QString(),
+        &error
+    );
+    QVERIFY2(app.has_value(), qPrintable(error));
+    app->iconPng = QByteArrayLiteral("not-a-real-png-but-bounded");
+    QVERIFY2(store.install(*app, &error), qPrintable(error));
+    QCOMPARE(store.apps().size(), 1);
+
+    WebAppStore restored(path);
+    QVERIFY2(restored.load(&error), qPrintable(error));
+    QCOMPARE(restored.apps().size(), 1);
+    const std::optional<WebApp> saved = restored.app(app->id);
+    QVERIFY(saved.has_value());
+    QCOMPARE(saved->name, app->name);
+    QCOMPARE(saved->startUrl, app->startUrl);
+    QCOMPARE(saved->scope, app->scope);
+    QCOMPARE(saved->iconPng, app->iconPng);
+
+    QVERIFY2(restored.remove(app->id, &error), qPrintable(error));
+    QVERIFY(restored.apps().isEmpty());
+    WebAppStore empty(path);
+    QVERIFY2(empty.load(&error), qPrintable(error));
+    QVERIFY(empty.apps().isEmpty());
+}
+
+void TrustConfigurationTests::corruptWebAppStoreIsPreservedAndDisabled()
+{
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+    const QString path = directory.filePath(QStringLiteral("web-apps.json"));
+    QFile file(path);
+    QVERIFY(file.open(QIODevice::WriteOnly));
+    const QByteArray corrupt = QByteArrayLiteral("{not valid json");
+    QCOMPARE(file.write(corrupt), corrupt.size());
+    file.close();
+
+    WebAppStore store(path);
+    QString error;
+    QVERIFY(!store.load(&error));
+    QVERIFY(!store.isAvailable());
+    QVERIFY(!error.isEmpty());
+
+    WebApp app;
+    app.id = QString(64, QLatin1Char('a'));
+    app.name = QStringLiteral("Should not overwrite");
+    app.startUrl = QUrl(QStringLiteral("https://example.com/app/"));
+    app.scope = app.startUrl;
+    app.manifestUrl = QUrl(QStringLiteral("https://example.com/app/manifest.webmanifest"));
+    QVERIFY(!store.install(app, &error));
+
+    QVERIFY(file.open(QIODevice::ReadOnly));
+    QCOMPARE(file.readAll(), corrupt);
+}
+
+void TrustConfigurationTests::webAppStoreRejectsNonArrayApps()
+{
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+    const QString path = directory.filePath(QStringLiteral("web-apps.json"));
+    QFile file(path);
+    QVERIFY(file.open(QIODevice::WriteOnly));
+    const QByteArray invalid = QByteArrayLiteral("{\"version\":1,\"apps\":{}}");
+    QCOMPARE(file.write(invalid), invalid.size());
+    file.close();
+
+    WebAppStore store(path);
+    QString error;
+    QVERIFY(!store.load(&error));
+    QVERIFY(!store.isAvailable());
+    QVERIFY(!error.isEmpty());
+
+    QVERIFY(file.open(QIODevice::ReadOnly));
+    QCOMPARE(file.readAll(), invalid);
 }
 
 #if defined(Q_OS_WIN) || defined(Q_OS_LINUX)

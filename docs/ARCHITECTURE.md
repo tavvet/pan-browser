@@ -48,12 +48,16 @@ flowchart TD
     MW --> Downloads["DownloadManager"]
     MW --> Permissions["PermissionController"]
     MW --> Session["SessionStore"]
+    MW --> WebApps["WebAppStore / web-apps.json"]
 
     Popup["Popup MainWindow"] --> Profile
     Popup --> History
     Popup --> Bookmarks
     Popup --> Downloads
     MW --> Popup
+    AppWindow["Scoped web-app MainWindow"] --> Profile
+    AppWindow --> WebApps
+    MW --> AppWindow
 
     Settings["SettingsDialog"] --> Preferences["BrowserPreferences / QSettings"]
     Settings --> TrustEditor["TrustRulesDialog"]
@@ -62,9 +66,10 @@ flowchart TD
 ```
 
 The primary `MainWindow` is the composition root. It creates and owns the
-shared `BrowserProfile`, `DownloadManager`, `HistoryStore`, and `BookmarkStore`.
-Popup windows reuse those objects and the current trust/search/preferences
-state; they do not create independent browser profiles.
+shared `BrowserProfile`, `DownloadManager`, `HistoryStore`, `BookmarkStore`,
+and `WebAppStore`. Popup and installed web-app windows reuse those objects and
+the current trust/search/preferences state; they do not create independent
+browser profiles.
 
 Each tab owns one `QWebEngineView` and one `BrowserPage`. `BrowserTabState` in
 `MainWindow` contains UI state that Qt WebEngine does not provide as a single
@@ -84,6 +89,7 @@ The primary window owns browser-wide resources:
 - `DownloadManager` listens to the shared profile and outlives every tab.
 - `HistoryStore` owns one named Qt SQL connection on the GUI thread.
 - `BookmarkStore` owns a separate named Qt SQL connection on the GUI thread.
+- `WebAppStore` owns the versioned, atomically written installed-app registry.
 - popup windows are children of the primary window and use
   `Qt::WA_DeleteOnClose`.
 
@@ -99,6 +105,41 @@ sessions.
 Popup tabs are not included in session restoration. Closing the last primary
 tab marks the session as intentionally discarded, clears `session.json`, and
 closes the primary window.
+
+### 3.1 Installed web apps
+
+Qt WebEngine exposes Chromium rendering and persistent-profile primitives but
+does not expose Chromium's PWA installation UI. PanBrowser therefore owns a
+small manifest-based installation layer:
+
+1. after a successful HTTPS load, `MainWindow` looks for a manifest link in an
+   isolated JavaScript world;
+2. only same-origin HTTPS manifest URLs are offered for installation;
+3. `BrowserPage` fetches the manifest in the existing page context so the
+   request uses the same WebEngine profile, cookies, and certificate handling;
+4. `WebAppStore::parseManifest()` validates size, JSON, origin, start URL,
+   scope, display mode, text lengths, and derives a stable SHA-256 app ID;
+5. the user sees the resolved start URL and scope before an atomic write to
+   `web-apps.json`;
+6. the app opens in a `MainWindow` with one scope-restricted `BrowserPage`, no
+   tab strip or address field, compact navigation controls, and the standard
+   PanBrowser TLS and permission UI.
+
+`BrowserPage::acceptNavigationRequest()` rejects top-level HTTP/HTTPS
+navigation outside an installed app's origin and scope. User-clicked links are
+opened by the primary window in a normal tab; automatic navigation is blocked,
+and form submissions are not converted into lossy URL-only GET requests.
+External schemes still pass through the ordinary confirmation policy.
+New-window requests from app windows are adopted by a normal browser page via
+`QWebEngineNewWindowRequest::openIn()`, preserving opener and request state.
+App windows share the main profile deliberately so an installed banking or
+communications app retains the same sign-in and domain-scoped custom-CA
+behavior as a normal tab.
+
+The registry stores a bounded PNG copy of the page icon. Manifest contents and
+site-controlled names never become executable paths or command lines. Removing
+an installed app removes only its registry entry; clearing site data remains a
+separate explicit privacy action.
 
 ## 4. TLS trust model
 
@@ -291,6 +332,7 @@ On macOS, application data is rooted at
 | `search-engines.json` | `SearchSettings` | Versioned engines and default selection; atomic write with `.backup`. |
 | `history.sqlite` | `HistoryStore` | WAL-mode SQLite browsing history, limited to 50,000 visits. |
 | `bookmarks.sqlite` | `BookmarkStore` | WAL-mode SQLite bookmarks with normalized URL and title fields for local lookup. |
+| `web-apps.json` | `WebAppStore` | Validated installed-app metadata and bounded page icons, atomically written. |
 | `session.json` | `SessionStore` | Up to 30 restorable HTTP(S) tabs, atomically written. |
 | `downloads.json` | `DownloadHistoryStore` | Up to 200 download records; paths and source host, not complete source URLs. |
 | native `QSettings` | `BrowserPreferences`, window/download UI | Start page, startup/cookie/history/language choices, window geometry, last download directory, and pending data-reset marker. |
@@ -426,8 +468,8 @@ Primary-window startup is ordered as follows:
 2. load trust rules and preferences;
 3. load or create search settings;
 4. apply a pending profile reset before Chromium opens the profile;
-5. create the shared browser profile, download manager, history store, and
-   bookmark store;
+5. create the shared browser profile, download manager, history store,
+   bookmark store, and installed web-app store;
 6. create the UI and permission controller;
 7. restore safe window geometry;
 8. reload runtime trust rules;
@@ -486,7 +528,8 @@ policy and persistence layers: domains and rule validation, settings backups,
 window placement, sessions, cleanup boundaries, downloads, permissions,
 external navigation, popup geometry, search parsing, history ranking/deletion,
 bookmark CRUD and normalization, combined suggestion ranking,
-corrupt-database behavior, ghost completion, find-bar keyboard behavior, and
+corrupt-database behavior, ghost completion, find-bar keyboard behavior,
+web-app manifest validation/scope enforcement and registry persistence, and
 native custom-anchor/hostname/weak-key validation on Windows and Linux.
 
 The test target deliberately excludes `MainWindow` and a live WebEngine process,
@@ -524,6 +567,10 @@ Before merging a change, verify the relevant invariants:
 - external applications and sensitive permissions require browser-owned,
   active-tab user interaction;
 - popup windows retain visible browser chrome and share the isolated profile;
+- installed web apps cannot navigate their app window outside their validated
+  HTTPS origin and scope;
+- web app manifests and icons remain size-bounded, and registry writes remain
+  atomic;
 - tab views die before their shared profile;
 - full profile deletion happens only before profile construction and only below
   managed roots;

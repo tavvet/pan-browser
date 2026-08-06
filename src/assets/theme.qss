@@ -395,6 +395,7 @@ QDialog#settingsDialog QListWidget#settingsSidebar::item:selected {
 QDialog#settingsDialog QWidget#generalSettingsPage,
 QDialog#settingsDialog QWidget#searchSettingsPage,
 QDialog#settingsDialog QWidget#historySettingsPage,
+QDialog#settingsDialog QWidget#webAppsSettingsPage,
 QDialog#settingsDialog QWidget#diagnosticsSettingsPage,
 QDialog#settingsDialog QScrollArea#diagnosticsScroll,
 QDialog#settingsDialog QWidget#diagnosticsContent,
@@ -493,7 +494,8 @@ QDialog#settingsDialog QPushButton#dangerButton {
     color: #ff9aaa;
 }
 
-QDialog#settingsDialog QListWidget#searchEnginesList {
+QDialog#settingsDialog QListWidget#searchEnginesList,
+QDialog#settingsDialog QListWidget#webAppsList {
     background: #1b1f26;
     color: #e3e7ee;
     border: 1px solid #303641;
@@ -539,11 +541,19 @@ QDialog#settingsDialog QListWidget#searchEnginesList::item {
     padding: 4px 8px;
 }
 
-QDialog#settingsDialog QListWidget#searchEnginesList::item:hover {
+QDialog#settingsDialog QListWidget#webAppsList::item {
+    min-height: 46px;
+    border-radius: 7px;
+    padding: 5px 8px;
+}
+
+QDialog#settingsDialog QListWidget#searchEnginesList::item:hover,
+QDialog#settingsDialog QListWidget#webAppsList::item:hover {
     background: #262c35;
 }
 
-QDialog#settingsDialog QListWidget#searchEnginesList::item:selected {
+QDialog#settingsDialog QListWidget#searchEnginesList::item:selected,
+QDialog#settingsDialog QListWidget#webAppsList::item:selected {
     background: #315ea8;
     color: #ffffff;
 }

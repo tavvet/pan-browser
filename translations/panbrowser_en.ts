@@ -5,11 +5,11 @@
     <name>BookmarksDialog</name>
     <message numerus="yes">
         <location filename="../src/BookmarksDialog.cpp" line="154"/>
-        <location filename="../tests/TrustConfigurationTests.cpp" line="533"/>
-        <location filename="../tests/TrustConfigurationTests.cpp" line="537"/>
-        <location filename="../tests/TrustConfigurationTests.cpp" line="541"/>
-        <location filename="../tests/TrustConfigurationTests.cpp" line="550"/>
-        <location filename="../tests/TrustConfigurationTests.cpp" line="554"/>
+        <location filename="../tests/TrustConfigurationTests.cpp" line="540"/>
+        <location filename="../tests/TrustConfigurationTests.cpp" line="544"/>
+        <location filename="../tests/TrustConfigurationTests.cpp" line="548"/>
+        <location filename="../tests/TrustConfigurationTests.cpp" line="557"/>
+        <location filename="../tests/TrustConfigurationTests.cpp" line="561"/>
         <source>%n bookmark(s)</source>
         <translation>
             <numerusform>%n bookmark</numerusform>
@@ -31,7 +31,7 @@
 <context>
     <name>MainWindow</name>
     <message numerus="yes">
-        <location filename="../src/MainWindow.cpp" line="1418"/>
+        <location filename="../src/MainWindow.cpp" line="1895"/>
         <source>%n custom rule(s)</source>
         <translation>
             <numerusform>%n custom rule</numerusform>

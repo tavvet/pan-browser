@@ -16,6 +16,8 @@ class HistorySettingsPage;
 class HistoryStore;
 class SearchSettingsPage;
 class TrustRulesDialog;
+class WebAppsSettingsPage;
+class WebAppStore;
 
 class SettingsDialog final : public QDialog {
     Q_OBJECT
@@ -25,6 +27,7 @@ public:
         General,
         Search,
         History,
+        WebApps,
         PrivacyData,
         TrustRules,
         Diagnostics,
@@ -37,6 +40,7 @@ public:
         const SearchSettings &searchSettings,
         BrowserProfile *profile,
         HistoryStore *historyStore,
+        WebAppStore *webAppStore,
         const QUrl &currentUrl,
         Page initialPage,
         QWidget *parent = nullptr
@@ -45,6 +49,9 @@ public:
     bool load(QString *error = nullptr);
     [[nodiscard]] BrowserPreferences preferences() const;
     [[nodiscard]] SearchSettings searchSettings() const;
+
+signals:
+    void webAppOpenRequested(const QString &id);
 
 private:
     void createInterface(const QUrl &currentUrl, Page initialPage);
@@ -65,6 +72,7 @@ private:
     QCheckBox *m_persistSessionCookies = nullptr;
     SearchSettingsPage *m_searchPage = nullptr;
     HistorySettingsPage *m_historyPage = nullptr;
+    WebAppsSettingsPage *m_webAppsPage = nullptr;
     DiagnosticsPage *m_diagnosticsPage = nullptr;
     TrustRulesDialog *m_trustRules = nullptr;
 };

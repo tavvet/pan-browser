@@ -5,6 +5,7 @@
 #include "SessionStore.h"
 #include "SearchSettings.h"
 #include "TrustConfiguration.h"
+#include "WebAppStore.h"
 
 #include <QHash>
 #include <QList>
@@ -20,6 +21,7 @@ class QStackedWidget;
 class QTabBar;
 class QTimer;
 class QToolBar;
+class QMenu;
 class QAction;
 class BookmarkStore;
 class BrowserProfile;
@@ -32,6 +34,7 @@ class PermissionController;
 class PermissionPrompt;
 class QCloseEvent;
 class QWebEngineCertificateError;
+class QWebEngineNewWindowRequest;
 class QWebEngineView;
 
 class MainWindow final : public QMainWindow {
@@ -48,6 +51,7 @@ private:
     enum class WindowRole {
         Primary,
         Popup,
+        WebApp,
     };
 
     struct BrowserTabState {
@@ -64,6 +68,15 @@ private:
         QUrl topLevelUrl;
         QUrl pendingUrl;
         HistoryTransition pendingHistoryTransition = HistoryTransition::Other;
+        QUrl manifestUrl;
+        QString manifestTitle;
+    };
+
+    struct PendingManifestRequest {
+        QPointer<QWebEngineView> webView;
+        QUrl manifestUrl;
+        QUrl documentUrl;
+        QString fallbackTitle;
     };
 
     MainWindow(
@@ -71,13 +84,16 @@ private:
         DownloadManager *sharedDownloadManager,
         HistoryStore *sharedHistoryStore,
         BookmarkStore *sharedBookmarkStore,
+        WebAppStore *sharedWebAppStore,
         MainWindow *primaryWindow,
         WindowRole role,
+        const WebApp &webApp,
         QWidget *parent
     );
 
     void createInterface();
     MainWindow *createPopupWindow(WindowRole role, const QRect &requestedGeometry);
+    MainWindow *createWebAppWindow(const WebApp &app);
     void applyPopupGeometry(const QRect &requestedGeometry);
     QWebEngineView *createTab(
         const QUrl &url,
@@ -99,6 +115,20 @@ private:
     void closeFindBar();
     void findInPage(bool backward = false);
     void openSettings();
+    void openWebAppsSettings();
+    void openSettingsPage(int page);
+    void openInstalledWebApp(const QString &id);
+    void installCurrentWebApp();
+    void detectWebAppManifest(QWebEngineView *webView);
+    void updateInstallWebAppAction();
+    void rebuildWebAppsMenu();
+    void handleFetchedWebAppManifest(
+        const QString &requestId,
+        const QByteArray &contents,
+        const QString &fetchError
+    );
+    void openUrlInPrimaryWindow(const QUrl &url);
+    void openWindowRequestInPrimary(QWebEngineNewWindowRequest &request);
     void editCurrentBookmark();
     void openBookmarks();
     void reloadRules();
@@ -123,6 +153,7 @@ private:
     DownloadManager *m_downloadManager = nullptr;
     HistoryStore *m_historyStore = nullptr;
     BookmarkStore *m_bookmarkStore = nullptr;
+    WebAppStore *m_webAppStore = nullptr;
     DownloadsPanel *m_downloadsPanel = nullptr;
     DownloadButton *m_downloadButton = nullptr;
     FindBar *m_findBar = nullptr;
@@ -142,12 +173,15 @@ private:
     QAction *m_securityIndicator = nullptr;
     QAction *m_bookmarkAction = nullptr;
     QAction *m_closeFindAction = nullptr;
+    QAction *m_installWebAppAction = nullptr;
+    QMenu *m_webAppsMenu = nullptr;
     QLabel *m_trustStatus = nullptr;
     QLabel *m_ruleCount = nullptr;
     QProgressBar *m_progress = nullptr;
     QTimer *m_sessionSaveTimer = nullptr;
     QTimer *m_addressSuggestionTimer = nullptr;
     QHash<QWebEngineView *, BrowserTabState> m_tabStates;
+    QHash<QString, PendingManifestRequest> m_manifestRequests;
     BrowserPreferences m_preferences;
     SearchSettings m_searchSettings;
     SessionStore m_sessionStore;
@@ -157,6 +191,8 @@ private:
     QString m_historyError;
     QString m_bookmarkError;
     MainWindow *m_primaryWindow = nullptr;
+    WindowRole m_windowRole = WindowRole::Primary;
+    WebApp m_webApp;
     QList<QPointer<MainWindow>> m_popupWindows;
     bool m_ownsBrowserResources = true;
     bool m_restoringSession = false;

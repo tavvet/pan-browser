@@ -20,6 +20,7 @@
 - [x] Local browsing history with management controls and ranked address-bar completion.
 - [x] Runtime diagnostics page with application, Chromium, graphics, and profile details.
 - [x] English and Russian interface localization with system-language detection and explicit override.
+- [x] Manifest-based web app installation with scoped app windows and management UI.
 
 ## Browser essentials
 

@@ -99,6 +99,10 @@ set(PANBROWSER_APP_SOURCES
     src/TrustRulesDialog.h
     src/TrustSettings.cpp
     src/TrustSettings.h
+    src/WebAppStore.cpp
+    src/WebAppStore.h
+    src/WebAppsSettingsPage.cpp
+    src/WebAppsSettingsPage.h
     src/WindowPlacement.cpp
     src/WindowPlacement.h
     src/CertificateTrustValidator.h
@@ -213,6 +217,8 @@ qt_add_executable(PanBrowserTests
     src/TrustConfiguration.h
     src/TrustSettings.cpp
     src/TrustSettings.h
+    src/WebAppStore.cpp
+    src/WebAppStore.h
     src/WindowPlacement.cpp
     src/WindowPlacement.h
 )

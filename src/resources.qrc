@@ -20,5 +20,6 @@
         <file>assets/icons/star-filled.svg</file>
         <file>assets/icons/chevron-up.svg</file>
         <file>assets/icons/chevron-down.svg</file>
+        <file>assets/icons/layout-grid.svg</file>
     </qresource>
 </RCC>

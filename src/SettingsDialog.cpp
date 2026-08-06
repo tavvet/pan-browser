@@ -5,6 +5,7 @@
 #include "HistorySettingsPage.h"
 #include "SearchSettingsPage.h"
 #include "TrustRulesDialog.h"
+#include "WebAppsSettingsPage.h"
 
 #include <QCheckBox>
 #include <QComboBox>
@@ -112,6 +113,7 @@ SettingsDialog::SettingsDialog(
     const SearchSettings &searchSettings,
     BrowserProfile *profile,
     HistoryStore *historyStore,
+    WebAppStore *webAppStore,
     const QUrl &currentUrl,
     Page initialPage,
     QWidget *parent
@@ -130,6 +132,18 @@ SettingsDialog::SettingsDialog(
         m_pages
     );
     m_pages->insertWidget(static_cast<int>(Page::History), m_historyPage);
+    m_webAppsPage = new WebAppsSettingsPage(webAppStore, m_pages);
+    m_pages->insertWidget(static_cast<int>(Page::WebApps), m_webAppsPage);
+    connect(
+        m_webAppsPage,
+        &WebAppsSettingsPage::openRequested,
+        this,
+        [this](const QString &id) {
+            saveAndClose();
+            if (result() == QDialog::Accepted)
+                emit webAppOpenRequested(id);
+        }
+    );
     m_diagnosticsPage = new DiagnosticsPage(m_profile, m_pages);
     m_pages->addWidget(m_diagnosticsPage);
     m_pages->setCurrentIndex(static_cast<int>(initialPage));
@@ -190,6 +204,12 @@ void SettingsDialog::createInterface(const QUrl &currentUrl, Page initialPage)
         m_sidebar
     );
     historyItem->setData(Qt::UserRole, static_cast<int>(Page::History));
+    auto *webAppsItem = new QListWidgetItem(
+        QIcon(QStringLiteral(":/assets/icons/layout-grid.svg")),
+        tr("Web Apps"),
+        m_sidebar
+    );
+    webAppsItem->setData(Qt::UserRole, static_cast<int>(Page::WebApps));
     auto *privacyDataItem = new QListWidgetItem(
         QIcon(QStringLiteral(":/assets/icons/database.svg")),
         tr("Privacy & Data"),

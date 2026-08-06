@@ -85,6 +85,7 @@ On first launch PanBrowser creates:
 ├── downloads.json      # download history
 ├── history.sqlite      # browsing history and autocomplete data
 ├── bookmarks.sqlite    # bookmarks and their autocomplete data
+├── web-apps.json       # installed web app metadata and icons
 ├── search-engines.json # address-bar search configuration
 ├── rules.json
 └── Certificates/
@@ -104,6 +105,23 @@ window open a full PanBrowser window with visible URL and TLS status, even when
 the site asks for a chromeless dialog. Popup windows share cookies, cache,
 downloads, permissions, and trust rules with the primary window, but are not
 saved in the restored tab session. Automatic popups remain blocked.
+
+HTTPS pages with a same-origin web app manifest can be installed from the
+PanBrowser menu. Installed web apps open in focused windows without tabs or an
+address field, while retaining compact navigation controls and the
+browser-owned TLS status bar. They share the main PanBrowser profile, so
+sign-ins, permissions, downloads, and domain trust rules behave consistently.
+User-clicked HTTP/HTTPS links outside the manifest scope open in a normal
+PanBrowser tab. Automatic out-of-scope navigation is blocked, as are form
+submissions whose POST body cannot be transferred safely to a browser tab.
+Installed apps are listed under **Settings → Web Apps**, where they can be
+opened or removed. Removing an app keeps its cookies and site data. Offline
+behavior depends on the service worker supplied by the website.
+
+The current web app implementation is internal to PanBrowser: it does not yet
+create macOS `.app` bundles, Windows Start Menu shortcuts, or Linux `.desktop`
+files, and it does not implement manifest share targets, protocol/file
+handlers, badges, or app shortcuts.
 
 The address bar opens explicit HTTP/HTTPS URLs, domains, IP addresses, and
 `localhost` directly. Other input is sent to the selected search engine only
