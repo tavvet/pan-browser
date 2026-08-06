@@ -22,6 +22,7 @@
 - [x] English and Russian interface localization with system-language detection and explicit override.
 - [x] Manifest-based web app installation with scoped app windows, management UI, and macOS application shortcuts.
 - [x] Secure DNS manager with system default, built-in and custom DNS-over-HTTPS providers, fallback/strict modes, runtime application, and diagnostics.
+- [x] Browser-wide proxy manager with system, direct, HTTP, and unauthenticated SOCKS5 modes, session-only HTTP authentication, fail-closed startup, and diagnostics.
 
 ## Browser essentials
 
@@ -48,3 +49,10 @@
 - [ ] Developer ID signing and notarization.
 - [ ] DMG packaging and first-run onboarding.
 - [ ] Importable and exportable trust profiles.
+
+## Deferred proxy extensions
+
+- [ ] Custom PAC URLs and explicit PAC diagnostics.
+- [ ] Per-domain proxy routing and bypass rules.
+- [ ] Named proxy profiles, chains, health checks, and automatic failover.
+- [ ] Independent proxy selection for installed web apps.

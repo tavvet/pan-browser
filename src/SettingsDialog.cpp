@@ -4,6 +4,7 @@
 #include "DiagnosticsPage.h"
 #include "DnsSettingsPage.h"
 #include "HistorySettingsPage.h"
+#include "ProxySettingsPage.h"
 #include "SearchSettingsPage.h"
 #include "TrustRulesDialog.h"
 #include "WebAppsSettingsPage.h"
@@ -111,9 +112,13 @@ SettingsDialog::SettingsDialog(
     const QString &configurationPath,
     const QString &searchConfigurationPath,
     const QString &dnsConfigurationPath,
+    const QString &proxyConfigurationPath,
     const BrowserPreferences &preferences,
     const SearchSettings &searchSettings,
     const DnsSettings &dnsSettings,
+    const ProxySettings &proxySettings,
+    const ProxySettings &activeProxySettings,
+    bool networkBlockedByProxyError,
     BrowserProfile *profile,
     HistoryStore *historyStore,
     WebAppStore *webAppStore,
@@ -125,9 +130,13 @@ SettingsDialog::SettingsDialog(
     , m_configurationPath(configurationPath)
     , m_searchConfigurationPath(searchConfigurationPath)
     , m_dnsConfigurationPath(dnsConfigurationPath)
+    , m_proxyConfigurationPath(proxyConfigurationPath)
     , m_preferences(preferences)
     , m_searchSettings(searchSettings)
     , m_dnsSettings(dnsSettings)
+    , m_proxySettings(proxySettings)
+    , m_activeProxySettings(activeProxySettings)
+    , m_networkBlockedByProxyError(networkBlockedByProxyError)
     , m_profile(profile)
 {
     createInterface(currentUrl, initialPage);
@@ -149,7 +158,14 @@ SettingsDialog::SettingsDialog(
                 emit webAppOpenRequested(id);
         }
     );
-    m_diagnosticsPage = new DiagnosticsPage(m_profile, m_dnsSettings, m_pages);
+    m_diagnosticsPage = new DiagnosticsPage(
+        m_profile,
+        m_dnsSettings,
+        m_activeProxySettings,
+        m_proxySettings,
+        m_networkBlockedByProxyError,
+        m_pages
+    );
     m_pages->addWidget(m_diagnosticsPage);
     m_pages->setCurrentIndex(static_cast<int>(initialPage));
 }
@@ -172,6 +188,11 @@ SearchSettings SettingsDialog::searchSettings() const
 DnsSettings SettingsDialog::dnsSettings() const
 {
     return m_dnsSettings;
+}
+
+ProxySettings SettingsDialog::proxySettings() const
+{
+    return m_proxySettings;
 }
 
 void SettingsDialog::createInterface(const QUrl &currentUrl, Page initialPage)
@@ -232,6 +253,12 @@ void SettingsDialog::createInterface(const QUrl &currentUrl, Page initialPage)
         m_sidebar
     );
     dnsItem->setData(Qt::UserRole, static_cast<int>(Page::Dns));
+    auto *proxyItem = new QListWidgetItem(
+        QIcon(QStringLiteral(":/assets/icons/proxy.svg")),
+        tr("Proxy"),
+        m_sidebar
+    );
+    proxyItem->setData(Qt::UserRole, static_cast<int>(Page::Proxy));
     auto *trustItem = new QListWidgetItem(
         QIcon(QStringLiteral(":/assets/icons/shield-check.svg")),
         tr("Trust Rules"),
@@ -487,6 +514,9 @@ void SettingsDialog::createInterface(const QUrl &currentUrl, Page initialPage)
     m_dnsPage = new DnsSettingsPage(m_dnsSettings, m_pages);
     m_pages->addWidget(m_dnsPage);
 
+    m_proxyPage = new ProxySettingsPage(m_proxySettings, m_pages);
+    m_pages->addWidget(m_proxyPage);
+
     m_trustRules = new TrustRulesDialog(m_configurationPath, m_pages, true);
     m_pages->addWidget(m_trustRules);
 
@@ -648,12 +678,19 @@ void SettingsDialog::saveAndClose()
         QMessageBox::warning(this, tr("Cannot save DNS settings"), error);
         return;
     }
+    if (!m_proxyPage->validate(&error)) {
+        selectPage(Page::Proxy);
+        QMessageBox::warning(this, tr("Cannot save proxy settings"), error);
+        return;
+    }
     QList<FileSnapshot> snapshots;
     for (const QString &path : {
              m_searchConfigurationPath,
              m_searchConfigurationPath + QStringLiteral(".backup"),
              m_dnsConfigurationPath,
              m_dnsConfigurationPath + QStringLiteral(".backup"),
+             m_proxyConfigurationPath,
+             m_proxyConfigurationPath + QStringLiteral(".backup"),
              m_configurationPath,
              m_configurationPath + QStringLiteral(".backup"),
          }) {
@@ -667,6 +704,7 @@ void SettingsDialog::saveAndClose()
 
     SearchSettings searchSettings = m_searchPage->settings();
     DnsSettings dnsSettings = m_dnsPage->settings();
+    ProxySettings proxySettings = m_proxyPage->settings();
     if (!preferences.save(&error)) {
         selectPage(Page::General);
         QMessageBox::warning(this, tr("Cannot save settings"), error);
@@ -686,6 +724,14 @@ void SettingsDialog::saveAndClose()
         if (!rollbackError.isEmpty())
             error += tr("\n\nRollback was incomplete:\n") + rollbackError;
         QMessageBox::warning(this, tr("Cannot save DNS settings"), error);
+        return;
+    }
+    if (!proxySettings.save(m_proxyConfigurationPath, &error)) {
+        const QString rollbackError = rollbackSettings(m_preferences, snapshots);
+        selectPage(Page::Proxy);
+        if (!rollbackError.isEmpty())
+            error += tr("\n\nRollback was incomplete:\n") + rollbackError;
+        QMessageBox::warning(this, tr("Cannot save proxy settings"), error);
         return;
     }
     if (!m_trustRules->save(&error)) {
@@ -709,5 +755,6 @@ void SettingsDialog::saveAndClose()
     m_preferences = preferences;
     m_searchSettings = searchSettings;
     m_dnsSettings = dnsSettings;
+    m_proxySettings = proxySettings;
     accept();
 }

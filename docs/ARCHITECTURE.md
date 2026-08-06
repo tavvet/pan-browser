@@ -65,13 +65,14 @@ flowchart TD
     Settings --> TrustEditor["TrustRulesDialog"]
     Settings --> Search["SearchSettings"]
     Settings --> DNS["DnsSettings / QWebEngineGlobalSettings"]
+    Settings --> Proxy["ProxySettings / QNetworkProxy"]
     Settings --> History
 ```
 
 The primary `MainWindow` is the composition root. It creates and owns the
 shared `BrowserProfile`, `DownloadManager`, `HistoryStore`, `BookmarkStore`,
 and `WebAppStore`. Popup and installed web-app windows reuse those objects and
-the current trust/search/DNS/preferences state; they do not create independent
+the current trust/search/DNS/proxy/preferences state; they do not create independent
 browser profiles.
 
 Each tab owns one `QWebEngineView` and one `BrowserPage`. `BrowserTabState` in
@@ -363,6 +364,53 @@ account-specific identifiers. Serialized settings are capped at 256 KiB on
 both read and write, so the editor cannot create a file that the next launch
 would reject.
 
+### 6.3 Proxy
+
+`ProxySettings` owns a versioned browser-wide configuration with three modes:
+operating-system proxy, no proxy, and one manual proxy. Manual configuration is
+either HTTP (including HTTPS tunnelling through CONNECT) or SOCKS5 and contains
+only a validated host, port, and optional HTTP username. Passwords are
+deliberately absent from the model and serialized JSON. Chromium does not
+support SOCKS5 authentication, so SOCKS5 credentials are disabled in the UI and
+ignored when comparing effective configurations.
+
+Qt WebEngine consumes Qt Network's application proxy. The primary
+`MainWindow` therefore calls `applyProxySettings()` before constructing
+`BrowserProfile`: system mode enables `QNetworkProxyFactory` system
+configuration, direct mode installs `QNetworkProxy::NoProxy`, and manual mode
+installs one `HttpProxy` or `Socks5Proxy`. The application proxy is shared by
+tabs, popups, installed web apps, and downloads. An explicit manual proxy never
+contains a direct fallback.
+
+Proxy changes are persisted from Settings but apply only after restart. This
+avoids a misleading partial switch while Chromium retains existing connections,
+authentication state, and resolver work. Diagnostics consequently show the
+active startup mode and the configured mode separately when a restart is
+pending, while omitting endpoints and usernames.
+
+Every page forwards `QWebEnginePage::proxyAuthenticationRequired` to the one
+`ProxyAuthenticationController` owned by the primary window. It asks for
+credentials in a browser-owned modal dialog, pre-fills the configured username,
+and writes the entered values only to Qt's request-scoped `QAuthenticator`.
+PanBrowser never stores the password. Chromium may cache accepted credentials
+for the remaining process lifetime; a rejection causes the next challenge to
+show a retry message.
+
+An absent configuration means the explicit System default. An existing but
+unreadable, malformed, or inapplicable configuration is different: falling
+back to System could leak traffic that the user expected to proxy. In that
+case `MainWindow` creates `BrowserProfile` with a fail-closed profile request
+interceptor. It blocks HTTP, HTTPS, WS, and WSS requests at the WebEngine
+profile boundary, reports the error visibly, and remains blocked until a valid
+configuration is saved and PanBrowser restarts.
+
+Do not replace this backend with a custom `QNetworkProxyFactory`: Qt WebEngine
+does not consult application-installed proxy factories. Future PAC, routing,
+profile, chain, and failover support must preserve the current single startup
+application step or use Chromium-supported mechanisms explicitly. Proxy mode
+is not a VPN boundary; external applications and traffic outside Chromium's
+HTTP proxy path are not covered.
+
 ## 7. Persistent data and privacy boundaries
 
 On macOS, application data is rooted at
@@ -378,6 +426,7 @@ On macOS, application data is rooted at
 | `Certificates/` | `TrustRulesDialog` | Imported CA files referenced by paths relative to `rules.json`. |
 | `search-engines.json` | `SearchSettings` | Versioned engines and default selection; atomic write with `.backup`. |
 | `dns-settings.json` | `DnsSettings` | Versioned DNS mode, selected provider, and custom HTTPS templates; atomic write with `.backup`. Files use owner-only mode bits on Unix-like systems and inherit the per-user application-data ACL on Windows. |
+| `proxy-settings.json` | `ProxySettings` | Versioned system/direct/manual mode plus proxy type, host, port, and optional HTTP username; no password; atomic write with `.backup` and owner-only mode bits on Unix-like systems. |
 | `history.sqlite` | `HistoryStore` | WAL-mode SQLite browsing history, limited to 50,000 visits. |
 | `bookmarks.sqlite` | `BookmarkStore` | WAL-mode SQLite bookmarks with normalized URL and title fields for local lookup. |
 | `web-apps.json` | `WebAppStore` | Validated installed-app metadata and bounded page icons, atomically written. |
@@ -397,18 +446,19 @@ recursive deletion target is a strict child of the expected managed root.
 
 ### 7.1 Settings save transaction
 
-The unified Settings dialog spans native `QSettings` and three JSON files, so a
+The unified Settings dialog spans native `QSettings` and four JSON files, so a
 single filesystem transaction is unavailable. Its save order and rollback are
 therefore deliberate:
 
 1. validate every page without changing persistent state;
-2. snapshot all three JSON files and their backups;
+2. snapshot all four JSON files and their backups;
 3. save general preferences;
 4. save search settings;
 5. save DNS settings;
-6. save trust rules last;
-7. apply the new DNS mode to Qt WebEngine;
-8. finalize imported certificate files only after every save and runtime apply succeeds.
+6. save proxy settings;
+7. save trust rules last;
+8. apply the new DNS mode to Qt WebEngine;
+9. finalize imported certificate files only after every save and runtime apply succeeds.
 
 If a later step fails, earlier preferences and files are restored from their
 snapshots. If rollback itself is incomplete, the error dialog says so rather
@@ -519,13 +569,14 @@ Primary-window startup is ordered as follows:
 2. load trust rules and preferences;
 3. load or create search settings;
 4. load DNS settings and apply the effective global resolver mode;
-5. apply a pending profile reset before Chromium opens the profile;
-6. create the shared browser profile, download manager, history store,
+5. load proxy settings and apply the effective application proxy;
+6. apply a pending profile reset before Chromium opens the profile;
+7. create the shared browser profile, download manager, history store,
    bookmark store, and installed web-app store;
-7. create the UI and permission controller;
-8. restore safe window geometry;
-9. reload runtime trust rules;
-10. restore command-line, start-page, or lazy session tabs.
+8. create the UI and permission/authentication controllers;
+9. restore safe window geometry;
+10. reload runtime trust rules;
+11. restore command-line, start-page, or lazy session tabs.
 
 On close, the primary window saves or clears the tab session according to the
 startup preference, persists geometry, closes popups, destroys tab pages, and
@@ -569,10 +620,11 @@ distribution still requires platform signing, a supported oldest Linux build
 host, license review, and the release work tracked in the roadmap.
 
 The Diagnostics settings page reports application, Qt WebEngine, Chromium,
-security-patch, graphics, sandbox, DNS mode/provider, runtime-flag, and
-profile-path information. It infers forced overrides from arguments and
+security-patch, graphics, sandbox, DNS mode/provider, proxy modes, runtime
+flags, and profile-path information. It infers forced overrides from arguments and
 environment variables; “Automatic” GPU status is not proof of the exact backend
-selected by Chromium. DNS endpoint templates are intentionally omitted.
+selected by Chromium. DNS endpoint templates, proxy hosts, and usernames are
+intentionally omitted.
 
 ## 13. Tests and change discipline
 
@@ -581,6 +633,7 @@ policy and persistence layers: domains and rule validation, settings backups,
 window placement, sessions, cleanup boundaries, downloads, permissions,
 external navigation, popup geometry, search parsing, history ranking/deletion,
 bookmark CRUD and normalization, combined suggestion ranking,
+proxy persistence/validation/application modes,
 corrupt-database behavior, ghost completion, find-bar keyboard behavior,
 web-app manifest validation/scope enforcement and registry persistence, and
 DNS settings validation/persistence/mode application, and native

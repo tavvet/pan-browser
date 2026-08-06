@@ -3,6 +3,7 @@
 #include "BrowserPreferences.h"
 #include "DnsSettings.h"
 #include "HistoryStore.h"
+#include "ProxySettings.h"
 #include "SessionStore.h"
 #include "SearchSettings.h"
 #include "TrustConfiguration.h"
@@ -33,6 +34,7 @@ class FindBar;
 class AddressCompletionPopup;
 class PermissionController;
 class PermissionPrompt;
+class ProxyAuthenticationController;
 class QCloseEvent;
 class QWebEngineCertificateError;
 class QWebEngineNewWindowRequest;
@@ -162,6 +164,8 @@ private:
     QString ensureConfiguration();
     void initializeSearchSettings();
     void initializeDnsSettings();
+    void initializeProxySettings();
+    void showProxyConfigurationError();
 
     BrowserProfile *m_profile = nullptr;
     DownloadManager *m_downloadManager = nullptr;
@@ -175,6 +179,7 @@ private:
     AddressCompletionPopup *m_addressCompletionPopup = nullptr;
     PermissionController *m_permissionController = nullptr;
     PermissionPrompt *m_permissionPrompt = nullptr;
+    ProxyAuthenticationController *m_proxyAuthenticationController = nullptr;
     QPointer<QMessageBox> m_externalUrlDialog;
     QPointer<QWebEngineView> m_externalUrlSource;
     QPointer<QWebEngineView> m_findView;
@@ -199,11 +204,15 @@ private:
     BrowserPreferences m_preferences;
     SearchSettings m_searchSettings;
     DnsSettings m_dnsSettings;
+    ProxySettings m_proxySettings;
+    ProxySettings m_activeProxySettings;
     SessionStore m_sessionStore;
     TrustPolicy m_trustPolicy;
     QString m_configurationPath;
     QString m_searchConfigurationPath;
     QString m_dnsConfigurationPath;
+    QString m_proxyConfigurationPath;
+    QString m_proxyConfigurationError;
     QString m_historyError;
     QString m_bookmarkError;
     MainWindow *m_primaryWindow = nullptr;
@@ -214,5 +223,6 @@ private:
     bool m_primaryTabsInitialized = false;
     bool m_restoringSession = false;
     bool m_discardSessionOnClose = false;
+    bool m_networkBlockedByProxyError = false;
     quint64 m_findRequestSerial = 0;
 };

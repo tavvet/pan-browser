@@ -22,5 +22,6 @@
         <file>assets/icons/chevron-down.svg</file>
         <file>assets/icons/layout-grid.svg</file>
         <file>assets/icons/network.svg</file>
+        <file>assets/icons/proxy.svg</file>
     </qresource>
 </RCC>

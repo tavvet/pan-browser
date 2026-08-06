@@ -2,6 +2,7 @@
 
 #include "BrowserPreferences.h"
 #include "DnsSettings.h"
+#include "ProxySettings.h"
 #include "SearchSettings.h"
 
 #include <QDialog>
@@ -16,6 +17,7 @@ class DiagnosticsPage;
 class DnsSettingsPage;
 class HistorySettingsPage;
 class HistoryStore;
+class ProxySettingsPage;
 class SearchSettingsPage;
 class TrustRulesDialog;
 class WebAppsSettingsPage;
@@ -32,6 +34,7 @@ public:
         WebApps,
         PrivacyData,
         Dns,
+        Proxy,
         TrustRules,
         Diagnostics,
     };
@@ -40,9 +43,13 @@ public:
         const QString &configurationPath,
         const QString &searchConfigurationPath,
         const QString &dnsConfigurationPath,
+        const QString &proxyConfigurationPath,
         const BrowserPreferences &preferences,
         const SearchSettings &searchSettings,
         const DnsSettings &dnsSettings,
+        const ProxySettings &proxySettings,
+        const ProxySettings &activeProxySettings,
+        bool networkBlockedByProxyError,
         BrowserProfile *profile,
         HistoryStore *historyStore,
         WebAppStore *webAppStore,
@@ -55,6 +62,7 @@ public:
     [[nodiscard]] BrowserPreferences preferences() const;
     [[nodiscard]] SearchSettings searchSettings() const;
     [[nodiscard]] DnsSettings dnsSettings() const;
+    [[nodiscard]] ProxySettings proxySettings() const;
 
 signals:
     void webAppOpenRequested(const QString &id);
@@ -68,9 +76,13 @@ private:
     QString m_configurationPath;
     QString m_searchConfigurationPath;
     QString m_dnsConfigurationPath;
+    QString m_proxyConfigurationPath;
     BrowserPreferences m_preferences;
     SearchSettings m_searchSettings;
     DnsSettings m_dnsSettings;
+    ProxySettings m_proxySettings;
+    ProxySettings m_activeProxySettings;
+    bool m_networkBlockedByProxyError = false;
     BrowserProfile *m_profile = nullptr;
     QListWidget *m_sidebar = nullptr;
     QStackedWidget *m_pages = nullptr;
@@ -80,6 +92,7 @@ private:
     QCheckBox *m_persistSessionCookies = nullptr;
     SearchSettingsPage *m_searchPage = nullptr;
     DnsSettingsPage *m_dnsPage = nullptr;
+    ProxySettingsPage *m_proxyPage = nullptr;
     HistorySettingsPage *m_historyPage = nullptr;
     WebAppsSettingsPage *m_webAppsPage = nullptr;
     DiagnosticsPage *m_diagnosticsPage = nullptr;

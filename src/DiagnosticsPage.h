@@ -1,6 +1,7 @@
 #pragma once
 
 #include "DnsSettings.h"
+#include "ProxySettings.h"
 
 #include <QWidget>
 
@@ -13,6 +14,9 @@ public:
     explicit DiagnosticsPage(
         BrowserProfile *profile,
         const DnsSettings &dnsSettings,
+        const ProxySettings &activeProxySettings,
+        const ProxySettings &configuredProxySettings,
+        bool networkBlockedByProxyError,
         QWidget *parent = nullptr
     );
 
@@ -21,4 +25,7 @@ private:
 
     BrowserProfile *m_profile = nullptr;
     DnsSettings m_dnsSettings;
+    ProxySettings m_activeProxySettings;
+    ProxySettings m_configuredProxySettings;
+    bool m_networkBlockedByProxyError = false;
 };

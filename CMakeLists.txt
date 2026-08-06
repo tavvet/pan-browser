@@ -88,6 +88,12 @@ set(PANBROWSER_APP_SOURCES
     src/PermissionPolicy.h
     src/PermissionPrompt.cpp
     src/PermissionPrompt.h
+    src/ProxyAuthenticationController.cpp
+    src/ProxyAuthenticationController.h
+    src/ProxySettings.cpp
+    src/ProxySettings.h
+    src/ProxySettingsPage.cpp
+    src/ProxySettingsPage.h
     src/main.cpp
     src/MainWindow.cpp
     src/MainWindow.h
@@ -233,6 +239,8 @@ qt_add_executable(PanBrowserTests
     src/BookmarkStore.h
     src/BrowserDataCleanup.cpp
     src/BrowserDataCleanup.h
+    src/BrowserProfile.cpp
+    src/BrowserProfile.h
     src/BrowserPreferences.cpp
     src/BrowserPreferences.h
     src/DownloadHistoryStore.cpp
@@ -249,6 +257,8 @@ qt_add_executable(PanBrowserTests
     src/Localization.h
     src/PermissionPolicy.cpp
     src/PermissionPolicy.h
+    src/ProxySettings.cpp
+    src/ProxySettings.h
     src/SessionStore.cpp
     src/SessionStore.h
     src/SearchSettings.cpp

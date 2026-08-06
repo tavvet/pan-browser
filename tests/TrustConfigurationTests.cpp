@@ -5,6 +5,7 @@
 #include "BookmarkStore.h"
 #include "BrowserPreferences.h"
 #include "BrowserDataCleanup.h"
+#include "BrowserProfile.h"
 #include "CertificateTrustValidator.h"
 #include "DownloadHistoryStore.h"
 #include "DnsSettings.h"
@@ -13,6 +14,7 @@
 #include "HistoryStore.h"
 #include "Localization.h"
 #include "PermissionPolicy.h"
+#include "ProxySettings.h"
 #include "SessionStore.h"
 #include "SearchSettings.h"
 #include "TrustConfiguration.h"
@@ -23,10 +25,13 @@
 
 #include <QApplication>
 #include <QFile>
+#include <QFileInfo>
 #include <QLabel>
 #include <QLineEdit>
 #include <QListWidget>
 #include <QMouseEvent>
+#include <QNetworkProxy>
+#include <QNetworkProxyFactory>
 #include <QSignalSpy>
 #include <QSettings>
 #include <QTemporaryDir>
@@ -76,6 +81,11 @@ private slots:
     void dnsSettingsRoundTripCustomProvidersAndCreateBackup();
     void dnsSettingsRejectOversizedConfigurationWithoutWriting();
     void dnsSettingsRejectUnsafeTemplatesAndApplyModes();
+    void proxySettingsDefaultToSystemAndRoundTrip();
+    void proxySettingsRejectUnsafeManualConfiguration();
+    void proxySettingsApplyGlobalModes();
+    void proxySettingsCompareOnlyEffectiveConfiguration();
+    void proxyFailureBlocksWebEngineNetworkSchemes();
     void searchSettingsRoundTripAndCreateBackup();
     void searchSettingsRejectInvalidTemplatesAndDuplicates();
     void addressInputDistinguishesUrlsAndSearches();
@@ -555,6 +565,10 @@ void TrustConfigurationTests::embeddedTranslationCatalogsLoad()
     QCOMPARE(
         QCoreApplication::translate("DnsSettingsPage", "Secure DNS only"),
         QStringLiteral("Только защищённый DNS")
+    );
+    QCOMPARE(
+        QCoreApplication::translate("ProxySettingsPage", "Manual proxy"),
+        QStringLiteral("Ручной прокси")
     );
     QCOMPARE(
         QCoreApplication::translate("QPlatformTheme", "Cancel"),
@@ -1081,6 +1095,161 @@ void TrustConfigurationTests::dnsSettingsRejectUnsafeTemplatesAndApplyModes()
     QVERIFY2(fallbackApplied, qPrintable(error));
     QVERIFY2(strictApplied, qPrintable(error));
     QVERIFY2(systemRestored, qPrintable(resetError));
+}
+
+void TrustConfigurationTests::proxySettingsDefaultToSystemAndRoundTrip()
+{
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+    const QString path = directory.filePath(QStringLiteral("proxy-settings.json"));
+
+    ProxySettings settings = ProxySettings::defaults();
+    QCOMPARE(settings.mode(), ProxyMode::System);
+    settings.setMode(ProxyMode::Manual);
+    settings.setManualType(ManualProxyType::Http);
+    settings.setHost(QStringLiteral("proxy.example.com"));
+    settings.setPort(3128);
+    settings.setUsername(QStringLiteral("alice"));
+
+    QString error;
+    QVERIFY2(settings.save(path, &error), qPrintable(error));
+#if defined(Q_OS_UNIX)
+    const QFileDevice::Permissions permissions = QFileInfo(path).permissions();
+    QVERIFY(permissions.testFlag(QFileDevice::ReadOwner));
+    QVERIFY(permissions.testFlag(QFileDevice::WriteOwner));
+    QVERIFY(!permissions.testFlag(QFileDevice::ReadGroup));
+    QVERIFY(!permissions.testFlag(QFileDevice::ReadOther));
+#endif
+    settings.setManualType(ManualProxyType::Socks5);
+    QVERIFY2(settings.save(path, &error), qPrintable(error));
+    const QString backupPath = path + QStringLiteral(".backup");
+    QVERIFY(QFileInfo::exists(backupPath));
+#if defined(Q_OS_UNIX)
+    const QFileDevice::Permissions backupPermissions = QFileInfo(backupPath).permissions();
+    QVERIFY(backupPermissions.testFlag(QFileDevice::ReadOwner));
+    QVERIFY(!backupPermissions.testFlag(QFileDevice::ReadGroup));
+    QVERIFY(!backupPermissions.testFlag(QFileDevice::ReadOther));
+#endif
+
+    QFile file(path);
+    QVERIFY(file.open(QIODevice::ReadOnly));
+    const QByteArray contents = file.readAll();
+    QVERIFY(!contents.contains("password"));
+    QVERIFY(!contents.contains("secret"));
+
+    ProxySettings loaded;
+    QVERIFY2(loaded.load(path, &error), qPrintable(error));
+    QCOMPARE(loaded, settings);
+}
+
+void TrustConfigurationTests::proxySettingsRejectUnsafeManualConfiguration()
+{
+    ProxySettings settings = ProxySettings::defaults();
+    settings.setMode(ProxyMode::Manual);
+    QString error;
+    QVERIFY(!settings.validate(&error));
+    QVERIFY(error.contains(QStringLiteral("host"), Qt::CaseInsensitive));
+
+    settings.setHost(QStringLiteral("https://proxy.example.com/path"));
+    QVERIFY(!settings.validate(&error));
+    settings.setHost(QStringLiteral("user@proxy.example.com"));
+    QVERIFY(!settings.validate(&error));
+    settings.setHost(QStringLiteral("2001:db8::1"));
+    settings.setPort(1080);
+    QVERIFY2(settings.validate(&error), qPrintable(error));
+    settings.setUsername(QStringLiteral("bad\nuser"));
+    QVERIFY(!settings.validate(&error));
+}
+
+void TrustConfigurationTests::proxySettingsApplyGlobalModes()
+{
+    QString error;
+    ProxySettings settings = ProxySettings::defaults();
+    const bool systemApplied = applyProxySettings(settings, &error);
+    const bool systemEnabled = QNetworkProxyFactory::usesSystemConfiguration();
+
+    settings.setMode(ProxyMode::NoProxy);
+    const bool directApplied = applyProxySettings(settings, &error);
+    const bool systemDisabledForDirect = !QNetworkProxyFactory::usesSystemConfiguration();
+    const QNetworkProxy directProxy = QNetworkProxy::applicationProxy();
+
+    settings.setMode(ProxyMode::Manual);
+    settings.setManualType(ManualProxyType::Http);
+    settings.setHost(QStringLiteral("proxy.example.com"));
+    settings.setPort(3128);
+    settings.setUsername(QStringLiteral("alice"));
+    const bool httpApplied = applyProxySettings(settings, &error);
+    const QNetworkProxy httpProxy = QNetworkProxy::applicationProxy();
+
+    settings.setManualType(ManualProxyType::Socks5);
+    settings.setPort(1080);
+    const bool socksApplied = applyProxySettings(settings, &error);
+    const QNetworkProxy socksProxy = QNetworkProxy::applicationProxy();
+
+    ProxySettings restore = ProxySettings::defaults();
+    QString restoreError;
+    const bool restored = applyProxySettings(restore, &restoreError);
+
+    QVERIFY2(systemApplied, qPrintable(error));
+    QVERIFY(systemEnabled);
+    QVERIFY2(directApplied, qPrintable(error));
+    QVERIFY(systemDisabledForDirect);
+    QCOMPARE(directProxy.type(), QNetworkProxy::NoProxy);
+    QVERIFY2(httpApplied, qPrintable(error));
+    QCOMPARE(httpProxy.type(), QNetworkProxy::HttpProxy);
+    QCOMPARE(httpProxy.hostName(), QStringLiteral("proxy.example.com"));
+    QCOMPARE(httpProxy.port(), quint16(3128));
+    QVERIFY(httpProxy.user().isEmpty());
+    QVERIFY(httpProxy.password().isEmpty());
+    QVERIFY2(socksApplied, qPrintable(error));
+    QCOMPARE(socksProxy.type(), QNetworkProxy::Socks5Proxy);
+    QCOMPARE(socksProxy.port(), quint16(1080));
+    QVERIFY2(restored, qPrintable(restoreError));
+}
+
+void TrustConfigurationTests::proxySettingsCompareOnlyEffectiveConfiguration()
+{
+    QVERIFY(manualProxyAuthenticationSupported(ManualProxyType::Http));
+    QVERIFY(!manualProxyAuthenticationSupported(ManualProxyType::Socks5));
+
+    ProxySettings active = ProxySettings::defaults();
+    ProxySettings configured = active;
+    configured.setHost(QStringLiteral("draft.example.com"));
+    configured.setPort(3128);
+    configured.setUsername(QStringLiteral("draft-user"));
+    QVERIFY(hasSameEffectiveProxyConfiguration(active, configured));
+
+    configured.setMode(ProxyMode::Manual);
+    QVERIFY(!hasSameEffectiveProxyConfiguration(active, configured));
+    active = configured;
+    QVERIFY(hasSameEffectiveProxyConfiguration(active, configured));
+
+    configured.setUsername(QStringLiteral("different-user"));
+    QVERIFY(!hasSameEffectiveProxyConfiguration(active, configured));
+    active.setManualType(ManualProxyType::Socks5);
+    configured.setManualType(ManualProxyType::Socks5);
+    QVERIFY(hasSameEffectiveProxyConfiguration(active, configured));
+
+    configured.setPort(1080);
+    QVERIFY(!hasSameEffectiveProxyConfiguration(active, configured));
+}
+
+void TrustConfigurationTests::proxyFailureBlocksWebEngineNetworkSchemes()
+{
+    for (const QString &url : {
+             QStringLiteral("http://example.com"),
+             QStringLiteral("https://example.com"),
+             QStringLiteral("ws://example.com/socket"),
+             QStringLiteral("wss://example.com/socket"),
+         }) {
+        QVERIFY(BrowserProfile::shouldBlockForProxyConfigurationError(QUrl(url)));
+    }
+    QVERIFY(!BrowserProfile::shouldBlockForProxyConfigurationError(
+        QUrl(QStringLiteral("about:blank"))
+    ));
+    QVERIFY(!BrowserProfile::shouldBlockForProxyConfigurationError(
+        QUrl(QStringLiteral("data:text/plain,offline"))
+    ));
 }
 
 void TrustConfigurationTests::searchSettingsRoundTripAndCreateBackup()

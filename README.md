@@ -88,6 +88,7 @@ On first launch PanBrowser creates:
 ├── web-apps.json       # installed web app metadata and icons
 ├── search-engines.json # address-bar search configuration
 ├── dns-settings.json   # secure DNS mode and custom providers
+├── proxy-settings.json # browser-wide proxy mode and endpoint (no password)
 ├── rules.json
 └── Certificates/
 ```
@@ -208,6 +209,30 @@ windows, and installed web apps without changing the operating-system DNS.
 Configuration is saved atomically in `dns-settings.json`, with the previous
 version retained as `dns-settings.json.backup`.
 
+The **Proxy** section uses the operating-system proxy by default. It can also
+disable proxy use or route browser traffic through one manually configured
+HTTP or SOCKS5 proxy. The HTTP option covers both HTTP traffic and HTTPS via
+CONNECT. Manual settings contain only proxy type, host, port, and an optional
+HTTP-proxy username. If HTTP proxy authentication is required, PanBrowser asks
+for the password when the proxy is first used and keeps it only for the current
+browser session. Chromium does not support SOCKS5 authentication, so SOCKS5
+servers must allow unauthenticated connections.
+Proxy changes take effect after restarting PanBrowser.
+
+Proxy mode is browser-wide: normal tabs, popup windows, installed web apps, and
+downloads share it. A failed manual proxy does not silently fall back to a
+direct connection. This feature is not a VPN and does not configure other
+applications; protocols that do not use Chromium's HTTP proxy path, including
+some WebRTC traffic, are outside its guarantee. PAC and platform-specific
+automatic configuration can be inherited in **System proxy** mode, but custom
+PAC URLs and per-domain routing are not yet exposed by PanBrowser.
+Configuration is saved atomically in `proxy-settings.json`, with the previous
+version retained as `proxy-settings.json.backup`.
+If an existing proxy configuration cannot be loaded, PanBrowser blocks all
+WebEngine network requests instead of falling back to a direct or system
+connection. The configuration can then be repaired in Settings and applied by
+restarting the browser.
+
 Downloads always use a system destination picker and never open files
 automatically. The toolbar download button shows active progress and persistent
 history with pause, resume, cancel, open, and reveal actions. History stores the
@@ -237,9 +262,11 @@ atomically, and reloads the active policy. The previous file is retained as
 
 The **Diagnostics** settings section shows the PanBrowser, Qt WebEngine, and
 Chromium versions; operating-system details; configured graphics and sandbox
-state; active DNS mode and provider; runtime overrides; and profile paths. It
+state; active DNS mode and provider; active and configured proxy modes; runtime
+overrides; and profile paths. It
 can copy a plain-text report for troubleshooting. Custom DNS endpoint URLs are
-not included because they may contain account-specific identifiers. Exact
+not included because they may contain account-specific identifiers. Proxy
+hostnames and usernames are likewise omitted from the report. Exact
 active GPU and ANGLE/RHI backend information remains available through Qt
 WebEngine diagnostic logging.
 

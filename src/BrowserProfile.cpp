@@ -7,6 +7,8 @@
 #include <QSettings>
 #include <QStandardPaths>
 #include <QWebEngineCookieStore>
+#include <QWebEngineUrlRequestInfo>
+#include <QWebEngineUrlRequestInterceptor>
 
 namespace {
 
@@ -35,6 +37,20 @@ QSettings browserSettings()
     return QSettings(QStringLiteral("PanBrowser"), QStringLiteral("PanBrowser"));
 }
 
+class FailClosedNetworkInterceptor final : public QWebEngineUrlRequestInterceptor {
+public:
+    explicit FailClosedNetworkInterceptor(QObject *parent)
+        : QWebEngineUrlRequestInterceptor(parent)
+    {
+    }
+
+    void interceptRequest(QWebEngineUrlRequestInfo &info) override
+    {
+        if (BrowserProfile::shouldBlockForProxyConfigurationError(info.requestUrl()))
+            info.block(true);
+    }
+};
+
 bool settingsSucceeded(const QSettings &settings, QString *error)
 {
     if (settings.status() == QSettings::NoError)
@@ -49,7 +65,11 @@ bool settingsSucceeded(const QSettings &settings, QString *error)
 
 } // namespace
 
-BrowserProfile::BrowserProfile(bool persistSessionCookies, QObject *parent)
+BrowserProfile::BrowserProfile(
+    bool persistSessionCookies,
+    QObject *parent,
+    bool blockNetwork
+)
     : QWebEngineProfile(QStringLiteral("PanBrowser"), parent)
 {
     const QString storagePath = profilePath();
@@ -63,6 +83,8 @@ BrowserProfile::BrowserProfile(bool persistSessionCookies, QObject *parent)
     setHttpCacheType(QWebEngineProfile::DiskHttpCache);
     setPersistentPermissionsPolicy(QWebEngineProfile::PersistentPermissionsPolicy::AskEveryTime);
     setPersistSessionCookies(persistSessionCookies);
+    if (blockNetwork)
+        setUrlRequestInterceptor(new FailClosedNetworkInterceptor(this));
 }
 
 bool BrowserProfile::applyPendingDataReset(QString *error)
@@ -103,6 +125,15 @@ bool BrowserProfile::dataResetScheduled()
 {
     QSettings settings = browserSettings();
     return settings.value(QStringLiteral("Browser/resetDataOnNextLaunch"), false).toBool();
+}
+
+bool BrowserProfile::shouldBlockForProxyConfigurationError(const QUrl &url)
+{
+    const QString scheme = url.scheme().toLower();
+    return scheme == QStringLiteral("http")
+        || scheme == QStringLiteral("https")
+        || scheme == QStringLiteral("ws")
+        || scheme == QStringLiteral("wss");
 }
 
 void BrowserProfile::setPersistSessionCookies(bool persist)

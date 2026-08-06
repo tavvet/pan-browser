@@ -84,11 +84,17 @@ QFormLayout *addCard(QVBoxLayout *layout, QWidget *parent)
 DiagnosticsPage::DiagnosticsPage(
     BrowserProfile *profile,
     const DnsSettings &dnsSettings,
+    const ProxySettings &activeProxySettings,
+    const ProxySettings &configuredProxySettings,
+    bool networkBlockedByProxyError,
     QWidget *parent
 )
     : QWidget(parent)
     , m_profile(profile)
     , m_dnsSettings(dnsSettings)
+    , m_activeProxySettings(activeProxySettings)
+    , m_configuredProxySettings(configuredProxySettings)
+    , m_networkBlockedByProxyError(networkBlockedByProxyError)
 {
     setObjectName(QStringLiteral("diagnosticsSettingsPage"));
     auto *rootLayout = new QVBoxLayout(this);
@@ -194,6 +200,30 @@ DiagnosticsPage::DiagnosticsPage(
             this
         )
     );
+    graphics->addRow(
+        tr("Active proxy"),
+        valueLabel(
+            m_networkBlockedByProxyError
+                ? tr("Network blocked — configuration error")
+                : proxyConfigurationDisplayName(m_activeProxySettings),
+            this
+        )
+    );
+    graphics->addRow(
+        tr("Configured proxy"),
+        valueLabel(
+            !m_networkBlockedByProxyError
+                && hasSameEffectiveProxyConfiguration(
+                    m_configuredProxySettings,
+                    m_activeProxySettings
+                )
+                ? proxyConfigurationDisplayName(m_configuredProxySettings)
+                : tr("%1 — pending restart").arg(
+                    proxyConfigurationDisplayName(m_configuredProxySettings)
+                ),
+            this
+        )
+    );
 
     auto *graphicsHint = new QLabel(
         tr("“Automatic” means Chromium attempts to use the GPU and falls back when necessary. For the exact active GPU and ANGLE/RHI backend, launch PanBrowser with QT_LOGGING_RULES=\"qt.webenginecontext=true;qt.webengine.compositor=true\"."),
@@ -254,8 +284,10 @@ QString DiagnosticsPage::diagnosticReport() const
         "QTWEBENGINE_CHROMIUM_FLAGS: %13\n"
         "DNS mode: %14\n"
         "DNS provider: %15\n"
-        "Persistent storage: %16\n"
-        "HTTP cache: %17\n"
+        "Active proxy: %16\n"
+        "Configured proxy: %17\n"
+        "Persistent storage: %18\n"
+        "HTTP cache: %19\n"
     ).arg(
         QCoreApplication::applicationVersion(),
         QString::fromLatin1(qVersion()),
@@ -278,6 +310,17 @@ QString DiagnosticsPage::diagnosticReport() const
             : (m_dnsSettings.providerById(m_dnsSettings.selectedProviderId())
                 ? m_dnsSettings.providerById(m_dnsSettings.selectedProviderId())->name
                 : QStringLiteral("Unavailable")),
+        m_networkBlockedByProxyError
+            ? QStringLiteral("Network blocked — configuration error")
+            : proxyConfigurationDisplayName(m_activeProxySettings),
+        !m_networkBlockedByProxyError
+            && hasSameEffectiveProxyConfiguration(
+                m_configuredProxySettings,
+                m_activeProxySettings
+            )
+            ? proxyConfigurationDisplayName(m_configuredProxySettings)
+            : proxyConfigurationDisplayName(m_configuredProxySettings)
+                + QStringLiteral(" — pending restart"),
         m_profile->persistentStoragePath(),
         m_profile->cachePath()
     );

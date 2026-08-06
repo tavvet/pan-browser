@@ -15,6 +15,7 @@
 #include "AddressCompletionPopup.h"
 #include "PermissionController.h"
 #include "PermissionPrompt.h"
+#include "ProxyAuthenticationController.h"
 #include "SettingsDialog.h"
 #include "WindowPlacement.h"
 #include "WebAppStore.h"
@@ -22,6 +23,7 @@
 
 #include <QAction>
 #include <QApplication>
+#include <QAuthenticator>
 #include <QCloseEvent>
 #include <QDesktopServices>
 #include <QDateTime>
@@ -135,10 +137,15 @@ MainWindow::MainWindow(
         m_preferences = BrowserPreferences::load(m_trustPolicy.startPage());
         initializeSearchSettings();
         initializeDnsSettings();
+        initializeProxySettings();
         QString dataResetError;
         if (!BrowserProfile::applyPendingDataReset(&dataResetError))
             qWarning().noquote() << "[PanBrowser data reset]" << dataResetError;
-        m_profile = new BrowserProfile(m_preferences.persistSessionCookies());
+        m_profile = new BrowserProfile(
+            m_preferences.persistSessionCookies(),
+            nullptr,
+            m_networkBlockedByProxyError
+        );
         m_downloadManager = new DownloadManager(
             m_profile,
             this,
@@ -168,6 +175,10 @@ MainWindow::MainWindow(
         QString webAppsError;
         if (!m_webAppStore->load(&webAppsError))
             qWarning().noquote() << "[PanBrowser web apps]" << webAppsError;
+        m_proxyAuthenticationController = new ProxyAuthenticationController(
+            m_activeProxySettings,
+            this
+        );
     } else {
         Q_ASSERT(sharedProfile);
         Q_ASSERT(sharedDownloadManager);
@@ -183,10 +194,16 @@ MainWindow::MainWindow(
         m_configurationPath = primaryWindow->m_configurationPath;
         m_searchConfigurationPath = primaryWindow->m_searchConfigurationPath;
         m_dnsConfigurationPath = primaryWindow->m_dnsConfigurationPath;
+        m_proxyConfigurationPath = primaryWindow->m_proxyConfigurationPath;
         m_trustPolicy = primaryWindow->m_trustPolicy;
         m_preferences = primaryWindow->m_preferences;
         m_searchSettings = primaryWindow->m_searchSettings;
         m_dnsSettings = primaryWindow->m_dnsSettings;
+        m_proxySettings = primaryWindow->m_proxySettings;
+        m_activeProxySettings = primaryWindow->m_activeProxySettings;
+        m_proxyConfigurationError = primaryWindow->m_proxyConfigurationError;
+        m_networkBlockedByProxyError = primaryWindow->m_networkBlockedByProxyError;
+        m_proxyAuthenticationController = primaryWindow->m_proxyAuthenticationController;
         setAttribute(Qt::WA_DeleteOnClose);
     }
 
@@ -200,6 +217,11 @@ MainWindow::MainWindow(
         if (initializePrimaryTabs) {
             m_primaryTabsInitialized = true;
             restoreInitialTabs();
+        }
+        if (m_networkBlockedByProxyError) {
+            QTimer::singleShot(0, this, [this] {
+                showProxyConfigurationError();
+            });
         }
     } else {
         reloadRulesLocal();
@@ -803,6 +825,25 @@ void MainWindow::activatePendingTab(QWebEngineView *webView)
 
 void MainWindow::connectBrowserSignals(QWebEngineView *webView)
 {
+    connect(
+        webView->page(),
+        &QWebEnginePage::proxyAuthenticationRequired,
+        this,
+        [this](
+            const QUrl &requestUrl,
+            QAuthenticator *authenticator,
+            const QString &proxyHost
+        ) {
+            if (m_proxyAuthenticationController) {
+                m_proxyAuthenticationController->requestAuthentication(
+                    this,
+                    requestUrl,
+                    authenticator,
+                    proxyHost
+                );
+            }
+        }
+    );
     connect(webView, &QWebEngineView::urlChanged, this, [this, webView](const QUrl &url) {
         BrowserTabState &state = m_tabStates[webView];
         state.pendingUrl.clear();
@@ -1788,9 +1829,13 @@ void MainWindow::openSettingsPage(int page)
         m_configurationPath,
         m_searchConfigurationPath,
         m_dnsConfigurationPath,
+        m_proxyConfigurationPath,
         m_preferences,
         m_searchSettings,
         m_dnsSettings,
+        m_proxySettings,
+        m_activeProxySettings,
+        m_networkBlockedByProxyError,
         m_profile,
         m_historyStore,
         m_webAppStore,
@@ -1811,9 +1856,15 @@ void MainWindow::openSettingsPage(int page)
     if (dialog.exec() == QDialog::Accepted) {
         const bool languageChanged = m_preferences.interfaceLanguage()
             != dialog.preferences().interfaceLanguage();
+        const bool proxyRestartRequired = m_networkBlockedByProxyError
+            || !hasSameEffectiveProxyConfiguration(
+                dialog.proxySettings(),
+                m_activeProxySettings
+            );
         m_preferences = dialog.preferences();
         m_searchSettings = dialog.searchSettings();
         m_dnsSettings = dialog.dnsSettings();
+        m_proxySettings = dialog.proxySettings();
         if (!m_preferences.saveBrowsingHistory() && m_addressCompletionPopup)
             m_addressCompletionPopup->hide();
         updateAddressPlaceholder();
@@ -1827,6 +1878,7 @@ void MainWindow::openSettingsPage(int page)
                 popup->m_preferences = m_preferences;
                 popup->m_searchSettings = m_searchSettings;
                 popup->m_dnsSettings = m_dnsSettings;
+                popup->m_proxySettings = m_proxySettings;
                 popup->updateAddressPlaceholder();
                 if (!m_preferences.saveBrowsingHistory()
                     && popup->m_addressCompletionPopup) {
@@ -1835,11 +1887,23 @@ void MainWindow::openSettingsPage(int page)
             }
         }
         reloadRules();
-        if (languageChanged) {
+        if (languageChanged || proxyRestartRequired) {
+            QString restartMessage;
+            if (languageChanged && proxyRestartRequired) {
+                restartMessage = tr(
+                    "Restart PanBrowser to apply the new interface language and proxy settings."
+                );
+            } else if (languageChanged) {
+                restartMessage = tr(
+                    "Restart PanBrowser to apply the new interface language."
+                );
+            } else {
+                restartMessage = tr("Restart PanBrowser to apply the new proxy settings.");
+            }
             QMessageBox::information(
                 this,
                 tr("Restart required"),
-                tr("Restart PanBrowser to apply the new interface language.")
+                restartMessage
             );
         }
     }
@@ -2160,4 +2224,74 @@ void MainWindow::initializeDnsSettings()
     QString fallbackError;
     if (!applyDnsSettings(m_dnsSettings, &fallbackError))
         qWarning().noquote() << "[PanBrowser DNS settings]" << fallbackError;
+}
+
+void MainWindow::initializeProxySettings()
+{
+    const QString directory = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+    QDir().mkpath(directory);
+    m_proxyConfigurationPath = QDir(directory).filePath(
+        QStringLiteral("proxy-settings.json")
+    );
+    m_proxySettings = ProxySettings::defaults();
+    m_activeProxySettings = ProxySettings::defaults();
+    m_proxyConfigurationError.clear();
+    m_networkBlockedByProxyError = false;
+
+    QString error;
+    if (QFile::exists(m_proxyConfigurationPath)) {
+        ProxySettings loaded;
+        if (loaded.load(m_proxyConfigurationPath, &error)) {
+            m_proxySettings = loaded;
+        } else {
+            qWarning().noquote() << "[PanBrowser proxy settings]" << error
+                                 << "Blocking network access; the file was not overwritten.";
+            m_proxyConfigurationError = error;
+            m_networkBlockedByProxyError = true;
+            return;
+        }
+    } else if (!m_proxySettings.save(m_proxyConfigurationPath, &error)) {
+        qWarning().noquote() << "[PanBrowser proxy settings]" << error;
+    }
+
+    m_activeProxySettings = m_proxySettings;
+    if (applyProxySettings(m_activeProxySettings, &error))
+        return;
+
+    qWarning().noquote() << "[PanBrowser proxy settings]" << error
+                         << "Blocking network access without overwriting the file.";
+    m_proxyConfigurationError = error;
+    m_networkBlockedByProxyError = true;
+}
+
+void MainWindow::showProxyConfigurationError()
+{
+    if (!m_networkBlockedByProxyError)
+        return;
+
+    show();
+    raise();
+    activateWindow();
+    setTrustStatus(tr("Network blocked because proxy settings are invalid."), true);
+
+    QMessageBox message(this);
+    message.setIcon(QMessageBox::Critical);
+    message.setTextFormat(Qt::PlainText);
+    message.setWindowTitle(tr("Network blocked"));
+    message.setText(
+        tr("PanBrowser blocked network access because the proxy settings could not be loaded.")
+    );
+    message.setInformativeText(
+        tr("%1\n\nOpen Proxy settings, save a valid configuration, and restart PanBrowser.")
+            .arg(m_proxyConfigurationError)
+    );
+    QPushButton *openSettingsButton = message.addButton(
+        tr("Open Proxy settings"),
+        QMessageBox::ActionRole
+    );
+    message.addButton(QMessageBox::Close);
+    message.exec();
+    if (message.clickedButton() == openSettingsButton) {
+        openSettingsPage(static_cast<int>(SettingsDialog::Page::Proxy));
+    }
 }
