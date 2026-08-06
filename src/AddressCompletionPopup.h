@@ -6,6 +6,7 @@
 
 class AddressLineEdit;
 class QListWidget;
+class QListWidgetItem;
 class QHideEvent;
 
 class AddressCompletionPopup final : public QFrame {
@@ -25,6 +26,7 @@ protected:
     void hideEvent(QHideEvent *event) override;
 
 private:
+    void activateItem(const QListWidgetItem *item);
     void activateCurrent();
     void positionBelowAddressBar();
     void updatePlacementStyle(const QString &placement);

@@ -10,6 +10,7 @@
 #include <QKeyEvent>
 #include <QListWidget>
 #include <QLocale>
+#include <QMouseEvent>
 #include <QRegularExpression>
 #include <QScreen>
 #include <QStyle>
@@ -74,8 +75,8 @@ AddressCompletionPopup::AddressCompletionPopup(
     layout->addWidget(m_list);
 
     qApp->installEventFilter(this);
-    connect(m_list, &QListWidget::itemClicked, this, [this](QListWidgetItem *) {
-        activateCurrent();
+    connect(m_list, &QListWidget::itemClicked, this, [this](QListWidgetItem *item) {
+        activateItem(item);
     });
 }
 
@@ -141,10 +142,17 @@ bool AddressCompletionPopup::eventFilter(QObject *watched, QEvent *event)
         && (target == this || isAncestorOf(target));
 
     if (event->type() == QEvent::MouseButtonPress) {
-        const bool eventBelongsToAddress = target
-            && (target == m_addressBar || m_addressBar->isAncestorOf(target));
-        if (!eventBelongsToCompletion && !eventBelongsToAddress)
+        const auto *mouseEvent = static_cast<QMouseEvent *>(event);
+        const QPoint globalPosition = mouseEvent->globalPosition().toPoint();
+        const QRect completionGeometry(mapToGlobal(QPoint(0, 0)), size());
+        const QRect addressGeometry(
+            m_addressBar->mapToGlobal(QPoint(0, 0)),
+            m_addressBar->size()
+        );
+        if (!completionGeometry.contains(globalPosition)
+            && !addressGeometry.contains(globalPosition)) {
             hide();
+        }
         return QFrame::eventFilter(watched, event);
     }
 
@@ -233,7 +241,11 @@ void AddressCompletionPopup::hideEvent(QHideEvent *event)
 
 void AddressCompletionPopup::activateCurrent()
 {
-    const QListWidgetItem *item = m_list->currentItem();
+    activateItem(m_list->currentItem());
+}
+
+void AddressCompletionPopup::activateItem(const QListWidgetItem *item)
+{
     if (!item)
         return;
     const QUrl url(item->data(Qt::UserRole).toString(), QUrl::StrictMode);

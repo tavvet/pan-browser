@@ -1,3 +1,4 @@
+#include "AddressCompletionPopup.h"
 #include "AddressLineEdit.h"
 #include "AddressSuggestion.h"
 #include "ApplicationLaunch.h"
@@ -20,9 +21,12 @@
 #include "WebAppShortcutManager.h"
 #include "WindowPlacement.h"
 
+#include <QApplication>
 #include <QFile>
 #include <QLabel>
 #include <QLineEdit>
+#include <QListWidget>
+#include <QMouseEvent>
 #include <QSignalSpy>
 #include <QSettings>
 #include <QTemporaryDir>
@@ -30,6 +34,7 @@
 #include <QTimeZone>
 #include <QTranslator>
 #include <QUuid>
+#include <QWindow>
 
 class TrustConfigurationTests final : public QObject {
     Q_OBJECT
@@ -82,6 +87,7 @@ private slots:
     void historyCanDeleteIndividualVisitsAndClearAll();
     void corruptHistoryIsPreservedAndDisabled();
     void ghostCompletionAcceptsOnlyAddressPrefixes();
+    void addressCompletionPopupActivatesMouseSelection();
     void addressSuggestionsPreferRelevanceThenBookmarks();
     void findBarSupportsKeyboardNavigationAndCounts();
     void applicationLaunchRequestsAreValidatedAndRoundTrip();
@@ -1365,6 +1371,61 @@ void TrustConfigurationTests::ghostCompletionAcceptsOnlyAddressPrefixes()
     QVERIFY(!address.hasGhostCompletion());
     QVERIFY(!address.acceptGhostCompletion());
     QCOMPARE(address.text(), QStringLiteral("news"));
+}
+
+void TrustConfigurationTests::addressCompletionPopupActivatesMouseSelection()
+{
+    QWidget window;
+    window.resize(700, 240);
+    AddressLineEdit address(&window);
+    address.setGeometry(20, 20, 660, 36);
+    window.show();
+    QTRY_VERIFY(window.isVisible());
+
+    AddressCompletionPopup popup(&address, &window);
+    const QUrl expectedUrl(QStringLiteral("https://example.com/path"));
+    AddressSuggestion suggestion;
+    suggestion.url = expectedUrl;
+    suggestion.title = QStringLiteral("Example");
+    suggestion.lastUsedAt = QDateTime::currentDateTimeUtc();
+    suggestion.source = AddressSuggestionSource::History;
+
+    QSignalSpy activated(&popup, &AddressCompletionPopup::urlActivated);
+    popup.showSuggestions({suggestion});
+    QTRY_VERIFY(popup.isVisible());
+    auto *list = popup.findChild<QListWidget *>(
+        QStringLiteral("addressCompletionList")
+    );
+    QVERIFY(list);
+    QVERIFY(list->count() == 1);
+    const QRect itemRect = list->visualItemRect(list->item(0));
+    QVERIFY(itemRect.isValid());
+
+    const QPoint globalItemCenter = list->viewport()->mapToGlobal(itemRect.center());
+    const QPoint popupLocalCenter = popup.mapFromGlobal(globalItemCenter);
+    QMouseEvent windowPress(
+        QEvent::MouseButtonPress,
+        QPointF(popupLocalCenter),
+        QPointF(popupLocalCenter),
+        QPointF(globalItemCenter),
+        Qt::LeftButton,
+        Qt::LeftButton,
+        Qt::NoModifier
+    );
+    QVERIFY(QApplication::sendEvent(popup.windowHandle(), &windowPress));
+    QVERIFY2(
+        popup.isVisible(),
+        "A native popup-window mouse press must not be mistaken for an outside click"
+    );
+
+    QTest::mouseClick(
+        list->viewport(),
+        Qt::LeftButton,
+        Qt::NoModifier,
+        itemRect.center()
+    );
+    QTRY_COMPARE(activated.count(), 1);
+    QCOMPARE(activated.takeFirst().at(0).toUrl(), expectedUrl);
 }
 
 void TrustConfigurationTests::addressSuggestionsPreferRelevanceThenBookmarks()

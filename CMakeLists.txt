@@ -222,6 +222,8 @@ enable_testing()
 qt_add_executable(PanBrowserTests
     src/ApplicationLaunch.cpp
     src/ApplicationLaunch.h
+    src/AddressCompletionPopup.cpp
+    src/AddressCompletionPopup.h
     tests/TrustConfigurationTests.cpp
     src/AddressLineEdit.cpp
     src/AddressLineEdit.h
