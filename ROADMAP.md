@@ -1,5 +1,8 @@
 # PanBrowser roadmap
 
+Current development baseline: **0.2.0**. Completed items describe the main
+branch; unfinished experiments kept on other branches remain unchecked here.
+
 ## Completed foundation
 
 - [x] Domain-scoped custom CA validation on macOS.

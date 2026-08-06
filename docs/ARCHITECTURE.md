@@ -4,6 +4,10 @@ This document explains how PanBrowser is put together, why the important
 boundaries exist, and which invariants must survive future changes. It is aimed
 at someone returning to the project after a long break.
 
+This document describes the **0.2.0** development baseline. Update it together
+with any change to component ownership, startup order, persistence, or a
+security boundary.
+
 For user-facing behavior and configuration examples, see
 [README.md](../README.md). For planned work, see [ROADMAP.md](../ROADMAP.md).
 
@@ -48,6 +52,7 @@ flowchart TD
     MW --> Bookmarks["BookmarkStore / SQLite"]
     MW --> Downloads["DownloadManager"]
     MW --> Permissions["PermissionController"]
+    MW --> ProxyAuth["ProxyAuthenticationController"]
     MW --> Session["SessionStore"]
     MW --> WebApps["WebAppStore / web-apps.json"]
     WebApps --> Shortcuts["WebAppShortcutManager / macOS .app launchers"]
@@ -67,13 +72,15 @@ flowchart TD
     Settings --> DNS["DnsSettings / QWebEngineGlobalSettings"]
     Settings --> Proxy["ProxySettings / QNetworkProxy"]
     Settings --> History
+    Settings --> WebApps
+    Settings --> Diagnostics["DiagnosticsPage"]
 ```
 
 The primary `MainWindow` is the composition root. It creates and owns the
 shared `BrowserProfile`, `DownloadManager`, `HistoryStore`, `BookmarkStore`,
 and `WebAppStore`. Popup and installed web-app windows reuse those objects and
-the current trust/search/DNS/proxy/preferences state; they do not create independent
-browser profiles.
+the current trust, search, DNS, proxy, and preference state; they do not create
+independent browser profiles.
 
 Each tab owns one `QWebEngineView` and one `BrowserPage`. `BrowserTabState` in
 `MainWindow` contains UI state that Qt WebEngine does not provide as a single
@@ -94,6 +101,9 @@ The primary window owns browser-wide resources:
 - `HistoryStore` owns one named Qt SQL connection on the GUI thread.
 - `BookmarkStore` owns a separate named Qt SQL connection on the GUI thread.
 - `WebAppStore` owns the versioned, atomically written installed-app registry.
+- `PermissionController` serializes active-tab permission prompts.
+- `ProxyAuthenticationController` serializes HTTP-proxy credential prompts and
+  never persists passwords.
 - popup windows are children of the primary window and use
   `Qt::WA_DeleteOnClose`.
 
@@ -633,11 +643,11 @@ policy and persistence layers: domains and rule validation, settings backups,
 window placement, sessions, cleanup boundaries, downloads, permissions,
 external navigation, popup geometry, search parsing, history ranking/deletion,
 bookmark CRUD and normalization, combined suggestion ranking,
-proxy persistence/validation/application modes,
-corrupt-database behavior, ghost completion, find-bar keyboard behavior,
-web-app manifest validation/scope enforcement and registry persistence, and
-DNS settings validation/persistence/mode application, and native
-custom-anchor/hostname/weak-key validation on Windows and Linux.
+proxy persistence, validation, and application modes; corrupt-database
+behavior; ghost completion; find-bar keyboard behavior; web-app manifest
+validation, scope enforcement, and registry persistence; DNS settings
+validation, persistence, and mode application; and native custom-anchor,
+hostname, and weak-key validation on Windows and Linux.
 
 The test target deliberately excludes `MainWindow` and a live WebEngine process,
 so signal wiring and visual state still need a short manual smoke test after
@@ -685,6 +695,11 @@ Before merging a change, verify the relevant invariants:
 - history relevance is evaluated before the result limit;
 - pruning and individual deletion rebuild only affected history pages;
 - persistent file formats remain versioned and writes remain atomic;
+- invalid persisted proxy configuration blocks WebEngine network traffic until
+  the configuration is repaired and the browser restarts;
+- proxy authentication passwords never enter settings, files, diagnostics, or
+  application logs;
+- diagnostics do not expose custom DNS templates, proxy hosts, or usernames;
 - new persistent data is documented in both this file and the README data tree.
 
 ## 15. Known extension points
