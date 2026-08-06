@@ -64,13 +64,14 @@ flowchart TD
     Settings["SettingsDialog"] --> Preferences["BrowserPreferences / QSettings"]
     Settings --> TrustEditor["TrustRulesDialog"]
     Settings --> Search["SearchSettings"]
+    Settings --> DNS["DnsSettings / QWebEngineGlobalSettings"]
     Settings --> History
 ```
 
 The primary `MainWindow` is the composition root. It creates and owns the
 shared `BrowserProfile`, `DownloadManager`, `HistoryStore`, `BookmarkStore`,
 and `WebAppStore`. Popup and installed web-app windows reuse those objects and
-the current trust/search/preferences state; they do not create independent
+the current trust/search/DNS/preferences state; they do not create independent
 browser profiles.
 
 Each tab owns one `QWebEngineView` and one `BrowserPage`. `BrowserTabState` in
@@ -339,6 +340,29 @@ distributed Qt translation package. The first implementation applies language
 changes after restart; rebuilding every manually constructed widget in live
 WebEngine windows would add avoidable state and lifecycle risk.
 
+### 6.2 Secure DNS
+
+`DnsSettings` owns the versioned resolver configuration and validates both the
+built-in and user-defined providers. The safe default is `System`: Chromium
+uses the resolver configuration supplied by the operating system. The other
+modes map directly to `QWebEngineGlobalSettings::DnsMode` and either fall back
+to system DNS when DNS-over-HTTPS fails or require the selected secure provider.
+
+DNS configuration is global to Qt WebEngine, not tied to an individual
+`QWebEngineProfile`. The primary `MainWindow` therefore loads and applies it
+before constructing `BrowserProfile`; tabs, popups, and installed web apps all
+share the same effective resolver. A settings change is applied at runtime.
+Invalid or unreadable startup configuration falls back to System without
+overwriting the bad file.
+
+Provider templates must be valid HTTPS URLs without credentials or fragments.
+Only the optional `{?dns}` URI variable is accepted, at most once; omitting it
+allows Chromium to use POST. Diagnostics expose the selected mode and provider
+name but deliberately omit template URLs because custom endpoints may contain
+account-specific identifiers. Serialized settings are capped at 256 KiB on
+both read and write, so the editor cannot create a file that the next launch
+would reject.
+
 ## 7. Persistent data and privacy boundaries
 
 On macOS, application data is rooted at
@@ -353,6 +377,7 @@ On macOS, application data is rooted at
 | `rules.json` | `TrustSettings` / `TrustPolicy` | Versioned trust configuration; atomic write with `.backup`. |
 | `Certificates/` | `TrustRulesDialog` | Imported CA files referenced by paths relative to `rules.json`. |
 | `search-engines.json` | `SearchSettings` | Versioned engines and default selection; atomic write with `.backup`. |
+| `dns-settings.json` | `DnsSettings` | Versioned DNS mode, selected provider, and custom HTTPS templates; atomic write with `.backup`. Files use owner-only mode bits on Unix-like systems and inherit the per-user application-data ACL on Windows. |
 | `history.sqlite` | `HistoryStore` | WAL-mode SQLite browsing history, limited to 50,000 visits. |
 | `bookmarks.sqlite` | `BookmarkStore` | WAL-mode SQLite bookmarks with normalized URL and title fields for local lookup. |
 | `web-apps.json` | `WebAppStore` | Validated installed-app metadata and bounded page icons, atomically written. |
@@ -372,16 +397,18 @@ recursive deletion target is a strict child of the expected managed root.
 
 ### 7.1 Settings save transaction
 
-The unified Settings dialog spans native `QSettings` and two JSON files, so a
+The unified Settings dialog spans native `QSettings` and three JSON files, so a
 single filesystem transaction is unavailable. Its save order and rollback are
 therefore deliberate:
 
 1. validate every page without changing persistent state;
-2. snapshot both JSON files and their backups;
+2. snapshot all three JSON files and their backups;
 3. save general preferences;
 4. save search settings;
-5. save trust rules last;
-6. finalize imported certificate files only after every save succeeds.
+5. save DNS settings;
+6. save trust rules last;
+7. apply the new DNS mode to Qt WebEngine;
+8. finalize imported certificate files only after every save and runtime apply succeeds.
 
 If a later step fails, earlier preferences and files are restored from their
 snapshots. If rollback itself is incomplete, the error dialog says so rather
@@ -491,13 +518,14 @@ Primary-window startup is ordered as follows:
 1. ensure `rules.json` and `Certificates/` exist;
 2. load trust rules and preferences;
 3. load or create search settings;
-4. apply a pending profile reset before Chromium opens the profile;
-5. create the shared browser profile, download manager, history store,
+4. load DNS settings and apply the effective global resolver mode;
+5. apply a pending profile reset before Chromium opens the profile;
+6. create the shared browser profile, download manager, history store,
    bookmark store, and installed web-app store;
-6. create the UI and permission controller;
-7. restore safe window geometry;
-8. reload runtime trust rules;
-9. restore command-line, start-page, or lazy session tabs.
+7. create the UI and permission controller;
+8. restore safe window geometry;
+9. reload runtime trust rules;
+10. restore command-line, start-page, or lazy session tabs.
 
 On close, the primary window saves or clears the tab session according to the
 startup preference, persists geometry, closes popups, destroys tab pages, and
@@ -541,9 +569,10 @@ distribution still requires platform signing, a supported oldest Linux build
 host, license review, and the release work tracked in the roadmap.
 
 The Diagnostics settings page reports application, Qt WebEngine, Chromium,
-security-patch, graphics, sandbox, runtime-flag, and profile-path information.
-It infers forced overrides from arguments and environment variables; “Automatic”
-GPU status is not proof of the exact backend selected by Chromium.
+security-patch, graphics, sandbox, DNS mode/provider, runtime-flag, and
+profile-path information. It infers forced overrides from arguments and
+environment variables; “Automatic” GPU status is not proof of the exact backend
+selected by Chromium. DNS endpoint templates are intentionally omitted.
 
 ## 13. Tests and change discipline
 
@@ -554,7 +583,8 @@ external navigation, popup geometry, search parsing, history ranking/deletion,
 bookmark CRUD and normalization, combined suggestion ranking,
 corrupt-database behavior, ghost completion, find-bar keyboard behavior,
 web-app manifest validation/scope enforcement and registry persistence, and
-native custom-anchor/hostname/weak-key validation on Windows and Linux.
+DNS settings validation/persistence/mode application, and native
+custom-anchor/hostname/weak-key validation on Windows and Linux.
 
 The test target deliberately excludes `MainWindow` and a live WebEngine process,
 so signal wiring and visual state still need a short manual smoke test after

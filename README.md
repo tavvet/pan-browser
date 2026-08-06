@@ -87,6 +87,7 @@ On first launch PanBrowser creates:
 ├── bookmarks.sqlite    # bookmarks and their autocomplete data
 ├── web-apps.json       # installed web app metadata and icons
 ├── search-engines.json # address-bar search configuration
+├── dns-settings.json   # secure DNS mode and custom providers
 ├── rules.json
 └── Certificates/
 ```
@@ -198,6 +199,15 @@ cookies, local storage, IndexedDB, service workers, and cache while preserving
 settings, trust rules, certificates, and saved tabs; a scheduled reset can be
 cancelled before restarting.
 
+The **DNS** section uses the operating-system resolver by default. It can
+instead configure DNS-over-HTTPS with system-DNS fallback or in strict mode.
+AdGuard DNS (default, unfiltered, and family protection), Cloudflare, Quad9,
+and Google Public DNS are included; custom providers accept one to four HTTPS
+server templates. DNS mode is browser-wide and applies to normal tabs, popup
+windows, and installed web apps without changing the operating-system DNS.
+Configuration is saved atomically in `dns-settings.json`, with the previous
+version retained as `dns-settings.json.backup`.
+
 Downloads always use a system destination picker and never open files
 automatically. The toolbar download button shows active progress and persistent
 history with pause, resume, cancel, open, and reveal actions. History stores the
@@ -227,9 +237,11 @@ atomically, and reloads the active policy. The previous file is retained as
 
 The **Diagnostics** settings section shows the PanBrowser, Qt WebEngine, and
 Chromium versions; operating-system details; configured graphics and sandbox
-state; runtime overrides; and profile paths. It can copy a plain-text report
-for troubleshooting. Exact active GPU and ANGLE/RHI backend information remains
-available through Qt WebEngine diagnostic logging.
+state; active DNS mode and provider; runtime overrides; and profile paths. It
+can copy a plain-text report for troubleshooting. Custom DNS endpoint URLs are
+not included because they may contain account-specific identifiers. Exact
+active GPU and ANGLE/RHI backend information remains available through Qt
+WebEngine diagnostic logging.
 
 For advanced troubleshooting, use **PanBrowser → Show Configuration Folder**
 to reveal the files in Finder. After editing `rules.json` manually, select

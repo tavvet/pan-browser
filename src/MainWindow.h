@@ -1,6 +1,7 @@
 #pragma once
 
 #include "BrowserPreferences.h"
+#include "DnsSettings.h"
 #include "HistoryStore.h"
 #include "SessionStore.h"
 #include "SearchSettings.h"
@@ -160,6 +161,7 @@ private:
     void restoreWindowPlacement();
     QString ensureConfiguration();
     void initializeSearchSettings();
+    void initializeDnsSettings();
 
     BrowserProfile *m_profile = nullptr;
     DownloadManager *m_downloadManager = nullptr;
@@ -196,10 +198,12 @@ private:
     QHash<QString, PendingManifestRequest> m_manifestRequests;
     BrowserPreferences m_preferences;
     SearchSettings m_searchSettings;
+    DnsSettings m_dnsSettings;
     SessionStore m_sessionStore;
     TrustPolicy m_trustPolicy;
     QString m_configurationPath;
     QString m_searchConfigurationPath;
+    QString m_dnsConfigurationPath;
     QString m_historyError;
     QString m_bookmarkError;
     MainWindow *m_primaryWindow = nullptr;

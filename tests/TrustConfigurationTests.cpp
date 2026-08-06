@@ -6,6 +6,7 @@
 #include "BrowserDataCleanup.h"
 #include "CertificateTrustValidator.h"
 #include "DownloadHistoryStore.h"
+#include "DnsSettings.h"
 #include "ExternalNavigationPolicy.h"
 #include "FindBar.h"
 #include "HistoryStore.h"
@@ -66,6 +67,10 @@ private slots:
     void externalSchemesRequireMainFrameConfirmation();
     void dangerousLocalSchemesAreBlocked();
     void popupGeometryIsVisibleAndUsable();
+    void dnsSettingsDefaultToSystemAndIncludeBuiltIns();
+    void dnsSettingsRoundTripCustomProvidersAndCreateBackup();
+    void dnsSettingsRejectOversizedConfigurationWithoutWriting();
+    void dnsSettingsRejectUnsafeTemplatesAndApplyModes();
     void searchSettingsRoundTripAndCreateBackup();
     void searchSettingsRejectInvalidTemplatesAndDuplicates();
     void addressInputDistinguishesUrlsAndSearches();
@@ -542,6 +547,10 @@ void TrustConfigurationTests::embeddedTranslationCatalogsLoad()
         QStringLiteral("Настройки")
     );
     QCOMPARE(
+        QCoreApplication::translate("DnsSettingsPage", "Secure DNS only"),
+        QStringLiteral("Только защищённый DNS")
+    );
+    QCOMPARE(
         QCoreApplication::translate("QPlatformTheme", "Cancel"),
         QStringLiteral("Отмена")
     );
@@ -928,6 +937,144 @@ void TrustConfigurationTests::popupGeometryIsVisibleAndUsable()
         popupWindowGeometry(QRect(2000, 100, 200, 100), owner, {screen}, screen),
         QRect(360, 190, 720, 520)
     );
+}
+
+void TrustConfigurationTests::dnsSettingsDefaultToSystemAndIncludeBuiltIns()
+{
+    const DnsSettings settings = DnsSettings::defaults();
+    QCOMPARE(settings.mode(), DnsResolutionMode::System);
+    QCOMPARE(settings.selectedProviderId(), QStringLiteral("builtin-adguard"));
+    QCOMPARE(settings.providers().size(), 6);
+    const DnsProvider *adguard = settings.providerById(QStringLiteral("builtin-adguard"));
+    QVERIFY(adguard);
+    QCOMPARE(adguard->name, QStringLiteral("AdGuard DNS"));
+    QCOMPARE(
+        adguard->serverTemplates,
+        QStringList{QStringLiteral("https://dns.adguard-dns.com/dns-query{?dns}")}
+    );
+    QString error;
+    QVERIFY2(settings.validate(&error), qPrintable(error));
+    QVERIFY2(applyDnsSettings(settings, &error), qPrintable(error));
+}
+
+void TrustConfigurationTests::dnsSettingsRoundTripCustomProvidersAndCreateBackup()
+{
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+    const QString path = directory.filePath(QStringLiteral("dns-settings.json"));
+
+    DnsSettings settings = DnsSettings::defaults();
+    DnsProvider custom;
+    custom.id = QStringLiteral("custom-test");
+    custom.name = QStringLiteral("Private resolver");
+    custom.description = QStringLiteral("Test provider");
+    custom.serverTemplates = {
+        QStringLiteral("https://resolver.example/profile-id/dns-query{?dns}"),
+        QStringLiteral("https://backup.example/dns-query"),
+    };
+    settings.providers().append(custom);
+    settings.setSelectedProviderId(custom.id);
+    settings.setMode(DnsResolutionMode::SecureOnly);
+
+    QString error;
+    QVERIFY2(settings.save(path, &error), qPrintable(error));
+#if defined(Q_OS_UNIX)
+    const QFileDevice::Permissions permissions = QFileInfo(path).permissions();
+    QVERIFY(permissions.testFlag(QFileDevice::ReadOwner));
+    QVERIFY(permissions.testFlag(QFileDevice::WriteOwner));
+    QVERIFY(!permissions.testFlag(QFileDevice::ReadGroup));
+    QVERIFY(!permissions.testFlag(QFileDevice::ReadOther));
+#endif
+
+    settings.setMode(DnsResolutionMode::SecureWithFallback);
+    QVERIFY2(settings.save(path, &error), qPrintable(error));
+    const QString backupPath = path + QStringLiteral(".backup");
+    QVERIFY(QFileInfo::exists(backupPath));
+#if defined(Q_OS_UNIX)
+    const QFileDevice::Permissions backupPermissions = QFileInfo(backupPath).permissions();
+    QVERIFY(backupPermissions.testFlag(QFileDevice::ReadOwner));
+    QVERIFY(!backupPermissions.testFlag(QFileDevice::ReadGroup));
+    QVERIFY(!backupPermissions.testFlag(QFileDevice::ReadOther));
+#endif
+
+    DnsSettings loaded;
+    QVERIFY2(loaded.load(path, &error), qPrintable(error));
+    QCOMPARE(loaded.mode(), DnsResolutionMode::SecureWithFallback);
+    QCOMPARE(loaded.selectedProviderId(), custom.id);
+    const DnsProvider *restored = loaded.providerById(custom.id);
+    QVERIFY(restored);
+    QCOMPARE(restored->name, custom.name);
+    QCOMPARE(restored->serverTemplates, custom.serverTemplates);
+    QVERIFY(!restored->builtIn);
+}
+
+void TrustConfigurationTests::dnsSettingsRejectOversizedConfigurationWithoutWriting()
+{
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+    const QString path = directory.filePath(QStringLiteral("dns-settings.json"));
+
+    DnsSettings settings = DnsSettings::defaults();
+    QString error;
+    QVERIFY2(settings.save(path, &error), qPrintable(error));
+    QFile original(path);
+    QVERIFY(original.open(QIODevice::ReadOnly));
+    const QByteArray originalContents = original.readAll();
+    original.close();
+
+    DnsProvider custom;
+    custom.id = QStringLiteral("custom-oversized");
+    custom.name = QStringLiteral("Oversized resolver");
+    custom.description = QString(300 * 1024, QLatin1Char('x'));
+    custom.serverTemplates = {QStringLiteral("https://resolver.example/dns-query")};
+    settings.providers().append(custom);
+
+    QVERIFY(!settings.save(path, &error));
+    QVERIFY(error.contains(QStringLiteral("too large")));
+    QFile unchanged(path);
+    QVERIFY(unchanged.open(QIODevice::ReadOnly));
+    QCOMPARE(unchanged.readAll(), originalContents);
+    QVERIFY(!QFileInfo::exists(path + QStringLiteral(".backup")));
+}
+
+void TrustConfigurationTests::dnsSettingsRejectUnsafeTemplatesAndApplyModes()
+{
+    DnsSettings settings = DnsSettings::defaults();
+    DnsProvider custom;
+    custom.id = QStringLiteral("custom-invalid");
+    custom.name = QStringLiteral("Invalid resolver");
+    custom.serverTemplates = {QStringLiteral("http://resolver.example/dns-query")};
+    settings.providers().append(custom);
+    settings.setSelectedProviderId(custom.id);
+
+    QString error;
+    QVERIFY(!settings.validate(&error));
+    QVERIFY(error.contains(QStringLiteral("HTTPS")));
+
+    settings.providers().last().serverTemplates = {
+        QStringLiteral("https://user:secret@resolver.example/dns-query")
+    };
+    QVERIFY(!settings.validate(&error));
+    QVERIFY(error.contains(QStringLiteral("credentials")));
+
+    settings.providers().last().serverTemplates = {
+        QStringLiteral("https://resolver.example/dns-query{?unsupported}")
+    };
+    QVERIFY(!settings.validate(&error));
+    QVERIFY(error.contains(QStringLiteral("unsupported")));
+
+    settings.providers().removeLast();
+    settings.setSelectedProviderId(QStringLiteral("builtin-adguard"));
+    settings.setMode(DnsResolutionMode::SecureWithFallback);
+    const bool fallbackApplied = applyDnsSettings(settings, &error);
+    settings.setMode(DnsResolutionMode::SecureOnly);
+    const bool strictApplied = applyDnsSettings(settings, &error);
+    settings.setMode(DnsResolutionMode::System);
+    QString resetError;
+    const bool systemRestored = applyDnsSettings(settings, &resetError);
+    QVERIFY2(fallbackApplied, qPrintable(error));
+    QVERIFY2(strictApplied, qPrintable(error));
+    QVERIFY2(systemRestored, qPrintable(resetError));
 }
 
 void TrustConfigurationTests::searchSettingsRoundTripAndCreateBackup()

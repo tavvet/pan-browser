@@ -21,6 +21,7 @@
 - [x] Runtime diagnostics page with application, Chromium, graphics, and profile details.
 - [x] English and Russian interface localization with system-language detection and explicit override.
 - [x] Manifest-based web app installation with scoped app windows, management UI, and macOS application shortcuts.
+- [x] Secure DNS manager with system default, built-in and custom DNS-over-HTTPS providers, fallback/strict modes, runtime application, and diagnostics.
 
 ## Browser essentials
 

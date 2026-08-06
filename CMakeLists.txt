@@ -66,6 +66,10 @@ set(PANBROWSER_APP_SOURCES
     src/DownloadsPanel.h
     src/DiagnosticsPage.cpp
     src/DiagnosticsPage.h
+    src/DnsSettings.cpp
+    src/DnsSettings.h
+    src/DnsSettingsPage.cpp
+    src/DnsSettingsPage.h
     src/ExternalNavigationPolicy.cpp
     src/ExternalNavigationPolicy.h
     src/FindBar.cpp
@@ -231,6 +235,8 @@ qt_add_executable(PanBrowserTests
     src/BrowserPreferences.h
     src/DownloadHistoryStore.cpp
     src/DownloadHistoryStore.h
+    src/DnsSettings.cpp
+    src/DnsSettings.h
     src/ExternalNavigationPolicy.cpp
     src/ExternalNavigationPolicy.h
     src/FindBar.cpp
@@ -262,6 +268,7 @@ target_link_libraries(PanBrowserTests PRIVATE
     Qt6::Network
     Qt6::Sql
     Qt6::Test
+    Qt6::WebEngineCore
     Qt6::Widgets
 )
 

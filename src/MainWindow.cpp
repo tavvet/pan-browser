@@ -134,6 +134,7 @@ MainWindow::MainWindow(
         m_trustPolicy.load(m_configurationPath, &bootstrapError);
         m_preferences = BrowserPreferences::load(m_trustPolicy.startPage());
         initializeSearchSettings();
+        initializeDnsSettings();
         QString dataResetError;
         if (!BrowserProfile::applyPendingDataReset(&dataResetError))
             qWarning().noquote() << "[PanBrowser data reset]" << dataResetError;
@@ -181,9 +182,11 @@ MainWindow::MainWindow(
         m_webAppStore = sharedWebAppStore;
         m_configurationPath = primaryWindow->m_configurationPath;
         m_searchConfigurationPath = primaryWindow->m_searchConfigurationPath;
+        m_dnsConfigurationPath = primaryWindow->m_dnsConfigurationPath;
         m_trustPolicy = primaryWindow->m_trustPolicy;
         m_preferences = primaryWindow->m_preferences;
         m_searchSettings = primaryWindow->m_searchSettings;
+        m_dnsSettings = primaryWindow->m_dnsSettings;
         setAttribute(Qt::WA_DeleteOnClose);
     }
 
@@ -1784,8 +1787,10 @@ void MainWindow::openSettingsPage(int page)
     SettingsDialog dialog(
         m_configurationPath,
         m_searchConfigurationPath,
+        m_dnsConfigurationPath,
         m_preferences,
         m_searchSettings,
+        m_dnsSettings,
         m_profile,
         m_historyStore,
         m_webAppStore,
@@ -1808,6 +1813,7 @@ void MainWindow::openSettingsPage(int page)
             != dialog.preferences().interfaceLanguage();
         m_preferences = dialog.preferences();
         m_searchSettings = dialog.searchSettings();
+        m_dnsSettings = dialog.dnsSettings();
         if (!m_preferences.saveBrowsingHistory() && m_addressCompletionPopup)
             m_addressCompletionPopup->hide();
         updateAddressPlaceholder();
@@ -1820,6 +1826,7 @@ void MainWindow::openSettingsPage(int page)
             if (popup) {
                 popup->m_preferences = m_preferences;
                 popup->m_searchSettings = m_searchSettings;
+                popup->m_dnsSettings = m_dnsSettings;
                 popup->updateAddressPlaceholder();
                 if (!m_preferences.saveBrowsingHistory()
                     && popup->m_addressCompletionPopup) {
@@ -2122,4 +2129,35 @@ void MainWindow::initializeSearchSettings()
 
     if (!m_searchSettings.save(m_searchConfigurationPath, &error))
         qWarning().noquote() << "[PanBrowser search settings]" << error;
+}
+
+void MainWindow::initializeDnsSettings()
+{
+    const QString directory = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+    QDir().mkpath(directory);
+    m_dnsConfigurationPath = QDir(directory).filePath(QStringLiteral("dns-settings.json"));
+    m_dnsSettings = DnsSettings::defaults();
+
+    QString error;
+    if (QFile::exists(m_dnsConfigurationPath)) {
+        DnsSettings loaded;
+        if (loaded.load(m_dnsConfigurationPath, &error)) {
+            m_dnsSettings = loaded;
+        } else {
+            qWarning().noquote() << "[PanBrowser DNS settings]" << error
+                                 << "Using in-memory defaults; the file was not overwritten.";
+        }
+    } else if (!m_dnsSettings.save(m_dnsConfigurationPath, &error)) {
+        qWarning().noquote() << "[PanBrowser DNS settings]" << error;
+    }
+
+    if (applyDnsSettings(m_dnsSettings, &error))
+        return;
+
+    qWarning().noquote() << "[PanBrowser DNS settings]" << error
+                         << "Falling back to system DNS without overwriting the file.";
+    m_dnsSettings.setMode(DnsResolutionMode::System);
+    QString fallbackError;
+    if (!applyDnsSettings(m_dnsSettings, &fallbackError))
+        qWarning().noquote() << "[PanBrowser DNS settings]" << fallbackError;
 }

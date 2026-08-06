@@ -2,6 +2,7 @@
 
 #include "BrowserProfile.h"
 #include "DiagnosticsPage.h"
+#include "DnsSettingsPage.h"
 #include "HistorySettingsPage.h"
 #include "SearchSettingsPage.h"
 #include "TrustRulesDialog.h"
@@ -109,8 +110,10 @@ QString rollbackSettings(
 SettingsDialog::SettingsDialog(
     const QString &configurationPath,
     const QString &searchConfigurationPath,
+    const QString &dnsConfigurationPath,
     const BrowserPreferences &preferences,
     const SearchSettings &searchSettings,
+    const DnsSettings &dnsSettings,
     BrowserProfile *profile,
     HistoryStore *historyStore,
     WebAppStore *webAppStore,
@@ -121,8 +124,10 @@ SettingsDialog::SettingsDialog(
     : QDialog(parent)
     , m_configurationPath(configurationPath)
     , m_searchConfigurationPath(searchConfigurationPath)
+    , m_dnsConfigurationPath(dnsConfigurationPath)
     , m_preferences(preferences)
     , m_searchSettings(searchSettings)
+    , m_dnsSettings(dnsSettings)
     , m_profile(profile)
 {
     createInterface(currentUrl, initialPage);
@@ -144,7 +149,7 @@ SettingsDialog::SettingsDialog(
                 emit webAppOpenRequested(id);
         }
     );
-    m_diagnosticsPage = new DiagnosticsPage(m_profile, m_pages);
+    m_diagnosticsPage = new DiagnosticsPage(m_profile, m_dnsSettings, m_pages);
     m_pages->addWidget(m_diagnosticsPage);
     m_pages->setCurrentIndex(static_cast<int>(initialPage));
 }
@@ -162,6 +167,11 @@ BrowserPreferences SettingsDialog::preferences() const
 SearchSettings SettingsDialog::searchSettings() const
 {
     return m_searchSettings;
+}
+
+DnsSettings SettingsDialog::dnsSettings() const
+{
+    return m_dnsSettings;
 }
 
 void SettingsDialog::createInterface(const QUrl &currentUrl, Page initialPage)
@@ -216,6 +226,12 @@ void SettingsDialog::createInterface(const QUrl &currentUrl, Page initialPage)
         m_sidebar
     );
     privacyDataItem->setData(Qt::UserRole, static_cast<int>(Page::PrivacyData));
+    auto *dnsItem = new QListWidgetItem(
+        QIcon(QStringLiteral(":/assets/icons/network.svg")),
+        tr("DNS"),
+        m_sidebar
+    );
+    dnsItem->setData(Qt::UserRole, static_cast<int>(Page::Dns));
     auto *trustItem = new QListWidgetItem(
         QIcon(QStringLiteral(":/assets/icons/shield-check.svg")),
         tr("Trust Rules"),
@@ -468,6 +484,9 @@ void SettingsDialog::createInterface(const QUrl &currentUrl, Page initialPage)
     dataLayout->addStretch();
     m_pages->addWidget(privacyDataPage);
 
+    m_dnsPage = new DnsSettingsPage(m_dnsSettings, m_pages);
+    m_pages->addWidget(m_dnsPage);
+
     m_trustRules = new TrustRulesDialog(m_configurationPath, m_pages, true);
     m_pages->addWidget(m_trustRules);
 
@@ -624,10 +643,17 @@ void SettingsDialog::saveAndClose()
         QMessageBox::warning(this, tr("Cannot save search settings"), error);
         return;
     }
+    if (!m_dnsPage->validate(&error)) {
+        selectPage(Page::Dns);
+        QMessageBox::warning(this, tr("Cannot save DNS settings"), error);
+        return;
+    }
     QList<FileSnapshot> snapshots;
     for (const QString &path : {
              m_searchConfigurationPath,
              m_searchConfigurationPath + QStringLiteral(".backup"),
+             m_dnsConfigurationPath,
+             m_dnsConfigurationPath + QStringLiteral(".backup"),
              m_configurationPath,
              m_configurationPath + QStringLiteral(".backup"),
          }) {
@@ -640,17 +666,26 @@ void SettingsDialog::saveAndClose()
     }
 
     SearchSettings searchSettings = m_searchPage->settings();
+    DnsSettings dnsSettings = m_dnsPage->settings();
     if (!preferences.save(&error)) {
         selectPage(Page::General);
         QMessageBox::warning(this, tr("Cannot save settings"), error);
         return;
     }
     if (!searchSettings.save(m_searchConfigurationPath, &error)) {
-        const QString rollbackError = rollbackSettings(m_preferences, snapshots.mid(0, 2));
+        const QString rollbackError = rollbackSettings(m_preferences, snapshots);
         selectPage(Page::Search);
         if (!rollbackError.isEmpty())
             error += tr("\n\nRollback was incomplete:\n") + rollbackError;
         QMessageBox::warning(this, tr("Cannot save search settings"), error);
+        return;
+    }
+    if (!dnsSettings.save(m_dnsConfigurationPath, &error)) {
+        const QString rollbackError = rollbackSettings(m_preferences, snapshots);
+        selectPage(Page::Dns);
+        if (!rollbackError.isEmpty())
+            error += tr("\n\nRollback was incomplete:\n") + rollbackError;
+        QMessageBox::warning(this, tr("Cannot save DNS settings"), error);
         return;
     }
     if (!m_trustRules->save(&error)) {
@@ -661,9 +696,18 @@ void SettingsDialog::saveAndClose()
         QMessageBox::warning(this, tr("Cannot save trust rules"), error);
         return;
     }
+    if (!applyDnsSettings(dnsSettings, &error)) {
+        const QString rollbackError = rollbackSettings(m_preferences, snapshots);
+        selectPage(Page::Dns);
+        if (!rollbackError.isEmpty())
+            error += tr("\n\nRollback was incomplete:\n") + rollbackError;
+        QMessageBox::warning(this, tr("Cannot apply DNS settings"), error);
+        return;
+    }
 
     m_trustRules->finalizeSave();
     m_preferences = preferences;
     m_searchSettings = searchSettings;
+    m_dnsSettings = dnsSettings;
     accept();
 }

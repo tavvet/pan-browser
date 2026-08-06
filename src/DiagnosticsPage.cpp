@@ -81,9 +81,14 @@ QFormLayout *addCard(QVBoxLayout *layout, QWidget *parent)
 
 } // namespace
 
-DiagnosticsPage::DiagnosticsPage(BrowserProfile *profile, QWidget *parent)
+DiagnosticsPage::DiagnosticsPage(
+    BrowserProfile *profile,
+    const DnsSettings &dnsSettings,
+    QWidget *parent
+)
     : QWidget(parent)
     , m_profile(profile)
+    , m_dnsSettings(dnsSettings)
 {
     setObjectName(QStringLiteral("diagnosticsSettingsPage"));
     auto *rootLayout = new QVBoxLayout(this);
@@ -176,6 +181,19 @@ DiagnosticsPage::DiagnosticsPage(BrowserProfile *profile, QWidget *parent)
         tr("Chromium flags"),
         valueLabel(environmentValue("QTWEBENGINE_CHROMIUM_FLAGS"), this)
     );
+    graphics->addRow(tr("DNS mode"), valueLabel(dnsModeDisplayName(m_dnsSettings.mode()), this));
+    const DnsProvider *dnsProvider = m_dnsSettings.providerById(
+        m_dnsSettings.selectedProviderId()
+    );
+    graphics->addRow(
+        tr("DNS provider"),
+        valueLabel(
+            m_dnsSettings.mode() == DnsResolutionMode::System
+                ? tr("Operating system default")
+                : (dnsProvider ? dnsProvider->name : tr("Unavailable")),
+            this
+        )
+    );
 
     auto *graphicsHint = new QLabel(
         tr("“Automatic” means Chromium attempts to use the GPU and falls back when necessary. For the exact active GPU and ANGLE/RHI backend, launch PanBrowser with QT_LOGGING_RULES=\"qt.webenginecontext=true;qt.webengine.compositor=true\"."),
@@ -234,8 +252,10 @@ QString DiagnosticsPage::diagnosticReport() const
         "Chromium sandbox: %11\n"
         "QSG_RHI_BACKEND: %12\n"
         "QTWEBENGINE_CHROMIUM_FLAGS: %13\n"
-        "Persistent storage: %14\n"
-        "HTTP cache: %15\n"
+        "DNS mode: %14\n"
+        "DNS provider: %15\n"
+        "Persistent storage: %16\n"
+        "HTTP cache: %17\n"
     ).arg(
         QCoreApplication::applicationVersion(),
         QString::fromLatin1(qVersion()),
@@ -252,6 +272,12 @@ QString DiagnosticsPage::diagnosticReport() const
         sandboxDisabled ? QStringLiteral("Disabled") : QStringLiteral("Enabled"),
         environmentValue("QSG_RHI_BACKEND"),
         environmentValue("QTWEBENGINE_CHROMIUM_FLAGS"),
+        dnsModeDisplayName(m_dnsSettings.mode()),
+        m_dnsSettings.mode() == DnsResolutionMode::System
+            ? QStringLiteral("Operating system default")
+            : (m_dnsSettings.providerById(m_dnsSettings.selectedProviderId())
+                ? m_dnsSettings.providerById(m_dnsSettings.selectedProviderId())->name
+                : QStringLiteral("Unavailable")),
         m_profile->persistentStoragePath(),
         m_profile->cachePath()
     );
