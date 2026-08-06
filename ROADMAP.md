@@ -31,6 +31,8 @@ branch; unfinished experiments kept on other branches remain unchecked here.
 
 - [x] Bookmarks with an address-bar toggle, management UI, and autocomplete integration.
 - [x] Find in page with `Command+F`, next/previous match navigation, and match count.
+- [ ] Complete favicon support: persist icons received from WebEngine and show
+  them in restored tabs, bookmarks, history, and address-bar suggestions.
 - [ ] Page zoom controls with keyboard shortcuts, per-site persistence, and reset to 100%.
 
 ## Cross-platform
@@ -46,6 +48,21 @@ branch; unfinished experiments kept on other branches remain unchecked here.
 - [ ] Audit the release bundle and remove unused Qt plugins and resources.
 - [x] Add application version information to the UI.
 - [ ] Add a controlled update mechanism.
+
+## Web app profiles
+
+- [ ] Add an explicit per-app profile mode: shared with PanBrowser or isolated.
+- [ ] Isolate cookies, site storage, service workers, and cache for selected apps.
+- [ ] Let app settings inherit global values or override trust rules,
+  permissions, and data-retention behavior individually.
+- [ ] Add per-app data inspection and clearing without affecting the main
+  browser profile or other installed apps.
+- [ ] Support per-app DNS and proxy overrides through process isolation, since
+  Qt WebEngine applies those network settings globally within a process.
+- [ ] Extend system launchers and single-instance coordination so isolated apps
+  open in the correct profile process.
+- [ ] Provide a safe migration path between shared and isolated profiles without
+  silently copying cookies or authentication state.
 
 ## Deferred distribution work
 
