@@ -38,6 +38,8 @@ find_package(Qt6WebEngineCore 6.11 REQUIRED)
 find_package(Qt6WebEngineWidgets 6.11 REQUIRED)
 
 set(PANBROWSER_APP_SOURCES
+    src/ApplicationLaunch.cpp
+    src/ApplicationLaunch.h
     src/AddressLineEdit.cpp
     src/AddressLineEdit.h
     src/AddressSuggestion.cpp
@@ -103,6 +105,8 @@ set(PANBROWSER_APP_SOURCES
     src/WebAppStore.h
     src/WebAppsSettingsPage.cpp
     src/WebAppsSettingsPage.h
+    src/WebAppShortcutManager.cpp
+    src/WebAppShortcutManager.h
     src/WindowPlacement.cpp
     src/WindowPlacement.h
     src/CertificateTrustValidator.h
@@ -116,6 +120,8 @@ if(APPLE)
     )
     list(APPEND PANBROWSER_APP_SOURCES
         src/CertificateTrustValidatorMac.mm
+        src/MacApplicationReopen.h
+        src/MacApplicationReopen.mm
         ${PANBROWSER_APP_ICON}
     )
 elseif(WIN32)
@@ -152,6 +158,30 @@ if(APPLE)
     )
     find_library(SECURITY_FRAMEWORK Security REQUIRED)
     target_link_libraries(PanBrowser PRIVATE ${SECURITY_FRAMEWORK})
+
+    add_executable(PanBrowserWebAppLauncher src/WebAppLauncherMac.cpp)
+    find_library(CORE_FOUNDATION_FRAMEWORK CoreFoundation REQUIRED)
+    target_link_libraries(PanBrowserWebAppLauncher PRIVATE ${CORE_FOUNDATION_FRAMEWORK})
+    set(PANBROWSER_WEB_APP_LAUNCHER_RESOURCE
+        "${CMAKE_CURRENT_BINARY_DIR}/generated/PanBrowserWebAppLauncher"
+    )
+    add_custom_command(
+        OUTPUT "${PANBROWSER_WEB_APP_LAUNCHER_RESOURCE}"
+        COMMAND ${CMAKE_COMMAND} -E make_directory
+            "${CMAKE_CURRENT_BINARY_DIR}/generated"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "$<TARGET_FILE:PanBrowserWebAppLauncher>"
+            "${PANBROWSER_WEB_APP_LAUNCHER_RESOURCE}"
+        DEPENDS PanBrowserWebAppLauncher
+        VERBATIM
+    )
+    set_source_files_properties(
+        "${PANBROWSER_WEB_APP_LAUNCHER_RESOURCE}"
+        PROPERTIES
+            GENERATED TRUE
+            MACOSX_PACKAGE_LOCATION Resources
+    )
+    target_sources(PanBrowser PRIVATE "${PANBROWSER_WEB_APP_LAUNCHER_RESOURCE}")
 endif()
 
 if(WIN32)
@@ -186,6 +216,8 @@ endif()
 
 enable_testing()
 qt_add_executable(PanBrowserTests
+    src/ApplicationLaunch.cpp
+    src/ApplicationLaunch.h
     tests/TrustConfigurationTests.cpp
     src/AddressLineEdit.cpp
     src/AddressLineEdit.h
@@ -219,6 +251,8 @@ qt_add_executable(PanBrowserTests
     src/TrustSettings.h
     src/WebAppStore.cpp
     src/WebAppStore.h
+    src/WebAppShortcutManager.cpp
+    src/WebAppShortcutManager.h
     src/WindowPlacement.cpp
     src/WindowPlacement.h
 )
@@ -230,6 +264,10 @@ target_link_libraries(PanBrowserTests PRIVATE
     Qt6::Test
     Qt6::Widgets
 )
+
+if(APPLE)
+    add_dependencies(PanBrowserTests PanBrowser)
+endif()
 
 if(WIN32)
     target_sources(PanBrowserTests PRIVATE src/CertificateTrustValidatorWindows.cpp)

@@ -52,7 +52,11 @@ WebAppsSettingsPage::WebAppsSettingsPage(WebAppStore *store, QWidget *parent)
     m_openButton = new QPushButton(tr("Open"), this);
     m_removeButton = new QPushButton(tr("Remove…"), this);
     m_removeButton->setObjectName(QStringLiteral("dangerButton"));
+    m_createShortcutButton = new QPushButton(tr("Create/Repair Shortcut"), this);
+    m_removeShortcutButton = new QPushButton(tr("Remove Shortcut"), this);
     buttons->addWidget(m_openButton);
+    buttons->addWidget(m_createShortcutButton);
+    buttons->addWidget(m_removeShortcutButton);
     buttons->addWidget(m_removeButton);
     buttons->addStretch();
     layout->addLayout(buttons);
@@ -69,6 +73,18 @@ WebAppsSettingsPage::WebAppsSettingsPage(WebAppStore *store, QWidget *parent)
             emit openRequested(item->data(Qt::UserRole).toString());
     });
     connect(m_removeButton, &QPushButton::clicked, this, &WebAppsSettingsPage::removeSelected);
+    connect(
+        m_createShortcutButton,
+        &QPushButton::clicked,
+        this,
+        &WebAppsSettingsPage::createOrRepairShortcut
+    );
+    connect(
+        m_removeShortcutButton,
+        &QPushButton::clicked,
+        this,
+        &WebAppsSettingsPage::removeShortcut
+    );
     if (m_store)
         connect(m_store, &WebAppStore::appsChanged, this, [this] { rebuildList(); });
     rebuildList();
@@ -109,6 +125,12 @@ void WebAppsSettingsPage::updateSelection()
         : std::nullopt;
     m_openButton->setEnabled(app.has_value());
     m_removeButton->setEnabled(app.has_value());
+    const bool shortcutsSupported = m_shortcutManager.isSupported();
+    const bool shortcutInstalled = app && m_shortcutManager.shortcutExists(*app);
+    m_createShortcutButton->setVisible(shortcutsSupported);
+    m_removeShortcutButton->setVisible(shortcutInstalled);
+    m_createShortcutButton->setEnabled(app.has_value());
+    m_removeShortcutButton->setEnabled(shortcutInstalled);
     if (!app) {
         m_details->setText(
             m_store && !m_store->isAvailable()
@@ -118,10 +140,15 @@ void WebAppsSettingsPage::updateSelection()
         return;
     }
     m_details->setText(
-        tr("Start page: %1\nAllowed scope: %2")
+        tr("Start page: %1\nAllowed scope: %2\nSystem shortcut: %3")
             .arg(
                 app->startUrl.toDisplayString(QUrl::RemovePassword),
-                app->scope.toDisplayString(QUrl::RemovePassword)
+                app->scope.toDisplayString(QUrl::RemovePassword),
+                shortcutInstalled
+                    ? tr("Installed")
+                    : (shortcutsSupported
+                        ? tr("Not installed")
+                        : tr("Not supported on this platform"))
             )
     );
 }
@@ -137,13 +164,57 @@ void WebAppsSettingsPage::removeSelected()
     if (QMessageBox::question(
             this,
             tr("Remove web app"),
-            tr("Remove “%1”? Cookies and other site data will be kept.").arg(app->name),
+            tr("Remove “%1” and its system shortcut? Cookies and other site data will be kept.").arg(app->name),
             QMessageBox::Yes | QMessageBox::Cancel,
             QMessageBox::Cancel
         ) != QMessageBox::Yes) {
         return;
     }
+    QString shortcutError;
+    if (m_shortcutManager.shortcutExists(*app))
+        m_shortcutManager.remove(*app, &shortcutError);
     QString error;
-    if (!m_store->remove(app->id, &error))
+    if (!m_store->remove(app->id, &error)) {
         QMessageBox::warning(this, tr("Cannot remove web app"), error);
+        return;
+    }
+    if (!shortcutError.isEmpty()) {
+        QMessageBox::warning(
+            this,
+            tr("Web app removed, but its shortcut remains"),
+            shortcutError
+        );
+    }
+}
+
+void WebAppsSettingsPage::createOrRepairShortcut()
+{
+    const QListWidgetItem *item = m_list->currentItem();
+    const std::optional<WebApp> app = item && m_store
+        ? m_store->app(item->data(Qt::UserRole).toString())
+        : std::nullopt;
+    if (!app)
+        return;
+    QString error;
+    if (!m_shortcutManager.createOrUpdate(*app, &error)) {
+        QMessageBox::warning(this, tr("Cannot create shortcut"), error);
+        return;
+    }
+    updateSelection();
+}
+
+void WebAppsSettingsPage::removeShortcut()
+{
+    const QListWidgetItem *item = m_list->currentItem();
+    const std::optional<WebApp> app = item && m_store
+        ? m_store->app(item->data(Qt::UserRole).toString())
+        : std::nullopt;
+    if (!app)
+        return;
+    QString error;
+    if (!m_shortcutManager.remove(*app, &error)) {
+        QMessageBox::warning(this, tr("Cannot remove shortcut"), error);
+        return;
+    }
+    updateSelection();
 }

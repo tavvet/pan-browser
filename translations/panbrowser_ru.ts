@@ -258,11 +258,11 @@
     </message>
     <message numerus="yes">
         <location filename="../src/BookmarksDialog.cpp" line="154"/>
-        <location filename="../tests/TrustConfigurationTests.cpp" line="540"/>
-        <location filename="../tests/TrustConfigurationTests.cpp" line="544"/>
-        <location filename="../tests/TrustConfigurationTests.cpp" line="548"/>
+        <location filename="../tests/TrustConfigurationTests.cpp" line="549"/>
+        <location filename="../tests/TrustConfigurationTests.cpp" line="553"/>
         <location filename="../tests/TrustConfigurationTests.cpp" line="557"/>
-        <location filename="../tests/TrustConfigurationTests.cpp" line="561"/>
+        <location filename="../tests/TrustConfigurationTests.cpp" line="566"/>
+        <location filename="../tests/TrustConfigurationTests.cpp" line="570"/>
         <source>%n bookmark(s)</source>
         <translation>
             <numerusform>%n закладка</numerusform>
@@ -1107,202 +1107,202 @@
 <context>
     <name>MainWindow</name>
     <message>
-        <location filename="../src/MainWindow.cpp" line="189"/>
+        <location filename="../src/MainWindow.cpp" line="192"/>
         <source>History unavailable: %1</source>
         <translation>История недоступна: %1</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="269"/>
+        <location filename="../src/MainWindow.cpp" line="277"/>
         <source>Tabs</source>
         <translation>Вкладки</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="296"/>
+        <location filename="../src/MainWindow.cpp" line="304"/>
         <source>New Tab (⌘T)</source>
         <translation>Новая вкладка (⌘T)</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="304"/>
+        <location filename="../src/MainWindow.cpp" line="312"/>
         <source>Navigation</source>
         <translation>Навигация</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="313"/>
+        <location filename="../src/MainWindow.cpp" line="321"/>
         <source>Back</source>
         <translation>Назад</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="317"/>
+        <location filename="../src/MainWindow.cpp" line="325"/>
         <source>Forward</source>
         <translation>Вперёд</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="321"/>
+        <location filename="../src/MainWindow.cpp" line="329"/>
         <source>Reload</source>
         <translation>Обновить</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="340"/>
-        <location filename="../src/MainWindow.cpp" line="1205"/>
+        <location filename="../src/MainWindow.cpp" line="348"/>
+        <location filename="../src/MainWindow.cpp" line="1215"/>
         <source>Add Bookmark (⌘D)</source>
         <translation>Добавить закладку (⌘D)</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="348"/>
+        <location filename="../src/MainWindow.cpp" line="356"/>
         <source>Go</source>
         <translation>Перейти</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="353"/>
+        <location filename="../src/MainWindow.cpp" line="361"/>
         <source>Downloads</source>
         <translation>Загрузки</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="358"/>
+        <location filename="../src/MainWindow.cpp" line="366"/>
         <source>Find in page</source>
         <translation>Поиск на странице</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="368"/>
+        <location filename="../src/MainWindow.cpp" line="376"/>
         <source>Permission request</source>
         <translation>Запрос разрешения</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="475"/>
+        <location filename="../src/MainWindow.cpp" line="483"/>
         <source>PanBrowser</source>
         <translation>PanBrowser</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="478"/>
-        <location filename="../src/MainWindow.cpp" line="719"/>
-        <location filename="../src/MainWindow.cpp" line="799"/>
-        <location filename="../src/MainWindow.cpp" line="820"/>
+        <location filename="../src/MainWindow.cpp" line="486"/>
+        <location filename="../src/MainWindow.cpp" line="729"/>
+        <location filename="../src/MainWindow.cpp" line="809"/>
+        <location filename="../src/MainWindow.cpp" line="830"/>
         <source>New Tab</source>
         <translation>Новая вкладка</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="485"/>
+        <location filename="../src/MainWindow.cpp" line="493"/>
         <source>Close Tab</source>
         <translation>Закрыть вкладку</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="494"/>
+        <location filename="../src/MainWindow.cpp" line="502"/>
         <source>Add Bookmark…</source>
         <translation>Добавить закладку…</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="500"/>
+        <location filename="../src/MainWindow.cpp" line="508"/>
         <source>Bookmarks…</source>
         <translation>Закладки…</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="507"/>
-        <location filename="../src/MainWindow.cpp" line="1487"/>
+        <location filename="../src/MainWindow.cpp" line="515"/>
+        <location filename="../src/MainWindow.cpp" line="1497"/>
         <source>Install Web App…</source>
         <translation>Установить веб-приложение…</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="518"/>
+        <location filename="../src/MainWindow.cpp" line="526"/>
         <source>Web Apps</source>
         <translation>Веб-приложения</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="525"/>
+        <location filename="../src/MainWindow.cpp" line="533"/>
         <source>Find in Page…</source>
         <translation>Найти на странице…</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="529"/>
+        <location filename="../src/MainWindow.cpp" line="537"/>
         <source>Find Next</source>
         <translation>Найти следующее</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="537"/>
+        <location filename="../src/MainWindow.cpp" line="545"/>
         <source>Find Previous</source>
         <translation>Найти предыдущее</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="549"/>
+        <location filename="../src/MainWindow.cpp" line="557"/>
         <source>Settings…</source>
         <translation>Настройки…</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="558"/>
+        <location filename="../src/MainWindow.cpp" line="566"/>
         <source>Reload Trust Rules</source>
         <translation>Перезагрузить правила доверия</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="565"/>
+        <location filename="../src/MainWindow.cpp" line="573"/>
         <source>Show Configuration Folder</source>
         <translation>Показать папку конфигурации</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="573"/>
+        <location filename="../src/MainWindow.cpp" line="581"/>
         <source>Ready</source>
         <translation>Готово</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="575"/>
+        <location filename="../src/MainWindow.cpp" line="583"/>
         <source>No rules loaded</source>
         <translation>Правила не загружены</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="607"/>
+        <location filename="../src/MainWindow.cpp" line="615"/>
         <source>Close Window</source>
         <translation>Закрыть окно</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="865"/>
+        <location filename="../src/MainWindow.cpp" line="875"/>
         <source>Loading…</source>
         <translation>Загрузка…</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="920"/>
+        <location filename="../src/MainWindow.cpp" line="930"/>
         <source>Secure · Chromium system trust</source>
         <translation>Безопасно · системное доверие Chromium</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="923"/>
+        <location filename="../src/MainWindow.cpp" line="933"/>
         <source>Not secure · HTTP connection</source>
         <translation>Небезопасно · соединение HTTP</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="925"/>
+        <location filename="../src/MainWindow.cpp" line="935"/>
         <source>No HTTPS security information</source>
         <translation>Нет сведений о безопасности HTTPS</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="930"/>
+        <location filename="../src/MainWindow.cpp" line="940"/>
         <source>Page loading failed</source>
         <translation>Не удалось загрузить страницу</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="983"/>
+        <location filename="../src/MainWindow.cpp" line="993"/>
         <source>Blocked a form submission outside this web app&apos;s scope</source>
         <translation>Отправка формы за пределы области веб-приложения заблокирована</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="989"/>
+        <location filename="../src/MainWindow.cpp" line="999"/>
         <source>Blocked automatic navigation outside this web app&apos;s scope</source>
         <translation>Автоматический переход за пределы области веб-приложения заблокирован</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1081"/>
+        <location filename="../src/MainWindow.cpp" line="1091"/>
         <source>The current page</source>
         <translation>Текущая страница</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1089"/>
+        <location filename="../src/MainWindow.cpp" line="1099"/>
         <source>Open external application?</source>
         <translation>Открыть внешнее приложение?</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1092"/>
+        <location filename="../src/MainWindow.cpp" line="1102"/>
         <source>Open this link in another application?</source>
         <translation>Открыть эту ссылку в другом приложении?</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1094"/>
+        <location filename="../src/MainWindow.cpp" line="1104"/>
         <source>%1 wants to open:
 
 %2</source>
@@ -1311,96 +1311,96 @@
 %2</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1097"/>
+        <location filename="../src/MainWindow.cpp" line="1107"/>
         <source>Open application</source>
         <translation>Открыть приложение</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1100"/>
-        <location filename="../src/MainWindow.cpp" line="1612"/>
+        <location filename="../src/MainWindow.cpp" line="1110"/>
+        <location filename="../src/MainWindow.cpp" line="1622"/>
         <source>Cancel</source>
         <translation>Отмена</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1123"/>
+        <location filename="../src/MainWindow.cpp" line="1133"/>
         <source>No application is available for the %1 link</source>
         <translation>Нет приложения для открытия ссылки %1</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1191"/>
-        <location filename="../src/MainWindow.cpp" line="1390"/>
+        <location filename="../src/MainWindow.cpp" line="1201"/>
+        <location filename="../src/MainWindow.cpp" line="1400"/>
         <source>Only web pages can be bookmarked</source>
         <translation>В закладки можно добавлять только веб-страницы</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1204"/>
+        <location filename="../src/MainWindow.cpp" line="1214"/>
         <source>Edit Bookmark (⌘D)</source>
         <translation>Изменить закладку (⌘D)</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1215"/>
+        <location filename="../src/MainWindow.cpp" line="1225"/>
         <source>Search with %1 or enter an address</source>
         <translation>Искать через %1 или ввести адрес</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1216"/>
+        <location filename="../src/MainWindow.cpp" line="1226"/>
         <source>Enter an address</source>
         <translation>Введите адрес</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1382"/>
+        <location filename="../src/MainWindow.cpp" line="1392"/>
         <source>Bookmarks are unavailable</source>
         <translation>Закладки недоступны</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1397"/>
+        <location filename="../src/MainWindow.cpp" line="1407"/>
         <source>Bookmarks unavailable</source>
         <translation>Закладки недоступны</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1493"/>
+        <location filename="../src/MainWindow.cpp" line="1503"/>
         <source>Open “%1”</source>
         <translation>Открыть «%1»</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1500"/>
+        <location filename="../src/MainWindow.cpp" line="1510"/>
         <source>Install “%1”…</source>
         <translation>Установить «%1»…</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1528"/>
+        <location filename="../src/MainWindow.cpp" line="1538"/>
         <source>Reading web app manifest…</source>
         <translation>Чтение манифеста веб-приложения…</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1544"/>
+        <location filename="../src/MainWindow.cpp" line="1554"/>
         <source>Timed out while reading the web app manifest</source>
         <translation>Истекло время ожидания при чтении манифеста веб-приложения</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1568"/>
-        <location filename="../src/MainWindow.cpp" line="1583"/>
-        <location filename="../src/MainWindow.cpp" line="1619"/>
+        <location filename="../src/MainWindow.cpp" line="1578"/>
+        <location filename="../src/MainWindow.cpp" line="1593"/>
+        <location filename="../src/MainWindow.cpp" line="1629"/>
         <source>Cannot install web app</source>
         <translation>Не удалось установить веб-приложение</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1569"/>
+        <location filename="../src/MainWindow.cpp" line="1579"/>
         <source>PanBrowser could not read the web app manifest: %1</source>
         <translation>PanBrowser не удалось прочитать манифест веб-приложения: %1</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1599"/>
+        <location filename="../src/MainWindow.cpp" line="1609"/>
         <source>Install web app</source>
         <translation>Установка веб-приложения</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1603"/>
+        <location filename="../src/MainWindow.cpp" line="1613"/>
         <source>Install “%1”?</source>
         <translation>Установить «%1»?</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1605"/>
+        <location filename="../src/MainWindow.cpp" line="1615"/>
         <source>The app will open in its own window and share PanBrowser cookies, site data, permissions, and trust rules.
 
 Start page: %1
@@ -1411,53 +1411,63 @@ Allowed scope: %2</source>
 Область действия: %2</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1611"/>
+        <location filename="../src/MainWindow.cpp" line="1621"/>
         <source>Install</source>
         <translation>Установить</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1622"/>
+        <location filename="../src/MainWindow.cpp" line="1638"/>
+        <source>Web app installed without a system shortcut</source>
+        <translation>Веб-приложение установлено без системного ярлыка</translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="1639"/>
+        <source>PanBrowser installed the web app, but could not create its system shortcut: %1</source>
+        <translation>PanBrowser установил веб-приложение, но не смог создать системный ярлык: %1</translation>
+    </message>
+    <message>
+        <location filename="../src/MainWindow.cpp" line="1644"/>
         <source>“%1” installed</source>
         <translation>«%1» установлено</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1643"/>
+        <location filename="../src/MainWindow.cpp" line="1665"/>
         <source>No web apps installed</source>
         <translation>Нет установленных веб-приложений</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1649"/>
+        <location filename="../src/MainWindow.cpp" line="1671"/>
         <source>Manage Web Apps…</source>
         <translation>Управление веб-приложениями…</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1664"/>
+        <location filename="../src/MainWindow.cpp" line="1707"/>
         <source>The web app is no longer installed</source>
         <translation>Веб-приложение больше не установлено</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1752"/>
-        <location filename="../src/MainWindow.cpp" line="1889"/>
+        <location filename="../src/MainWindow.cpp" line="1797"/>
+        <location filename="../src/MainWindow.cpp" line="1934"/>
         <source>Rules error: %1</source>
         <translation>Ошибка правил: %1</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1784"/>
+        <location filename="../src/MainWindow.cpp" line="1829"/>
         <source>Restart required</source>
         <translation>Требуется перезапуск</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1785"/>
+        <location filename="../src/MainWindow.cpp" line="1830"/>
         <source>Restart PanBrowser to apply the new interface language.</source>
         <translation>Перезапустите PanBrowser, чтобы применить новый язык интерфейса.</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1888"/>
+        <location filename="../src/MainWindow.cpp" line="1933"/>
         <source>Rules unavailable</source>
         <translation>Правила недоступны</translation>
     </message>
     <message numerus="yes">
-        <location filename="../src/MainWindow.cpp" line="1895"/>
+        <location filename="../src/MainWindow.cpp" line="1940"/>
         <source>%n custom rule(s)</source>
         <translation>
             <numerusform>%n пользовательское правило</numerusform>
@@ -1466,42 +1476,42 @@ Allowed scope: %2</source>
         </translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1897"/>
+        <location filename="../src/MainWindow.cpp" line="1942"/>
         <source>Trust rules loaded</source>
         <translation>Правила доверия загружены</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1914"/>
+        <location filename="../src/MainWindow.cpp" line="1959"/>
         <source>Blocked %1: no matching trust rule</source>
         <translation>%1 заблокирован: подходящее правило доверия не найдено</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1923"/>
+        <location filename="../src/MainWindow.cpp" line="1968"/>
         <source>Blocked %1: non-overridable certificate error</source>
         <translation>%1 заблокирован: эту ошибку сертификата нельзя переопределить</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1932"/>
+        <location filename="../src/MainWindow.cpp" line="1977"/>
         <source>Blocked %1: only an unknown CA may be overridden</source>
         <translation>%1 заблокирован: переопределить можно только ошибку неизвестного центра сертификации</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1941"/>
+        <location filename="../src/MainWindow.cpp" line="1986"/>
         <source>Blocked %1: system validation failed</source>
         <translation>%1 заблокирован: системная проверка не пройдена</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1961"/>
+        <location filename="../src/MainWindow.cpp" line="2006"/>
         <source>Secure · %1 · %2</source>
         <translation>Безопасно · %1 · %2</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1968"/>
+        <location filename="../src/MainWindow.cpp" line="2013"/>
         <source>Blocked %1: %2</source>
         <translation>%1 заблокирован: %2</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1989"/>
+        <location filename="../src/MainWindow.cpp" line="2034"/>
         <source>Secure</source>
         <translation>Безопасно</translation>
     </message>
@@ -1597,7 +1607,7 @@ Allowed scope: %2</source>
     </message>
     <message>
         <location filename="../src/Localization.cpp" line="14"/>
-        <location filename="../tests/TrustConfigurationTests.cpp" line="536"/>
+        <location filename="../tests/TrustConfigurationTests.cpp" line="545"/>
         <source>Cancel</source>
         <translation>Отмена</translation>
     </message>
@@ -1942,7 +1952,7 @@ Warning: searches sent through HTTP are not encrypted.</source>
     </message>
     <message>
         <location filename="../src/SettingsDialog.cpp" line="170"/>
-        <location filename="../tests/TrustConfigurationTests.cpp" line="532"/>
+        <location filename="../tests/TrustConfigurationTests.cpp" line="541"/>
         <source>Settings</source>
         <translation>Настройки</translation>
     </message>
@@ -2208,6 +2218,19 @@ Rollback was incomplete:
 
 Откат выполнен не полностью:
 </translation>
+    </message>
+</context>
+<context>
+    <name>SingleInstanceCoordinator</name>
+    <message>
+        <location filename="../src/ApplicationLaunch.cpp" line="130"/>
+        <source>The application launch request is invalid</source>
+        <translation>Некорректный запрос на запуск приложения</translation>
+    </message>
+    <message>
+        <location filename="../src/ApplicationLaunch.cpp" line="146"/>
+        <source>Cannot start the local PanBrowser command server: %1</source>
+        <translation>Не удалось запустить локальный сервер команд PanBrowser: %1</translation>
     </message>
 </context>
 <context>
@@ -2722,6 +2745,96 @@ SHA-256: %5</translation>
     </message>
 </context>
 <context>
+    <name>WebAppShortcutManager</name>
+    <message>
+        <location filename="../src/WebAppShortcutManager.cpp" line="64"/>
+        <source>Cannot set shortcut file permissions</source>
+        <translation>Не удалось задать права доступа к файлу ярлыка</translation>
+    </message>
+    <message>
+        <location filename="../src/WebAppShortcutManager.cpp" line="129"/>
+        <source>The system tool returned an error</source>
+        <translation>Системная утилита вернула ошибку</translation>
+    </message>
+    <message>
+        <location filename="../src/WebAppShortcutManager.cpp" line="138"/>
+        <source>Cannot create the shortcut icon directory</source>
+        <translation>Не удалось создать папку значка ярлыка</translation>
+    </message>
+    <message>
+        <location filename="../src/WebAppShortcutManager.cpp" line="164"/>
+        <source>Cannot write the shortcut icon</source>
+        <translation>Не удалось записать значок ярлыка</translation>
+    </message>
+    <message>
+        <location filename="../src/WebAppShortcutManager.cpp" line="269"/>
+        <location filename="../src/WebAppShortcutManager.cpp" line="376"/>
+        <source>System shortcuts are not supported on this platform yet</source>
+        <translation>Системные ярлыки пока не поддерживаются на этой платформе</translation>
+    </message>
+    <message>
+        <location filename="../src/WebAppShortcutManager.cpp" line="272"/>
+        <location filename="../src/WebAppShortcutManager.cpp" line="374"/>
+        <source>The web app shortcut data is invalid</source>
+        <translation>Некорректные данные ярлыка веб-приложения</translation>
+    </message>
+    <message>
+        <location filename="../src/WebAppShortcutManager.cpp" line="274"/>
+        <source>PanBrowser must run from a complete macOS application bundle to create shortcuts</source>
+        <translation>Для создания ярлыков PanBrowser должен быть запущен из полноценного пакета приложения macOS</translation>
+    </message>
+    <message>
+        <location filename="../src/WebAppShortcutManager.cpp" line="276"/>
+        <source>The web app shortcuts directory must not be a symbolic link</source>
+        <translation>Папка ярлыков веб-приложений не должна быть символической ссылкой</translation>
+    </message>
+    <message>
+        <location filename="../src/WebAppShortcutManager.cpp" line="278"/>
+        <source>Cannot create the web app shortcuts directory</source>
+        <translation>Не удалось создать папку ярлыков веб-приложений</translation>
+    </message>
+    <message>
+        <location filename="../src/WebAppShortcutManager.cpp" line="292"/>
+        <source>Cannot create the macOS shortcut bundle</source>
+        <translation>Не удалось создать пакет ярлыка macOS</translation>
+    </message>
+    <message>
+        <location filename="../src/WebAppShortcutManager.cpp" line="306"/>
+        <source>Cannot install the macOS shortcut launcher</source>
+        <translation>Не удалось установить программу запуска ярлыка macOS</translation>
+    </message>
+    <message>
+        <location filename="../src/WebAppShortcutManager.cpp" line="326"/>
+        <source>Cannot write the macOS shortcut bundle: %1</source>
+        <translation>Не удалось записать пакет ярлыка macOS: %1</translation>
+    </message>
+    <message>
+        <location filename="../src/WebAppShortcutManager.cpp" line="336"/>
+        <source>Cannot sign the macOS shortcut: %1</source>
+        <translation>Не удалось подписать ярлык macOS: %1</translation>
+    </message>
+    <message>
+        <location filename="../src/WebAppShortcutManager.cpp" line="344"/>
+        <source>Another application already uses the shortcut path: %1</source>
+        <translation>Путь ярлыка уже используется другим приложением: %1</translation>
+    </message>
+    <message>
+        <location filename="../src/WebAppShortcutManager.cpp" line="349"/>
+        <source>Cannot replace the existing web app shortcut</source>
+        <translation>Не удалось заменить существующий ярлык веб-приложения</translation>
+    </message>
+    <message>
+        <location filename="../src/WebAppShortcutManager.cpp" line="356"/>
+        <source>Cannot move the web app shortcut into place</source>
+        <translation>Не удалось переместить ярлык веб-приложения на место</translation>
+    </message>
+    <message>
+        <location filename="../src/WebAppShortcutManager.cpp" line="380"/>
+        <source>Cannot remove the web app shortcut: %1</source>
+        <translation>Не удалось удалить ярлык веб-приложения: %1</translation>
+    </message>
+</context>
+<context>
     <name>WebAppStore</name>
     <message>
         <location filename="../src/WebAppStore.cpp" line="180"/>
@@ -2855,36 +2968,91 @@ SHA-256: %5</translation>
         <translation>Удалить…</translation>
     </message>
     <message>
-        <location filename="../src/WebAppsSettingsPage.cpp" line="115"/>
+        <location filename="../src/WebAppsSettingsPage.cpp" line="55"/>
+        <source>Create/Repair Shortcut</source>
+        <translation>Создать/восстановить ярлык</translation>
+    </message>
+    <message>
+        <location filename="../src/WebAppsSettingsPage.cpp" line="56"/>
+        <source>Remove Shortcut</source>
+        <translation>Удалить ярлык</translation>
+    </message>
+    <message>
+        <location filename="../src/WebAppsSettingsPage.cpp" line="137"/>
         <source>Installed web apps are unavailable because their data file could not be read.</source>
         <translation>Установленные веб-приложения недоступны, поскольку не удалось прочитать их файл данных.</translation>
     </message>
     <message>
-        <location filename="../src/WebAppsSettingsPage.cpp" line="116"/>
+        <location filename="../src/WebAppsSettingsPage.cpp" line="138"/>
         <source>No web apps installed. Open a PWA website and choose Install Web App from the PanBrowser menu.</source>
         <translation>Нет установленных веб-приложений. Откройте сайт с PWA и выберите «Установить веб-приложение» в меню PanBrowser.</translation>
     </message>
     <message>
-        <location filename="../src/WebAppsSettingsPage.cpp" line="121"/>
+        <location filename="../src/WebAppsSettingsPage.cpp" line="143"/>
         <source>Start page: %1
-Allowed scope: %2</source>
+Allowed scope: %2
+System shortcut: %3</source>
         <translation>Стартовая страница: %1
-Область действия: %2</translation>
+Область действия: %2
+Системный ярлык: %3</translation>
     </message>
     <message>
-        <location filename="../src/WebAppsSettingsPage.cpp" line="139"/>
+        <location filename="../src/WebAppsSettingsPage.cpp" line="148"/>
+        <source>Installed</source>
+        <translation>Установлен</translation>
+    </message>
+    <message>
+        <location filename="../src/WebAppsSettingsPage.cpp" line="148"/>
+        <source>Not installed</source>
+        <translation>Не установлен</translation>
+    </message>
+    <message>
+        <location filename="../src/WebAppsSettingsPage.cpp" line="149"/>
+        <source>Not supported on this platform</source>
+        <translation>Не поддерживается на этой платформе</translation>
+    </message>
+    <message>
+        <location filename="../src/WebAppsSettingsPage.cpp" line="165"/>
+        <source>Remove “%1” and its system shortcut? Cookies and other site data will be kept.</source>
+        <translation>Удалить «%1» и его системный ярлык? Файлы cookie и другие данные сайта сохранятся.</translation>
+    </message>
+    <message>
+        <location filename="../src/WebAppsSettingsPage.cpp" line="182"/>
+        <source>Web app removed, but its shortcut remains</source>
+        <translation>Веб-приложение удалено, но его ярлык остался</translation>
+    </message>
+    <message>
+        <location filename="../src/WebAppsSettingsPage.cpp" line="198"/>
+        <source>Cannot create shortcut</source>
+        <translation>Не удалось создать ярлык</translation>
+    </message>
+    <message>
+        <location filename="../src/WebAppsSettingsPage.cpp" line="214"/>
+        <source>Cannot remove shortcut</source>
+        <translation>Не удалось удалить ярлык</translation>
+    </message>
+    <message>
+        <location filename="../src/WebAppsSettingsPage.cpp" line="164"/>
         <source>Remove web app</source>
         <translation>Удаление веб-приложения</translation>
     </message>
     <message>
-        <location filename="../src/WebAppsSettingsPage.cpp" line="140"/>
-        <source>Remove “%1”? Cookies and other site data will be kept.</source>
-        <translation>Удалить «%1»? Файлы cookie и другие данные сайта сохранятся.</translation>
-    </message>
-    <message>
-        <location filename="../src/WebAppsSettingsPage.cpp" line="148"/>
+        <location filename="../src/WebAppsSettingsPage.cpp" line="176"/>
         <source>Cannot remove web app</source>
         <translation>Не удалось удалить веб-приложение</translation>
+    </message>
+</context>
+<context>
+    <name>main</name>
+    <message>
+        <location filename="../src/main.cpp" line="73"/>
+        <source>Cannot open web app</source>
+        <translation>Не удалось открыть веб-приложение</translation>
+    </message>
+    <message>
+        <location filename="../src/main.cpp" line="74"/>
+        <source>The requested web app is not installed or its registry is unavailable.</source>
+        <translation>Запрошенное веб-приложение не установлено или его реестр недоступен.</translation>
     </message>
 </context>
 </TS>

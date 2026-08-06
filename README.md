@@ -115,13 +115,17 @@ User-clicked HTTP/HTTPS links outside the manifest scope open in a normal
 PanBrowser tab. Automatic out-of-scope navigation is blocked, as are form
 submissions whose POST body cannot be transferred safely to a browser tab.
 Installed apps are listed under **Settings → Web Apps**, where they can be
-opened or removed. Removing an app keeps its cookies and site data. Offline
-behavior depends on the service worker supplied by the website.
+opened, removed, or have their system shortcut repaired. On macOS, installation
+also creates a small signed launcher application under
+`~/Applications/PanBrowser Apps`. Launchers reuse an existing PanBrowser
+process through a user-only local command channel, so every app continues to
+use the same browser profile. Removing an app also removes its managed
+shortcut, while keeping cookies and site data. Offline behavior depends on the
+service worker supplied by the website.
 
-The current web app implementation is internal to PanBrowser: it does not yet
-create macOS `.app` bundles, Windows Start Menu shortcuts, or Linux `.desktop`
-files, and it does not implement manifest share targets, protocol/file
-handlers, badges, or app shortcuts.
+The current web app implementation does not yet create Windows Start Menu
+shortcuts or Linux `.desktop` files, and it does not implement manifest share
+targets, protocol/file handlers, badges, or manifest-defined app shortcuts.
 
 The address bar opens explicit HTTP/HTTPS URLs, domains, IP addresses, and
 `localhost` directly. Other input is sent to the selected search engine only

@@ -41,8 +41,20 @@ class MainWindow final : public QMainWindow {
     Q_OBJECT
 
 public:
-    explicit MainWindow(QWidget *parent = nullptr);
+    enum class StartupPresentation {
+        Browser,
+        Background,
+    };
+
+    explicit MainWindow(
+        StartupPresentation presentation = StartupPresentation::Browser,
+        QWidget *parent = nullptr
+    );
     ~MainWindow() override;
+
+    void activatePrimaryWindow();
+    void openUrlInPrimaryWindow(const QUrl &url);
+    [[nodiscard]] bool launchInstalledWebApp(const QString &id);
 
 protected:
     void closeEvent(QCloseEvent *event) override;
@@ -88,6 +100,7 @@ private:
         MainWindow *primaryWindow,
         WindowRole role,
         const WebApp &webApp,
+        bool initializePrimaryTabs,
         QWidget *parent
     );
 
@@ -127,7 +140,6 @@ private:
         const QByteArray &contents,
         const QString &fetchError
     );
-    void openUrlInPrimaryWindow(const QUrl &url);
     void openWindowRequestInPrimary(QWebEngineNewWindowRequest &request);
     void editCurrentBookmark();
     void openBookmarks();
@@ -195,6 +207,7 @@ private:
     WebApp m_webApp;
     QList<QPointer<MainWindow>> m_popupWindows;
     bool m_ownsBrowserResources = true;
+    bool m_primaryTabsInitialized = false;
     bool m_restoringSession = false;
     bool m_discardSessionOnClose = false;
     quint64 m_findRequestSerial = 0;

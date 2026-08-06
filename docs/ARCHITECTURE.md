@@ -35,7 +35,8 @@ allowing PanBrowser to own the surrounding UI and certificate-error policy.
 
 ```mermaid
 flowchart TD
-    App["main.cpp / QApplication"] --> MW["Primary MainWindow"]
+    App["main.cpp / QApplication"] --> Instance["SingleInstanceCoordinator / local IPC"]
+    Instance --> MW["Primary MainWindow"]
     MW --> Profile["BrowserProfile / QWebEngineProfile"]
     MW --> Tabs["QTabBar + QStackedWidget"]
     Tabs --> View["QWebEngineView per tab"]
@@ -49,6 +50,7 @@ flowchart TD
     MW --> Permissions["PermissionController"]
     MW --> Session["SessionStore"]
     MW --> WebApps["WebAppStore / web-apps.json"]
+    WebApps --> Shortcuts["WebAppShortcutManager / macOS .app launchers"]
 
     Popup["Popup MainWindow"] --> Profile
     Popup --> History
@@ -134,7 +136,28 @@ New-window requests from app windows are adopted by a normal browser page via
 `QWebEngineNewWindowRequest::openIn()`, preserving opener and request state.
 App windows share the main profile deliberately so an installed banking or
 communications app retains the same sign-in and domain-scoped custom-CA
-behavior as a normal tab.
+behavior as a normal tab. They are independent top-level windows rather than
+transient children: closing the browser window closes ordinary popup windows
+but leaves installed apps running. On macOS, a small delegate proxy forwards
+Qt's existing application-delegate behavior and handles the native reopen
+AppleEvent by restoring and activating the primary browser window.
+
+`ApplicationLaunchRequest` is the platform-neutral startup contract. A request
+activates the browser, opens a validated HTTP(S) URL, or opens an installed app
+by its validated SHA-256 ID. `SingleInstanceCoordinator` exposes that contract
+over a bounded, user-only `QLocalServer`; a second process forwards its request
+and exits before opening the persistent WebEngine profile. Shortcut and URL
+launches can therefore reuse an already-running browser safely. Command-line
+options are parsed before this contract is created and are never interpreted as
+restorable tab URLs.
+
+On macOS, `WebAppShortcutManager` creates signed launcher bundles below
+`~/Applications/PanBrowser Apps`. Each bundle contains a small shared Mach-O
+launcher, its resolved app ID and host executable path, and an `.icns` generated
+from the stored page icon. The launcher has no Qt or WebEngine copy: it invokes
+PanBrowser with `--app-id`, falling back to the main bundle identifier if the
+recorded executable has moved. Bundle names and deletion targets are sanitized
+and verified against the embedded app ID before any filesystem mutation.
 
 The registry stores a bounded PNG copy of the page icon. Manifest contents and
 site-controlled names never become executable paths or command lines. Removing
@@ -333,6 +356,7 @@ On macOS, application data is rooted at
 | `history.sqlite` | `HistoryStore` | WAL-mode SQLite browsing history, limited to 50,000 visits. |
 | `bookmarks.sqlite` | `BookmarkStore` | WAL-mode SQLite bookmarks with normalized URL and title fields for local lookup. |
 | `web-apps.json` | `WebAppStore` | Validated installed-app metadata and bounded page icons, atomically written. |
+| `~/Applications/PanBrowser Apps/*.app` | `WebAppShortcutManager` | macOS-only signed launchers; each deletion target is verified by its embedded app ID. |
 | `session.json` | `SessionStore` | Up to 30 restorable HTTP(S) tabs, atomically written. |
 | `downloads.json` | `DownloadHistoryStore` | Up to 200 download records; paths and source host, not complete source URLs. |
 | native `QSettings` | `BrowserPreferences`, window/download UI | Start page, startup/cookie/history/language choices, window geometry, last download directory, and pending data-reset marker. |

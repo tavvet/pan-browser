@@ -1,5 +1,6 @@
 #include "AddressLineEdit.h"
 #include "AddressSuggestion.h"
+#include "ApplicationLaunch.h"
 #include "BookmarkStore.h"
 #include "BrowserPreferences.h"
 #include "BrowserDataCleanup.h"
@@ -15,6 +16,7 @@
 #include "TrustConfiguration.h"
 #include "TrustSettings.h"
 #include "WebAppStore.h"
+#include "WebAppShortcutManager.h"
 #include "WindowPlacement.h"
 
 #include <QFile>
@@ -26,6 +28,7 @@
 #include <QTest>
 #include <QTimeZone>
 #include <QTranslator>
+#include <QUuid>
 
 class TrustConfigurationTests final : public QObject {
     Q_OBJECT
@@ -76,12 +79,18 @@ private slots:
     void ghostCompletionAcceptsOnlyAddressPrefixes();
     void addressSuggestionsPreferRelevanceThenBookmarks();
     void findBarSupportsKeyboardNavigationAndCounts();
+    void applicationLaunchRequestsAreValidatedAndRoundTrip();
+    void applicationLaunchRequestsAreForwardedToPrimaryInstance();
     void webAppManifestIsValidatedAndNormalized();
     void webAppManifestIdUsesStartOrigin();
     void webAppManifestRejectsUnsafeOriginsAndScopes();
     void webAppStoreRoundTripsAndRemovesApps();
     void corruptWebAppStoreIsPreservedAndDisabled();
     void webAppStoreRejectsNonArrayApps();
+    void webAppShortcutNamesStayInsideTheirDirectory();
+#if defined(Q_OS_MACOS)
+    void macWebAppShortcutRoundTrips();
+#endif
 #if defined(Q_OS_WIN) || defined(Q_OS_LINUX)
     void nativeCertificateValidatorTrustsConfiguredAnchor();
     void nativeCertificateValidatorRejectsWrongHostname();
@@ -1295,6 +1304,82 @@ void TrustConfigurationTests::findBarSupportsKeyboardNavigationAndCounts()
     QCOMPARE(result->text(), QStringLiteral("No matches"));
 }
 
+void TrustConfigurationTests::applicationLaunchRequestsAreValidatedAndRoundTrip()
+{
+    const ApplicationLaunchRequest activate = ApplicationLaunchRequest::activate();
+    QVERIFY(activate.isValid());
+    const std::optional<ApplicationLaunchRequest> restoredActivate =
+        ApplicationLaunchRequest::fromPayload(activate.toPayload());
+    QVERIFY(restoredActivate.has_value());
+    QCOMPARE(restoredActivate->command, ApplicationLaunchRequest::Command::Activate);
+
+    const QString appId(64, QLatin1Char('a'));
+    const ApplicationLaunchRequest open = ApplicationLaunchRequest::openWebApp(appId);
+    QVERIFY(open.isValid());
+    const std::optional<ApplicationLaunchRequest> restoredOpen =
+        ApplicationLaunchRequest::fromPayload(open.toPayload());
+    QVERIFY(restoredOpen.has_value());
+    QCOMPARE(restoredOpen->command, ApplicationLaunchRequest::Command::OpenWebApp);
+    QCOMPARE(restoredOpen->webAppId, appId);
+
+    const QUrl url(QStringLiteral("https://example.com/account?section=cards"));
+    const ApplicationLaunchRequest openUrl = ApplicationLaunchRequest::openUrl(url);
+    QVERIFY(openUrl.isValid());
+    const std::optional<ApplicationLaunchRequest> restoredUrl =
+        ApplicationLaunchRequest::fromPayload(openUrl.toPayload());
+    QVERIFY(restoredUrl.has_value());
+    QCOMPARE(restoredUrl->command, ApplicationLaunchRequest::Command::OpenUrl);
+    QCOMPARE(restoredUrl->url, url);
+
+    QVERIFY(!ApplicationLaunchRequest::openWebApp(QStringLiteral("../unsafe")).isValid());
+    QVERIFY(!ApplicationLaunchRequest::openUrl(QUrl(QStringLiteral("file:///etc/passwd"))).isValid());
+    QVERIFY(!ApplicationLaunchRequest::fromPayload(
+        QByteArrayLiteral("{\"version\":1,\"command\":\"open-web-app\",\"appId\":\"bad\"}")
+    ));
+    QVERIFY(!ApplicationLaunchRequest::fromPayload(QByteArray(5000, 'x')));
+}
+
+void TrustConfigurationTests::applicationLaunchRequestsAreForwardedToPrimaryInstance()
+{
+    const QString serverName = QStringLiteral("panbrowser-test-%1").arg(
+        QUuid::createUuid().toString(QUuid::WithoutBraces)
+    );
+    SingleInstanceCoordinator primary(serverName);
+    QString error;
+    const SingleInstanceCoordinator::StartResult primaryResult =
+        primary.start(ApplicationLaunchRequest::activate(), &error);
+    QVERIFY2(
+        primaryResult == SingleInstanceCoordinator::StartResult::Primary,
+        qPrintable(error)
+    );
+    QVERIFY2(error.isEmpty(), qPrintable(error));
+
+    QSignalSpy requestSpy(&primary, &SingleInstanceCoordinator::launchRequested);
+    SingleInstanceCoordinator secondary(serverName);
+    const QString appId(64, QLatin1Char('c'));
+    QCOMPARE(
+        secondary.start(ApplicationLaunchRequest::openWebApp(appId), &error),
+        SingleInstanceCoordinator::StartResult::Forwarded
+    );
+    QTRY_COMPARE(requestSpy.count(), 1);
+    const ApplicationLaunchRequest request =
+        qvariant_cast<ApplicationLaunchRequest>(requestSpy.takeFirst().at(0));
+    QCOMPARE(request.command, ApplicationLaunchRequest::Command::OpenWebApp);
+    QCOMPARE(request.webAppId, appId);
+
+    SingleInstanceCoordinator urlSecondary(serverName);
+    const QUrl url(QStringLiteral("https://example.com/from-secondary"));
+    QCOMPARE(
+        urlSecondary.start(ApplicationLaunchRequest::openUrl(url), &error),
+        SingleInstanceCoordinator::StartResult::Forwarded
+    );
+    QTRY_COMPARE(requestSpy.count(), 1);
+    const ApplicationLaunchRequest urlRequest =
+        qvariant_cast<ApplicationLaunchRequest>(requestSpy.takeFirst().at(0));
+    QCOMPARE(urlRequest.command, ApplicationLaunchRequest::Command::OpenUrl);
+    QCOMPARE(urlRequest.url, url);
+}
+
 void TrustConfigurationTests::webAppManifestIsValidatedAndNormalized()
 {
     const QByteArray manifest = QByteArray(
@@ -1492,6 +1577,60 @@ void TrustConfigurationTests::webAppStoreRejectsNonArrayApps()
     QVERIFY(file.open(QIODevice::ReadOnly));
     QCOMPARE(file.readAll(), invalid);
 }
+
+void TrustConfigurationTests::webAppShortcutNamesStayInsideTheirDirectory()
+{
+    const QString unsafeName = QStringLiteral("../../Bank:/")
+        + QChar(0x202e)
+        + QString(100, QLatin1Char('x'));
+    const QString safeName = WebAppShortcutManager::safeShortcutName(unsafeName);
+    QVERIFY(!safeName.contains(QLatin1Char('/')));
+    QVERIFY(!safeName.contains(QLatin1Char(':')));
+    QVERIFY(!safeName.contains(QChar(0x202e)));
+    QVERIFY(!safeName.startsWith(QLatin1Char('.')));
+    QVERIFY(safeName.size() <= 80);
+
+    const QString emoji = QString::fromUtf8("\xF0\x9F\x9A\x80");
+    const QString unicodeBoundaryName = QString(79, QLatin1Char('x'))
+        + emoji
+        + QStringLiteral("tail");
+    const QString unicodeBoundarySafeName =
+        WebAppShortcutManager::safeShortcutName(unicodeBoundaryName);
+    QCOMPARE(unicodeBoundarySafeName.size(), 79);
+    QCOMPARE(QString::fromUtf8(unicodeBoundarySafeName.toUtf8()), unicodeBoundarySafeName);
+
+    WebApp app;
+    app.id = QString(64, QLatin1Char('a'));
+    app.name = unsafeName;
+    WebAppShortcutManager manager(QStringLiteral("/shortcuts"), QStringLiteral("/host.app"));
+    QCOMPARE(QFileInfo(manager.shortcutPath(app)).absolutePath(), QStringLiteral("/shortcuts"));
+}
+
+#if defined(Q_OS_MACOS)
+void TrustConfigurationTests::macWebAppShortcutRoundTrips()
+{
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+    const QString hostBundle = QDir(QCoreApplication::applicationDirPath()).filePath(
+        QStringLiteral("PanBrowser.app")
+    );
+    WebAppShortcutManager manager(directory.path(), hostBundle);
+    QVERIFY(manager.isSupported());
+
+    WebApp app;
+    app.id = QString(64, QLatin1Char('b'));
+    app.name = QStringLiteral("Shortcut Test");
+    app.shortName = QStringLiteral("Test");
+    QString error;
+    QVERIFY2(manager.createOrUpdate(app, &error), qPrintable(error));
+    QVERIFY(manager.shortcutExists(app));
+    QVERIFY(QFileInfo(QDir(manager.shortcutPath(app)).filePath(
+        QStringLiteral("Contents/MacOS/PanBrowserWebAppLauncher")
+    )).isExecutable());
+    QVERIFY2(manager.remove(app, &error), qPrintable(error));
+    QVERIFY(!manager.shortcutExists(app));
+}
+#endif
 
 #if defined(Q_OS_WIN) || defined(Q_OS_LINUX)
 void TrustConfigurationTests::nativeCertificateValidatorTrustsConfiguredAnchor()

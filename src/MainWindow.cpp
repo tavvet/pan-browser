@@ -18,6 +18,7 @@
 #include "SettingsDialog.h"
 #include "WindowPlacement.h"
 #include "WebAppStore.h"
+#include "WebAppShortcutManager.h"
 
 #include <QAction>
 #include <QApplication>
@@ -89,7 +90,7 @@ bool isSameWebOrigin(const QUrl &left, const QUrl &right)
 
 } // namespace
 
-MainWindow::MainWindow(QWidget *parent)
+MainWindow::MainWindow(StartupPresentation presentation, QWidget *parent)
     : MainWindow(
         nullptr,
         nullptr,
@@ -99,6 +100,7 @@ MainWindow::MainWindow(QWidget *parent)
         nullptr,
         WindowRole::Primary,
         WebApp(),
+        presentation == StartupPresentation::Browser,
         parent
     )
 {
@@ -113,6 +115,7 @@ MainWindow::MainWindow(
     MainWindow *primaryWindow,
     WindowRole role,
     const WebApp &webApp,
+    bool initializePrimaryTabs,
     QWidget *parent
 )
     : QMainWindow(parent, role == WindowRole::Primary ? Qt::WindowFlags() : Qt::Window)
@@ -191,7 +194,10 @@ MainWindow::MainWindow(
     if (m_ownsBrowserResources) {
         restoreWindowPlacement();
         reloadRules();
-        restoreInitialTabs();
+        if (initializePrimaryTabs) {
+            m_primaryTabsInitialized = true;
+            restoreInitialTabs();
+        }
     } else {
         reloadRulesLocal();
         createTab(role == WindowRole::WebApp ? m_webApp.startUrl : QUrl());
@@ -227,17 +233,19 @@ MainWindow::~MainWindow()
 void MainWindow::closeEvent(QCloseEvent *event)
 {
     if (m_ownsBrowserResources) {
-        saveSession();
-        QSettings settings(QStringLiteral("PanBrowser"), QStringLiteral("PanBrowser"));
-        settings.beginGroup(QStringLiteral("MainWindow"));
-        settings.setValue(QStringLiteral("geometry"), saveGeometry());
-        settings.setValue(QStringLiteral("state"), saveState(1));
-        settings.endGroup();
-        settings.sync();
+        if (m_primaryTabsInitialized) {
+            saveSession();
+            QSettings settings(QStringLiteral("PanBrowser"), QStringLiteral("PanBrowser"));
+            settings.beginGroup(QStringLiteral("MainWindow"));
+            settings.setValue(QStringLiteral("geometry"), saveGeometry());
+            settings.setValue(QStringLiteral("state"), saveState(1));
+            settings.endGroup();
+            settings.sync();
+        }
 
         const QList<QPointer<MainWindow>> popups = m_popupWindows;
         for (MainWindow *popup : popups) {
-            if (popup)
+            if (popup && popup->m_windowRole == WindowRole::Popup)
                 popup->close();
         }
     }
@@ -632,6 +640,7 @@ MainWindow *MainWindow::createPopupWindow(
         primary,
         role,
         WebApp(),
+        false,
         primary
     );
     primary->m_popupWindows.append(popup);
@@ -665,7 +674,8 @@ MainWindow *MainWindow::createWebAppWindow(const WebApp &app)
         primary,
         WindowRole::WebApp,
         app,
-        primary
+        false,
+        nullptr
     );
     primary->m_popupWindows.append(window);
     connect(window, &QObject::destroyed, primary, [primary, window] {
@@ -1619,6 +1629,18 @@ void MainWindow::handleFetchedWebAppManifest(
         QMessageBox::warning(this, tr("Cannot install web app"), error);
         return;
     }
+    WebAppShortcutManager shortcutManager;
+    if (shortcutManager.isSupported()) {
+        QString shortcutError;
+        if (!shortcutManager.createOrUpdate(*app, &shortcutError)) {
+            QMessageBox::warning(
+                this,
+                tr("Web app installed without a system shortcut"),
+                tr("PanBrowser installed the web app, but could not create its system shortcut: %1")
+                    .arg(shortcutError)
+            );
+        }
+    }
     statusBar()->showMessage(tr("“%1” installed").arg(app->name), 4000);
     openInstalledWebApp(app->id);
 }
@@ -1653,18 +1675,45 @@ void MainWindow::rebuildWebAppsMenu()
 
 void MainWindow::openInstalledWebApp(const QString &id)
 {
-    if (!m_ownsBrowserResources && m_primaryWindow) {
-        m_primaryWindow->openInstalledWebApp(id);
+    (void)launchInstalledWebApp(id);
+}
+
+void MainWindow::activatePrimaryWindow()
+{
+    MainWindow *primary = m_primaryWindow ? m_primaryWindow : this;
+    if (primary != this) {
+        primary->activatePrimaryWindow();
         return;
     }
+    if (!m_primaryTabsInitialized) {
+        m_primaryTabsInitialized = true;
+        restoreInitialTabs();
+    }
+    qApp->setWindowIcon(QIcon(QStringLiteral(":/assets/app-icon.svg")));
+    show();
+    raise();
+    activateWindow();
+}
+
+bool MainWindow::launchInstalledWebApp(const QString &id)
+{
+    if (!m_ownsBrowserResources && m_primaryWindow) {
+        return m_primaryWindow->launchInstalledWebApp(id);
+    }
     if (!m_webAppStore)
-        return;
+        return false;
     const std::optional<WebApp> app = m_webAppStore->app(id);
     if (!app) {
         statusBar()->showMessage(tr("The web app is no longer installed"), 4000);
-        return;
+        return false;
+    }
+    if (!m_primaryTabsInitialized && m_popupWindows.isEmpty() && !app->iconPng.isEmpty()) {
+        QPixmap iconPixmap;
+        if (iconPixmap.loadFromData(app->iconPng, "PNG"))
+            qApp->setWindowIcon(QIcon(iconPixmap));
     }
     createWebAppWindow(*app);
+    return true;
 }
 
 void MainWindow::openUrlInPrimaryWindow(const QUrl &url)
@@ -1674,6 +1723,9 @@ void MainWindow::openUrlInPrimaryWindow(const QUrl &url)
         primary->openUrlInPrimaryWindow(url);
         return;
     }
+    if (!primary->m_primaryTabsInitialized)
+        primary->m_primaryTabsInitialized = true;
+    qApp->setWindowIcon(QIcon(QStringLiteral(":/assets/app-icon.svg")));
     primary->show();
     primary->raise();
     primary->activateWindow();
@@ -1688,9 +1740,7 @@ void MainWindow::openWindowRequestInPrimary(QWebEngineNewWindowRequest &request)
         return;
     }
 
-    primary->show();
-    primary->raise();
-    primary->activateWindow();
+    primary->activatePrimaryWindow();
     const bool separateWindow = request.destination() == QWebEngineNewWindowRequest::InNewWindow
         || request.destination() == QWebEngineNewWindowRequest::InNewDialog;
     if (separateWindow) {
@@ -1792,12 +1842,6 @@ void MainWindow::openSettingsPage(int page)
 
 void MainWindow::restoreInitialTabs()
 {
-    const QStringList arguments = QApplication::arguments();
-    if (arguments.size() > 1) {
-        createTab(QUrl::fromUserInput(arguments.at(1)));
-        return;
-    }
-
     if (m_preferences.startupMode() != StartupMode::RestoreTabs) {
         createTab(m_preferences.startPage());
         return;
