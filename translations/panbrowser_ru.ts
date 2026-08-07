@@ -2990,14 +2990,19 @@ Rollback was incomplete:
 <context>
     <name>SingleInstanceCoordinator</name>
     <message>
-        <location filename="../src/ApplicationLaunch.cpp" line="163"/>
+        <location filename="../src/ApplicationLaunch.cpp" line="177"/>
         <source>The application launch request is invalid</source>
         <translation>Некорректный запрос на запуск приложения</translation>
     </message>
     <message>
-        <location filename="../src/ApplicationLaunch.cpp" line="179"/>
+        <location filename="../src/ApplicationLaunch.cpp" line="186"/>
         <source>Cannot start the local PanBrowser command server: %1</source>
         <translation>Не удалось запустить локальный сервер команд PanBrowser: %1</translation>
+    </message>
+    <message>
+        <location filename="../src/ApplicationLaunch.cpp" line="200"/>
+        <source>Another PanBrowser instance is running but did not accept the launch request</source>
+        <translation>Другой экземпляр PanBrowser запущен, но не принял запрос на запуск</translation>
     </message>
 </context>
 <context>

@@ -44,6 +44,9 @@
 #include <QUuid>
 #include <QWindow>
 
+#include <chrono>
+#include <future>
+
 class TrustConfigurationTests final : public QObject {
     Q_OBJECT
 
@@ -1810,24 +1813,46 @@ void TrustConfigurationTests::applicationLaunchRequestsAreForwardedToPrimaryInst
     QVERIFY2(error.isEmpty(), qPrintable(error));
 
     QSignalSpy requestSpy(&primary, &SingleInstanceCoordinator::launchRequested);
-    SingleInstanceCoordinator secondary(serverName);
     const QString appId(64, QLatin1Char('c'));
-    QCOMPARE(
-        secondary.start(ApplicationLaunchRequest::openWebApp(appId), &error),
-        SingleInstanceCoordinator::StartResult::Forwarded
+    auto webAppFuture = std::async(std::launch::async, [serverName, appId] {
+        SingleInstanceCoordinator secondary(serverName);
+        QString secondaryError;
+        const SingleInstanceCoordinator::StartResult result = secondary.start(
+            ApplicationLaunchRequest::openWebApp(appId),
+            &secondaryError
+        );
+        return qMakePair(result, secondaryError);
+    });
+    QTRY_VERIFY_WITH_TIMEOUT(
+        webAppFuture.wait_for(std::chrono::milliseconds(0)) == std::future_status::ready,
+        5000
     );
+    const auto webAppResult = webAppFuture.get();
+    QCOMPARE(webAppResult.first, SingleInstanceCoordinator::StartResult::Forwarded);
+    QVERIFY2(webAppResult.second.isEmpty(), qPrintable(webAppResult.second));
     QTRY_COMPARE(requestSpy.count(), 1);
     const ApplicationLaunchRequest request =
         qvariant_cast<ApplicationLaunchRequest>(requestSpy.takeFirst().at(0));
     QCOMPARE(request.command, ApplicationLaunchRequest::Command::OpenWebApp);
     QCOMPARE(request.webAppId, appId);
 
-    SingleInstanceCoordinator urlSecondary(serverName);
     const QUrl url(QStringLiteral("https://example.com/from-secondary"));
-    QCOMPARE(
-        urlSecondary.start(ApplicationLaunchRequest::openUrl(url), &error),
-        SingleInstanceCoordinator::StartResult::Forwarded
+    auto urlFuture = std::async(std::launch::async, [serverName, url] {
+        SingleInstanceCoordinator secondary(serverName);
+        QString secondaryError;
+        const SingleInstanceCoordinator::StartResult result = secondary.start(
+            ApplicationLaunchRequest::openUrl(url),
+            &secondaryError
+        );
+        return qMakePair(result, secondaryError);
+    });
+    QTRY_VERIFY_WITH_TIMEOUT(
+        urlFuture.wait_for(std::chrono::milliseconds(0)) == std::future_status::ready,
+        5000
     );
+    const auto urlResult = urlFuture.get();
+    QCOMPARE(urlResult.first, SingleInstanceCoordinator::StartResult::Forwarded);
+    QVERIFY2(urlResult.second.isEmpty(), qPrintable(urlResult.second));
     QTRY_COMPARE(requestSpy.count(), 1);
     const ApplicationLaunchRequest urlRequest =
         qvariant_cast<ApplicationLaunchRequest>(requestSpy.takeFirst().at(0));

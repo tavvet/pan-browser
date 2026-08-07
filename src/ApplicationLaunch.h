@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QByteArray>
+#include <QLockFile>
 #include <QObject>
 #include <QString>
 #include <QUrl>
@@ -60,5 +61,6 @@ private:
     void consumeSocket(QLocalSocket *socket);
 
     QString m_serverName;
+    QLockFile m_instanceLock;
     QLocalServer *m_server = nullptr;
 };

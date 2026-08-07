@@ -8,6 +8,7 @@
 #include <QLocalSocket>
 #include <QRegularExpression>
 #include <QStandardPaths>
+#include <QThread>
 
 #include <utility>
 
@@ -39,6 +40,17 @@ QString defaultServerName()
         QCryptographicHash::Sha256
     ).toHex().left(16);
     return QStringLiteral("dev.panbrowser.app.%1").arg(QString::fromLatin1(suffix));
+}
+
+QString lockFilePath(const QString &serverName)
+{
+    QString directory = QStandardPaths::writableLocation(QStandardPaths::RuntimeLocation);
+    if (directory.isEmpty())
+        directory = QStandardPaths::writableLocation(QStandardPaths::TempLocation);
+    const QString suffix = QString::fromLatin1(
+        QCryptographicHash::hash(serverName.toUtf8(), QCryptographicHash::Sha256).toHex()
+    );
+    return QDir(directory).filePath(QStringLiteral("panbrowser-%1.lock").arg(suffix));
 }
 
 } // namespace
@@ -145,8 +157,10 @@ SingleInstanceCoordinator::SingleInstanceCoordinator(
 )
     : QObject(parent)
     , m_serverName(std::move(serverName))
+    , m_instanceLock(lockFilePath(m_serverName))
     , m_server(new QLocalServer(this))
 {
+    m_instanceLock.setStaleLockTime(0);
     m_server->setSocketOptions(QLocalServer::UserAccessOption);
     connect(m_server, &QLocalServer::newConnection, this, &SingleInstanceCoordinator::acceptPendingConnections);
 }
@@ -163,20 +177,27 @@ SingleInstanceCoordinator::StartResult SingleInstanceCoordinator::start(
             *error = tr("The application launch request is invalid");
         return StartResult::Error;
     }
-    if (forwardRequest(initialRequest))
-        return StartResult::Forwarded;
-    if (listen())
-        return StartResult::Primary;
+    if (m_instanceLock.tryLock(0)) {
+        QLocalServer::removeServer(m_serverName);
+        if (listen())
+            return StartResult::Primary;
+        m_instanceLock.unlock();
+        if (error) {
+            *error = tr("Cannot start the local PanBrowser command server: %1")
+                .arg(m_server->errorString());
+        }
+        return StartResult::Error;
+    }
 
-    // Another process may have won the listen race after our first connection attempt.
-    if (forwardRequest(initialRequest))
-        return StartResult::Forwarded;
-
-    QLocalServer::removeServer(m_serverName);
-    if (listen())
-        return StartResult::Primary;
+    // The primary process can hold the lock just before its local server is ready.
+    for (int attempt = 0; attempt < 5; ++attempt) {
+        if (forwardRequest(initialRequest))
+            return StartResult::Forwarded;
+        if (attempt < 4)
+            QThread::msleep(50);
+    }
     if (error)
-        *error = tr("Cannot start the local PanBrowser command server: %1").arg(m_server->errorString());
+        *error = tr("Another PanBrowser instance is running but did not accept the launch request");
     return StartResult::Error;
 }
 
