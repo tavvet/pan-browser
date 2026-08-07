@@ -49,7 +49,10 @@ branch; unfinished experiments kept on other branches remain unchecked here.
 
 ## Packaging and maintenance
 
-- [ ] Audit the release bundle and remove unused Qt plugins and resources.
+- [x] Audit release bundles in Windows CI and prune unsupported Qt WebEngine
+  locale resources from the distribution candidate.
+- [ ] Evaluate further Qt plugin or resource removal with cross-platform smoke
+  tests before changing the retained-runtime policy.
 - [x] Add application version information to the UI.
 - [ ] Add a controlled update mechanism.
 

@@ -17,8 +17,9 @@ not implemented.
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for component ownership,
 startup order, security boundaries, data formats, tests, and maintenance
-invariants. See [ROADMAP.md](ROADMAP.md) for completed work and planned browser
-features.
+invariants, and [docs/BUNDLE_POLICY.md](docs/BUNDLE_POLICY.md) for deployment
+auditing and size-optimization rules. See [ROADMAP.md](ROADMAP.md) for completed
+work and planned browser features.
 
 Keyboard shortcuts below use macOS notation. Qt maps standard shortcuts to
 their platform equivalents, normally <kbd>Ctrl</kbd> instead of
@@ -41,18 +42,41 @@ The script creates a self-contained, ad-hoc signed application at
 
 ### Windows
 
-Run the packaging script from an x64 Visual Studio 2022 developer shell with
-Qt 6.11 MSVC, CMake, and Ninja available. Set `QT_ROOT` when Qt is not already
-discoverable:
+Run the packaging script with Qt 6.11 MSVC and CMake available. The default
+Ninja generator also requires Ninja and an x64 Visual Studio 2022 developer
+shell. Set `QT_ROOT` when Qt is not already discoverable:
 
 ```powershell
-$env:QT_ROOT = "C:\Qt\6.11.0\msvc2022_64"
+$env:QT_ROOT = "C:\Qt\6.11.1\msvc2022_64"
 .\scripts\build-windows.ps1
+```
+
+The default generator is Ninja. When using a normal Visual Studio installation
+instead of its developer shell, CMake can initialize MSVC through the Visual
+Studio generator:
+
+```powershell
+.\scripts\build-windows.ps1 -Generator "Visual Studio 17 2022"
 ```
 
 It produces `dist\PanBrowser-windows-x64.zip`. The archive includes the
 application, compiler runtime selected by Qt, plugins, `QtWebEngineProcess`,
 Chromium resources, and locales.
+
+Pass `-OptimizeBundle` to retain only the supported `en-US` and `ru` Chromium
+locale packs. Add `-KeepBaselineArchive` to also preserve the unmodified Qt
+deployment for comparison:
+
+```powershell
+.\scripts\build-windows.ps1 -OptimizeBundle -KeepBaselineArchive
+```
+
+The script writes JSON and Markdown bundle reports next to the archives. A
+manual **Windows bundle** workflow under GitHub Actions runs this comparison on
+a Windows runner and uploads both archives and their reports; no Windows build
+tools need to be installed on the developer workstation. The workflow downloads
+the pinned Qt 6.11.1 build from Qt's official repository, verifies each archive
+against its published checksum, and caches the extracted SDK between runs.
 
 ### Linux
 

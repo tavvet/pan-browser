@@ -1,0 +1,84 @@
+name: Windows bundle
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-bundle-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  QT_VERSION: 6.11.1
+  QT_ROOT: ${{ github.workspace }}\build-tools\Qt\6.11.1\msvc2022_64
+
+jobs:
+  package:
+    name: Build, audit, and package Windows x64
+    runs-on: windows-2022
+    timeout-minutes: 90
+
+    steps:
+      - name: Check out source
+        # actions/checkout v6.0.2
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          persist-credentials: false
+
+      - name: Restore Qt cache
+        id: qt-cache
+        # actions/cache v5.0.5
+        uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae
+        with:
+          path: build-tools/Qt
+          key: panbrowser-qt-windows-msvc2022-x64-${{ env.QT_VERSION }}-${{ hashFiles('scripts/install-qt-windows.ps1') }}
+
+      - name: Install Qt from official archives
+        shell: pwsh
+        run: ./scripts/install-qt-windows.ps1 -Destination $env:QT_ROOT -QtVersion $env:QT_VERSION
+
+      - name: Save Qt cache
+        if: steps.qt-cache.outputs.cache-hit != 'true'
+        # actions/cache v5.0.5
+        uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae
+        with:
+          path: build-tools/Qt
+          key: panbrowser-qt-windows-msvc2022-x64-${{ env.QT_VERSION }}-${{ hashFiles('scripts/install-qt-windows.ps1') }}
+
+      - name: Build baseline and optimized bundles
+        shell: pwsh
+        run: >-
+          ./scripts/build-windows.ps1
+          -QtRoot $env:QT_ROOT
+          -Generator "Visual Studio 17 2022"
+          -OptimizeBundle
+          -KeepBaselineArchive
+
+      - name: Add bundle reports to the job summary
+        if: always()
+        shell: pwsh
+        run: |
+          if (Test-Path -LiteralPath dist) {
+            Get-ChildItem -LiteralPath dist -Filter "PanBrowser-windows-x64-*.md" |
+              Sort-Object Name |
+              ForEach-Object {
+                Get-Content -LiteralPath $_.FullName |
+                  Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Encoding utf8 -Append
+              }
+          }
+
+      - name: Upload Windows bundles and audit reports
+        # actions/upload-artifact v7.0.1
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: PanBrowser-windows-x64
+          path: |
+            dist/PanBrowser-windows-x64.zip
+            dist/PanBrowser-windows-x64-baseline.zip
+            dist/PanBrowser-windows-x64-*.json
+            dist/PanBrowser-windows-x64-*.md
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0

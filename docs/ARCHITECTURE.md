@@ -655,6 +655,17 @@ scripts/build-windows.ps1 -> dist/PanBrowser-windows-x64.zip
 scripts/build-linux.sh    -> dist/PanBrowser-linux-<architecture>.tar.gz
 ```
 
+Windows packaging can additionally retain an unmodified baseline archive and
+then prune unsupported Chromium locale packs from the distribution candidate.
+`scripts/audit-bundle.cmake` emits per-file JSON plus a Markdown largest-file
+summary before and after optimization. The manual GitHub Actions Windows job
+uses this path. `scripts/install-qt-windows.ps1` installs a pinned, minimal Qt
+6.11.1 SDK from official archives. This repository-owned installer was added in
+August 2026 because the generic Qt CI installer did not yet understand the
+separate Qt WebEngine 6.11 repository layout. The extracted SDK is cached using
+the installer manifest hash. The locale allowlist and the files that must remain
+in every bundle are documented in `docs/BUNDLE_POLICY.md`.
+
 These outputs are suitable for local and cross-machine testing. Public
 distribution still requires platform signing, a supported oldest Linux build
 host, license review, and the release work tracked in the roadmap.
