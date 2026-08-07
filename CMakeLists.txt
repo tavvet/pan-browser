@@ -285,6 +285,9 @@ qt_add_executable(PanBrowserTests
     src/WindowChrome.h
     src/WindowChromePlatform.h
 )
+if(WIN32)
+    set_target_properties(PanBrowserTests PROPERTIES WIN32_EXECUTABLE FALSE)
+endif()
 target_include_directories(PanBrowserTests PRIVATE src)
 target_link_libraries(PanBrowserTests PRIVATE
     Qt6::Core
