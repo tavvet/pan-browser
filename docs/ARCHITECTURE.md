@@ -176,6 +176,36 @@ site-controlled names never become executable paths or command lines. Removing
 an installed app removes only its registry entry; clearing site data remains a
 separate explicit privacy action.
 
+### 3.2 Window chrome
+
+Normal browser and popup windows use `WindowChromeController` on macOS. The
+same Qt path is enabled experimentally on Windows pending native testing. Before
+the native window is created it requests
+`Qt::ExpandedClientAreaHint` and `Qt::NoTitleBarBackgroundHint`, allowing the
+existing tab toolbar to occupy the native title-bar area without replacing the
+system frame or window controls. `Qt::WA_LayoutOnEntireRect` is required as
+well: without it, `QMainWindow` reserves the safe top margin and leaves the tab
+toolbar in a second row even though the native title bar is transparent.
+
+After the platform window exists, the controller observes
+`QWindow::safeAreaMarginsChanged`. The macOS adapter also hides the native
+window-title text, reinforces the full-size content-view style, and measures the
+actual traffic-light button frames. Only the resulting left and right margins
+are applied to the tab layout: those keep tabs clear of system controls, while
+applying the top safe margin would move the strip back below the title bar. The
+pure `integratedChromeContentMargins()` helper keeps platform geometry
+independently testable.
+
+Mouse presses reach the controller only when they land directly on the empty
+tab-toolbar or tab-container background. It calls `QWindow::startSystemMove()`
+there, preserving native movement behavior while leaving tab dragging and the
+new-tab button untouched. A double click on the same empty area toggles the
+maximized state. Surface-destruction events disconnect the native handle before
+queued geometry updates can run, and guarded pointers protect layouts owned by
+the toolbar during teardown. Installed web apps retain their compact native
+title bar, and Linux retains ordinary window-manager decorations as a reliable
+fallback for differing X11 and Wayland decoration policies.
+
 ## 4. TLS trust model
 
 ### 4.1 Normal path
@@ -647,7 +677,9 @@ proxy persistence, validation, and application modes; corrupt-database
 behavior; ghost completion; find-bar keyboard behavior; web-app manifest
 validation, scope enforcement, and registry persistence; DNS settings
 validation, persistence, and mode application; and native custom-anchor,
-hostname, and weak-key validation on Windows and Linux.
+hostname, and weak-key validation on Windows and Linux. Window-chrome tests
+verify that platform safe areas cannot reduce ordinary layout margins or cover
+system caption controls.
 
 The test target deliberately excludes `MainWindow` and a live WebEngine process,
 so signal wiring and visual state still need a short manual smoke test after
@@ -684,6 +716,8 @@ Before merging a change, verify the relevant invariants:
 - external applications and sensitive permissions require browser-owned,
   active-tab user interaction;
 - popup windows retain visible browser chrome and share the isolated profile;
+- integrated title bars retain native window controls and reserve their
+  reported safe areas without intercepting tab interaction;
 - installed web apps cannot navigate their app window outside their validated
   HTTPS origin and scope;
 - web app manifests and icons remain size-bounded, and registry writes remain

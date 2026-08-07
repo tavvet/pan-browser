@@ -119,6 +119,9 @@ set(PANBROWSER_APP_SOURCES
     src/WebAppShortcutManager.h
     src/WindowPlacement.cpp
     src/WindowPlacement.h
+    src/WindowChrome.cpp
+    src/WindowChrome.h
+    src/WindowChromePlatform.h
     src/CertificateTrustValidator.h
     src/resources.qrc
 )
@@ -132,6 +135,7 @@ if(APPLE)
         src/CertificateTrustValidatorMac.mm
         src/MacApplicationReopen.h
         src/MacApplicationReopen.mm
+        src/WindowChromeMac.mm
         ${PANBROWSER_APP_ICON}
     )
 elseif(WIN32)
@@ -140,6 +144,10 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     list(APPEND PANBROWSER_APP_SOURCES src/CertificateTrustValidatorLinux.cpp)
 else()
     list(APPEND PANBROWSER_APP_SOURCES src/CertificateTrustValidatorFallback.cpp)
+endif()
+
+if(NOT APPLE)
+    list(APPEND PANBROWSER_APP_SOURCES src/WindowChromePlatform.cpp)
 endif()
 
 qt_add_executable(PanBrowser MACOSX_BUNDLE ${PANBROWSER_APP_SOURCES})
@@ -273,6 +281,9 @@ qt_add_executable(PanBrowserTests
     src/WebAppShortcutManager.h
     src/WindowPlacement.cpp
     src/WindowPlacement.h
+    src/WindowChrome.cpp
+    src/WindowChrome.h
+    src/WindowChromePlatform.h
 )
 target_include_directories(PanBrowserTests PRIVATE src)
 target_link_libraries(PanBrowserTests PRIVATE
@@ -285,7 +296,10 @@ target_link_libraries(PanBrowserTests PRIVATE
 )
 
 if(APPLE)
+    target_sources(PanBrowserTests PRIVATE src/WindowChromeMac.mm)
     add_dependencies(PanBrowserTests PanBrowser)
+else()
+    target_sources(PanBrowserTests PRIVATE src/WindowChromePlatform.cpp)
 endif()
 
 if(WIN32)

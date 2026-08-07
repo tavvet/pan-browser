@@ -136,6 +136,15 @@ the site asks for a chromeless dialog. Popup windows share cookies, cache,
 downloads, permissions, and trust rules with the primary window, but are not
 saved in the restored tab session. Automatic popups remain blocked.
 
+On macOS, normal browser and popup windows place the tab strip in the native
+title-bar area while retaining system window controls. Safe-area margins keep
+tabs clear of those controls, and the unused part of the strip can drag or
+maximize the window without interfering with tab reordering. The equivalent
+Windows path is implemented but remains experimental until it has been tested
+against Windows 10/11 caption controls, Snap, and mixed-DPI displays. Installed
+web apps and platforms without reliable expanded-title-bar support retain a
+normal native title bar.
+
 ### Installed web apps
 
 HTTPS pages with a same-origin web app manifest can be installed from the

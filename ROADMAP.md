@@ -11,6 +11,8 @@ branch; unfinished experiments kept on other branches remain unchecked here.
 - [x] Safe restoration of window size and position.
 - [x] Dedicated persistent WebEngine profile for cookies, site data, and cache.
 - [x] Movable browser tabs with per-tab navigation and TLS status.
+- [x] Integrated native title-bar tab strip on macOS with a safe decorated-window
+  fallback on other platforms and installed web apps.
 - [x] Unified settings window with General and Trust Rules sections.
 - [x] Configurable start page and startup behavior.
 - [x] Optional session-cookie and tab restoration with lazy background tabs.
@@ -42,6 +44,8 @@ branch; unfinished experiments kept on other branches remain unchecked here.
 - [ ] Freshness-checked revocation cache for custom trust anchors.
 - [x] Platform-specific build and packaging scripts.
 - [ ] Windows Start Menu and Linux `.desktop` launchers for installed web apps.
+- [ ] Validate and polish the experimental integrated title bar on Windows
+  10/11, including caption controls, drag/Snap, and mixed-DPI displays.
 
 ## Packaging and maintenance
 

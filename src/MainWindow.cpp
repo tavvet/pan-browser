@@ -18,6 +18,7 @@
 #include "ProxyAuthenticationController.h"
 #include "SettingsDialog.h"
 #include "WindowPlacement.h"
+#include "WindowChrome.h"
 #include "WebAppStore.h"
 #include "WebAppShortcutManager.h"
 
@@ -129,6 +130,10 @@ MainWindow::MainWindow(
     m_windowRole = role;
     m_webApp = webApp;
     m_ownsBrowserResources = role == WindowRole::Primary;
+    m_integratedWindowChrome = role != WindowRole::WebApp
+        && WindowChromeController::platformSupportsIntegratedTitleBar();
+    if (m_integratedWindowChrome)
+        WindowChromeController::applyIntegratedTitleBar(this);
 
     if (m_ownsBrowserResources) {
         m_configurationPath = ensureConfiguration();
@@ -304,6 +309,7 @@ void MainWindow::createInterface()
     tabsToolbar->setMovable(false);
     tabsToolbar->setFloatable(false);
     tabsToolbar->setIconSize(QSize(17, 17));
+    tabsToolbar->setProperty("integratedChrome", m_integratedWindowChrome);
 
     QWidget *tabsContainer = new QWidget(tabsToolbar);
     tabsContainer->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
@@ -330,6 +336,15 @@ void MainWindow::createInterface()
     tabsLayout->addWidget(newTabButton, 0, Qt::AlignBottom);
     tabsLayout->addStretch(1);
     tabsToolbar->addWidget(tabsContainer);
+
+    if (m_integratedWindowChrome) {
+        m_windowChromeController = new WindowChromeController(
+            this,
+            tabsLayout,
+            {tabsToolbar, tabsContainer},
+            this
+        );
+    }
 
     addToolBar(Qt::TopToolBarArea, tabsToolbar);
     addToolBarBreak(Qt::TopToolBarArea);

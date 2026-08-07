@@ -22,16 +22,19 @@
 #include "WebAppStore.h"
 #include "WebAppShortcutManager.h"
 #include "WindowPlacement.h"
+#include "WindowChrome.h"
 
 #include <QApplication>
 #include <QFile>
 #include <QFileInfo>
+#include <QHBoxLayout>
 #include <QLabel>
 #include <QLineEdit>
 #include <QListWidget>
 #include <QMouseEvent>
 #include <QNetworkProxy>
 #include <QNetworkProxyFactory>
+#include <QPlatformSurfaceEvent>
 #include <QSignalSpy>
 #include <QSettings>
 #include <QTemporaryDir>
@@ -57,6 +60,8 @@ private slots:
     void disconnectedScreenFallsBackToPrimary();
     void inaccessibleTitleAreaIsRecentered();
     void oversizedWindowFitsSmallerResolution();
+    void integratedChromePreservesBaseMarginsAndAvoidsSystemControls();
+    void integratedChromeSurvivesSurfaceAndLayoutTeardown();
     void browserPreferencesValidateStartPage();
     void interfaceLanguagePreferenceRoundTrips();
     void interfaceLanguageSettingsParsing();
@@ -462,6 +467,79 @@ void TrustConfigurationTests::oversizedWindowFitsSmallerResolution()
     const QRect restored = adjustedWindowGeometry(largeWindow, {smallerScreen}, smallerScreen);
 
     QCOMPARE(restored, smallerScreen);
+}
+
+void TrustConfigurationTests::integratedChromePreservesBaseMarginsAndAvoidsSystemControls()
+{
+#if defined(Q_OS_MACOS) || defined(Q_OS_WIN)
+    QVERIFY(WindowChromeController::platformSupportsIntegratedTitleBar());
+    QWidget window;
+    WindowChromeController::applyIntegratedTitleBar(&window);
+    QVERIFY(window.windowFlags().testFlag(Qt::ExpandedClientAreaHint));
+    QVERIFY(window.windowFlags().testFlag(Qt::NoTitleBarBackgroundHint));
+    QVERIFY(window.testAttribute(Qt::WA_LayoutOnEntireRect));
+    QVERIFY(!window.testAttribute(Qt::WA_ContentsMarginsRespectsSafeArea));
+#else
+    QVERIFY(!WindowChromeController::platformSupportsIntegratedTitleBar());
+#endif
+
+    QCOMPARE(
+        integratedChromeContentMargins(
+            QMargins(8, 5, 10, 1),
+            QMargins(72, 28, 138, 0)
+        ),
+        QMargins(72, 5, 138, 1)
+    );
+    QCOMPARE(
+        integratedChromeContentMargins(
+            QMargins(8, 5, 10, 1),
+            QMargins(4, 40, 6, 20)
+        ),
+        QMargins(8, 5, 10, 1)
+    );
+    QCOMPARE(
+        integratedChromeContentMargins(
+            QMargins(8, 5, 10, 1),
+            QMargins(0, 28, 0, 0),
+            QMargins(82, 0, 0, 0)
+        ),
+        QMargins(82, 5, 10, 1)
+    );
+}
+
+void TrustConfigurationTests::integratedChromeSurvivesSurfaceAndLayoutTeardown()
+{
+    QWidget window;
+    auto *container = new QWidget(&window);
+    auto *layout = new QHBoxLayout(container);
+    auto *dragRegion = new QWidget(container);
+    layout->addWidget(dragRegion);
+    WindowChromeController controller(&window, layout, {dragRegion});
+
+    QMouseEvent doubleClick(
+        QEvent::MouseButtonDblClick,
+        QPointF(5, 5),
+        QPointF(5, 5),
+        QPointF(5, 5),
+        Qt::LeftButton,
+        Qt::LeftButton,
+        Qt::NoModifier
+    );
+    QVERIFY(QCoreApplication::sendEvent(dragRegion, &doubleClick));
+    QVERIFY(window.isMaximized());
+    window.showNormal();
+
+    QPlatformSurfaceEvent created(QPlatformSurfaceEvent::SurfaceCreated);
+    QCoreApplication::sendEvent(&window, &created);
+    QPlatformSurfaceEvent destroying(
+        QPlatformSurfaceEvent::SurfaceAboutToBeDestroyed
+    );
+    QCoreApplication::sendEvent(&window, &destroying);
+
+    delete container;
+    QEvent shown(QEvent::Show);
+    QCoreApplication::sendEvent(&window, &shown);
+    QCoreApplication::processEvents();
 }
 
 void TrustConfigurationTests::browserPreferencesValidateStartPage()

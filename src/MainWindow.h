@@ -39,6 +39,7 @@ class QCloseEvent;
 class QWebEngineCertificateError;
 class QWebEngineNewWindowRequest;
 class QWebEngineView;
+class WindowChromeController;
 
 class MainWindow final : public QMainWindow {
     Q_OBJECT
@@ -199,6 +200,7 @@ private:
     QProgressBar *m_progress = nullptr;
     QTimer *m_sessionSaveTimer = nullptr;
     QTimer *m_addressSuggestionTimer = nullptr;
+    WindowChromeController *m_windowChromeController = nullptr;
     QHash<QWebEngineView *, BrowserTabState> m_tabStates;
     QHash<QString, PendingManifestRequest> m_manifestRequests;
     BrowserPreferences m_preferences;
@@ -224,5 +226,6 @@ private:
     bool m_restoringSession = false;
     bool m_discardSessionOnClose = false;
     bool m_networkBlockedByProxyError = false;
+    bool m_integratedWindowChrome = false;
     quint64 m_findRequestSerial = 0;
 };
