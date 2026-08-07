@@ -80,10 +80,11 @@ if ($LASTEXITCODE -ne 0) {
         if (Test-Path -LiteralPath $TestExecutable -PathType Leaf) {
             $DiagnosticOutput = Join-Path $BuildDir "PanBrowserTests.stdout.txt"
             $DiagnosticError = Join-Path $BuildDir "PanBrowserTests.stderr.txt"
+            $DiagnosticReport = Join-Path $BuildDir "PanBrowserTests.report.txt"
             try {
                 $DiagnosticProcess = Start-Process `
                     -FilePath $TestExecutable `
-                    -ArgumentList @("-o", "-,txt") `
+                    -ArgumentList @("-o", "$DiagnosticReport,txt") `
                     -NoNewWindow `
                     -Wait `
                     -PassThru `
@@ -94,7 +95,7 @@ if ($LASTEXITCODE -ne 0) {
             catch {
                 Write-Warning "Cannot run PanBrowserTests directly: $($_.Exception.Message)"
             }
-            foreach ($DiagnosticFile in @($DiagnosticOutput, $DiagnosticError)) {
+            foreach ($DiagnosticFile in @($DiagnosticReport, $DiagnosticOutput, $DiagnosticError)) {
                 if (Test-Path -LiteralPath $DiagnosticFile -PathType Leaf) {
                     Get-Content -LiteralPath $DiagnosticFile | Write-Output
                 }
