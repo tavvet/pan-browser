@@ -29,6 +29,27 @@
 
 namespace {
 
+namespace SettingsSidebarMetrics {
+
+constexpr int minimumWidth = 190;
+constexpr int maximumWidth = 280;
+
+// Keep these values aligned with QListWidget#settingsSidebar in Theme.qss.
+constexpr int horizontalPadding = 10;
+constexpr int rightBorderWidth = 1;
+constexpr int roundingAllowance = 1;
+
+int preferredWidth(QListWidget *sidebar)
+{
+    sidebar->ensurePolished();
+    const int surroundingWidth =
+        (2 * horizontalPadding) + rightBorderWidth + roundingAllowance;
+    const int contentWidth = sidebar->sizeHintForColumn(0) + surroundingWidth;
+    return qBound(minimumWidth, contentWidth, maximumWidth);
+}
+
+} // namespace SettingsSidebarMetrics
+
 struct FileSnapshot {
     QString path;
     QByteArray contents;
@@ -216,7 +237,8 @@ void SettingsDialog::createInterface(const QUrl &currentUrl, Page initialPage)
     m_sidebar = new QListWidget(body);
     m_sidebar->setObjectName(QStringLiteral("settingsSidebar"));
     m_sidebar->setIconSize(QSize(20, 20));
-    m_sidebar->setFixedWidth(190);
+    m_sidebar->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    m_sidebar->setTextElideMode(Qt::ElideRight);
     auto *generalItem = new QListWidgetItem(
         QIcon(QStringLiteral(":/assets/icons/settings.svg")),
         tr("General"),
@@ -271,6 +293,8 @@ void SettingsDialog::createInterface(const QUrl &currentUrl, Page initialPage)
         m_sidebar
     );
     diagnosticsItem->setData(Qt::UserRole, static_cast<int>(Page::Diagnostics));
+
+    m_sidebar->setFixedWidth(SettingsSidebarMetrics::preferredWidth(m_sidebar));
     bodyLayout->addWidget(m_sidebar);
 
     m_pages = new QStackedWidget(body);
