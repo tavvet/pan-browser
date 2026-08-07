@@ -193,7 +193,9 @@ bool SingleInstanceCoordinator::forwardRequest(
     if (!socket.waitForConnected(500))
         return false;
     const QByteArray message = payload + '\n';
-    if (socket.write(message) != message.size() || !socket.waitForBytesWritten(1000))
+    if (socket.write(message) != message.size())
+        return false;
+    if (socket.bytesToWrite() > 0 && !socket.waitForBytesWritten(1000))
         return false;
     socket.disconnectFromServer();
     return true;

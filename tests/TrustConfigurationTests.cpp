@@ -2057,8 +2057,13 @@ void TrustConfigurationTests::webAppShortcutNamesStayInsideTheirDirectory()
     WebApp app;
     app.id = QString(64, QLatin1Char('a'));
     app.name = unsafeName;
-    WebAppShortcutManager manager(QStringLiteral("/shortcuts"), QStringLiteral("/host.app"));
-    QCOMPARE(QFileInfo(manager.shortcutPath(app)).absolutePath(), QStringLiteral("/shortcuts"));
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+    WebAppShortcutManager manager(directory.path(), directory.filePath(QStringLiteral("host.app")));
+    QCOMPARE(
+        QFileInfo(manager.shortcutPath(app)).absolutePath(),
+        QDir(directory.path()).absolutePath()
+    );
 }
 
 #if defined(Q_OS_MACOS)

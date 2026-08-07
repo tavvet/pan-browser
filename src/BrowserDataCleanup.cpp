@@ -22,13 +22,22 @@ bool removeManagedDataDirectory(
     if (error)
         error->clear();
 
-    const QString root = QDir::cleanPath(QDir(managedRoot).absolutePath());
-    const QString directory = QDir::cleanPath(QDir(directoryPath).absolutePath());
-    const QString requiredPrefix = root + QDir::separator();
+    const QString root = QDir::fromNativeSeparators(
+        QDir::cleanPath(QDir(managedRoot).absolutePath())
+    );
+    const QString directory = QDir::fromNativeSeparators(
+        QDir::cleanPath(QDir(directoryPath).absolutePath())
+    );
+#ifdef Q_OS_WIN
+    constexpr Qt::CaseSensitivity pathCaseSensitivity = Qt::CaseInsensitive;
+#else
+    constexpr Qt::CaseSensitivity pathCaseSensitivity = Qt::CaseSensitive;
+#endif
+    const QString requiredPrefix = root + QLatin1Char('/');
     if (root.isEmpty()
         || directory.isEmpty()
-        || directory == root
-        || !directory.startsWith(requiredPrefix)) {
+        || directory.compare(root, pathCaseSensitivity) == 0
+        || !directory.startsWith(requiredPrefix, pathCaseSensitivity)) {
         return fail(error, QStringLiteral("Refusing to remove data outside %1").arg(root));
     }
 
