@@ -74,7 +74,35 @@ if ($UsesVisualStudioGenerator) {
     $TestArguments += @("-C", "Release")
 }
 & ctest @TestArguments
-if ($LASTEXITCODE -ne 0) { throw "Tests failed" }
+if ($LASTEXITCODE -ne 0) {
+    if ($UsesVisualStudioGenerator) {
+        $TestExecutable = Join-Path $BuildDir "Release\PanBrowserTests.exe"
+        if (Test-Path -LiteralPath $TestExecutable -PathType Leaf) {
+            $DiagnosticOutput = Join-Path $BuildDir "PanBrowserTests.stdout.txt"
+            $DiagnosticError = Join-Path $BuildDir "PanBrowserTests.stderr.txt"
+            try {
+                $DiagnosticProcess = Start-Process `
+                    -FilePath $TestExecutable `
+                    -ArgumentList @("-o", "-,txt") `
+                    -NoNewWindow `
+                    -Wait `
+                    -PassThru `
+                    -RedirectStandardOutput $DiagnosticOutput `
+                    -RedirectStandardError $DiagnosticError
+                Write-Output "Direct PanBrowserTests exit code: $($DiagnosticProcess.ExitCode)"
+            }
+            catch {
+                Write-Warning "Cannot run PanBrowserTests directly: $($_.Exception.Message)"
+            }
+            foreach ($DiagnosticFile in @($DiagnosticOutput, $DiagnosticError)) {
+                if (Test-Path -LiteralPath $DiagnosticFile -PathType Leaf) {
+                    Get-Content -LiteralPath $DiagnosticFile | Write-Output
+                }
+            }
+        }
+    }
+    throw "Tests failed"
+}
 
 $PackageName = "PanBrowser-windows-$Architecture"
 $PackageDir = Join-Path $DistDir $PackageName
