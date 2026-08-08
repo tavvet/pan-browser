@@ -31,6 +31,7 @@ class DownloadButton;
 class DownloadManager;
 class DownloadsPanel;
 class FindBar;
+class HttpAuthenticationController;
 class AddressCompletionPopup;
 class PermissionController;
 class PermissionPrompt;
@@ -181,6 +182,7 @@ private:
     AddressCompletionPopup *m_addressCompletionPopup = nullptr;
     PermissionController *m_permissionController = nullptr;
     PermissionPrompt *m_permissionPrompt = nullptr;
+    HttpAuthenticationController *m_httpAuthenticationController = nullptr;
     ProxyAuthenticationController *m_proxyAuthenticationController = nullptr;
     QPointer<QMessageBox> m_externalUrlDialog;
     QPointer<QWebEngineView> m_externalUrlSource;

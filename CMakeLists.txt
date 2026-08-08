@@ -63,6 +63,8 @@ set(PANBROWSER_APP_SOURCES
     src/BrowserPreferences.h
     src/BrowserPage.cpp
     src/BrowserPage.h
+    src/CredentialPromptDialog.cpp
+    src/CredentialPromptDialog.h
     src/DownloadHistoryStore.cpp
     src/DownloadHistoryStore.h
     src/DownloadManager.cpp
@@ -81,6 +83,8 @@ set(PANBROWSER_APP_SOURCES
     src/FindBar.h
     src/HistoryStore.cpp
     src/HistoryStore.h
+    src/HttpAuthenticationController.cpp
+    src/HttpAuthenticationController.h
     src/Localization.cpp
     src/Localization.h
     src/AddressCompletionPopup.cpp
@@ -278,6 +282,8 @@ qt_add_executable(PanBrowserTests
     src/BrowserProfile.h
     src/BrowserPreferences.cpp
     src/BrowserPreferences.h
+    src/CredentialPromptDialog.cpp
+    src/CredentialPromptDialog.h
     src/DownloadHistoryStore.cpp
     src/DownloadHistoryStore.h
     src/DnsSettings.cpp
@@ -288,10 +294,14 @@ qt_add_executable(PanBrowserTests
     src/FindBar.h
     src/HistoryStore.cpp
     src/HistoryStore.h
+    src/HttpAuthenticationController.cpp
+    src/HttpAuthenticationController.h
     src/Localization.cpp
     src/Localization.h
     src/PermissionPolicy.cpp
     src/PermissionPolicy.h
+    src/ProxyAuthenticationController.cpp
+    src/ProxyAuthenticationController.h
     src/ProxySettings.cpp
     src/ProxySettings.h
     src/PrivateData.cpp

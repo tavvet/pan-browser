@@ -257,11 +257,11 @@
     </message>
     <message numerus="yes">
         <location filename="../src/BookmarksDialog.cpp" line="154"/>
-        <location filename="../tests/TrustConfigurationTests.cpp" line="765"/>
-        <location filename="../tests/TrustConfigurationTests.cpp" line="769"/>
-        <location filename="../tests/TrustConfigurationTests.cpp" line="773"/>
+        <location filename="../tests/TrustConfigurationTests.cpp" line="774"/>
+        <location filename="../tests/TrustConfigurationTests.cpp" line="778"/>
         <location filename="../tests/TrustConfigurationTests.cpp" line="782"/>
-        <location filename="../tests/TrustConfigurationTests.cpp" line="786"/>
+        <location filename="../tests/TrustConfigurationTests.cpp" line="791"/>
+        <location filename="../tests/TrustConfigurationTests.cpp" line="795"/>
         <source>%n bookmark(s)</source>
         <translation>
             <numerusform>%n закладка</numerusform>
@@ -293,22 +293,22 @@
 <context>
     <name>BrowserPreferences</name>
     <message>
-        <location filename="../src/BrowserPreferences.cpp" line="87"/>
+        <location filename="../src/BrowserPreferences.cpp" line="86"/>
         <source>Cannot read or migrate application settings</source>
         <translation>Не удалось прочитать или обновить настройки приложения</translation>
     </message>
     <message>
-        <location filename="../src/BrowserPreferences.cpp" line="105"/>
+        <location filename="../src/BrowserPreferences.cpp" line="104"/>
         <source>Cannot read application settings</source>
         <translation>Не удалось прочитать настройки приложения</translation>
     </message>
     <message>
-        <location filename="../src/BrowserPreferences.cpp" line="147"/>
+        <location filename="../src/BrowserPreferences.cpp" line="146"/>
         <source>Cannot write application settings</source>
         <translation>Не удалось записать настройки приложения</translation>
     </message>
     <message>
-        <location filename="../src/BrowserPreferences.cpp" line="157"/>
+        <location filename="../src/BrowserPreferences.cpp" line="156"/>
         <source>Start page must be a valid HTTP or HTTPS URL</source>
         <translation>Стартовая страница должна содержать корректный HTTP- или HTTPS-адрес</translation>
     </message>
@@ -527,6 +527,34 @@
         <location filename="../src/CertificateTrustValidatorWindows.cpp" line="357"/>
         <source>validated with configured CA</source>
         <translation>проверено по настроенному центру сертификации</translation>
+    </message>
+</context>
+<context>
+    <name>CredentialPromptDialog</name>
+    <message>
+        <location filename="../src/CredentialPromptDialog.cpp" line="49"/>
+        <source>Authentication failed. Check the credentials and try again.</source>
+        <translation>Не удалось выполнить вход. Проверьте учётные данные и попробуйте снова.</translation>
+    </message>
+    <message>
+        <location filename="../src/CredentialPromptDialog.cpp" line="74"/>
+        <source>This connection is not encrypted. The username and password may be intercepted.</source>
+        <translation>Это соединение не зашифровано. Имя пользователя и пароль могут быть перехвачены.</translation>
+    </message>
+    <message>
+        <location filename="../src/CredentialPromptDialog.cpp" line="91"/>
+        <source>Username</source>
+        <translation>Имя пользователя</translation>
+    </message>
+    <message>
+        <location filename="../src/CredentialPromptDialog.cpp" line="98"/>
+        <source>Password</source>
+        <translation>Пароль</translation>
+    </message>
+    <message>
+        <location filename="../src/CredentialPromptDialog.cpp" line="115"/>
+        <source>Sign in</source>
+        <translation>Войти</translation>
     </message>
 </context>
 <context>
@@ -1007,7 +1035,7 @@
     </message>
     <message>
         <location filename="../src/DnsSettingsPage.cpp" line="145"/>
-        <location filename="../tests/TrustConfigurationTests.cpp" line="753"/>
+        <location filename="../tests/TrustConfigurationTests.cpp" line="762"/>
         <source>Secure DNS only</source>
         <translation>Только защищённый DNS</translation>
     </message>
@@ -1522,205 +1550,238 @@
     </message>
 </context>
 <context>
+    <name>HttpAuthenticationController</name>
+    <message>
+        <location filename="../src/HttpAuthenticationController.cpp" line="30"/>
+        <source>Unknown site</source>
+        <translation>Неизвестный сайт</translation>
+    </message>
+    <message>
+        <location filename="../src/HttpAuthenticationController.cpp" line="79"/>
+        <source>Website authentication</source>
+        <translation>Авторизация на сайте</translation>
+    </message>
+    <message>
+        <location filename="../src/HttpAuthenticationController.cpp" line="83"/>
+        <source>The website requires a username and password.</source>
+        <translation>Сайт запрашивает имя пользователя и пароль.</translation>
+    </message>
+    <message>
+        <location filename="../src/HttpAuthenticationController.cpp" line="87"/>
+        <source>Site: %1</source>
+        <translation>Сайт: %1</translation>
+    </message>
+    <message>
+        <location filename="../src/HttpAuthenticationController.cpp" line="92"/>
+        <source>Realm: %1</source>
+        <translation>Область авторизации: %1</translation>
+    </message>
+    <message>
+        <location filename="../src/HttpAuthenticationController.cpp" line="98"/>
+        <source>The password is used for this browser session and is never written to PanBrowser settings.</source>
+        <translation>Пароль используется только в текущем сеансе браузера и никогда не записывается в настройки PanBrowser.</translation>
+    </message>
+</context>
+<context>
     <name>MainWindow</name>
     <message>
-        <location filename="../src/MainWindow.cpp" line="223"/>
+        <location filename="../src/MainWindow.cpp" line="226"/>
         <source>History unavailable: %1</source>
         <translation>История недоступна: %1</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="318"/>
+        <location filename="../src/MainWindow.cpp" line="321"/>
         <source>Tabs</source>
         <translation>Вкладки</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="346"/>
+        <location filename="../src/MainWindow.cpp" line="349"/>
         <source>New Tab (⌘T)</source>
         <translation>Новая вкладка (⌘T)</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="363"/>
+        <location filename="../src/MainWindow.cpp" line="366"/>
         <source>Navigation</source>
         <translation>Навигация</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="372"/>
+        <location filename="../src/MainWindow.cpp" line="375"/>
         <source>Back</source>
         <translation>Назад</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="376"/>
+        <location filename="../src/MainWindow.cpp" line="379"/>
         <source>Forward</source>
         <translation>Вперёд</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="380"/>
+        <location filename="../src/MainWindow.cpp" line="383"/>
         <source>Reload</source>
         <translation>Обновить</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="399"/>
-        <location filename="../src/MainWindow.cpp" line="1303"/>
+        <location filename="../src/MainWindow.cpp" line="402"/>
+        <location filename="../src/MainWindow.cpp" line="1322"/>
         <source>Add Bookmark (⌘D)</source>
         <translation>Добавить закладку (⌘D)</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="407"/>
+        <location filename="../src/MainWindow.cpp" line="410"/>
         <source>Go</source>
         <translation>Перейти</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="412"/>
+        <location filename="../src/MainWindow.cpp" line="415"/>
         <source>Downloads</source>
         <translation>Загрузки</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="417"/>
+        <location filename="../src/MainWindow.cpp" line="420"/>
         <source>Find in page</source>
         <translation>Поиск на странице</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="427"/>
+        <location filename="../src/MainWindow.cpp" line="430"/>
         <source>Permission request</source>
         <translation>Запрос разрешения</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="535"/>
-        <location filename="../src/MainWindow.cpp" line="537"/>
+        <location filename="../src/MainWindow.cpp" line="538"/>
+        <location filename="../src/MainWindow.cpp" line="540"/>
         <source>PanBrowser</source>
         <translation>PanBrowser</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="541"/>
-        <location filename="../src/MainWindow.cpp" line="798"/>
-        <location filename="../src/MainWindow.cpp" line="897"/>
-        <location filename="../src/MainWindow.cpp" line="918"/>
+        <location filename="../src/MainWindow.cpp" line="544"/>
+        <location filename="../src/MainWindow.cpp" line="801"/>
+        <location filename="../src/MainWindow.cpp" line="916"/>
+        <location filename="../src/MainWindow.cpp" line="937"/>
         <source>New Tab</source>
         <translation>Новая вкладка</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="548"/>
+        <location filename="../src/MainWindow.cpp" line="551"/>
         <source>Close Tab</source>
         <translation>Закрыть вкладку</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="557"/>
+        <location filename="../src/MainWindow.cpp" line="560"/>
         <source>Add Bookmark…</source>
         <translation>Добавить закладку…</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="563"/>
+        <location filename="../src/MainWindow.cpp" line="566"/>
         <source>Bookmarks…</source>
         <translation>Закладки…</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="570"/>
-        <location filename="../src/MainWindow.cpp" line="1585"/>
+        <location filename="../src/MainWindow.cpp" line="573"/>
+        <location filename="../src/MainWindow.cpp" line="1604"/>
         <source>Install Web App…</source>
         <translation>Установить веб-приложение…</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="581"/>
+        <location filename="../src/MainWindow.cpp" line="584"/>
         <source>Web Apps</source>
         <translation>Веб-приложения</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="588"/>
+        <location filename="../src/MainWindow.cpp" line="591"/>
         <source>Find in Page…</source>
         <translation>Найти на странице…</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="592"/>
+        <location filename="../src/MainWindow.cpp" line="595"/>
         <source>Find Next</source>
         <translation>Найти следующее</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="600"/>
+        <location filename="../src/MainWindow.cpp" line="603"/>
         <source>Find Previous</source>
         <translation>Найти предыдущее</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="612"/>
+        <location filename="../src/MainWindow.cpp" line="615"/>
         <source>Settings…</source>
         <translation>Настройки…</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="621"/>
+        <location filename="../src/MainWindow.cpp" line="624"/>
         <source>Reload Trust Rules</source>
         <translation>Перезагрузить правила доверия</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="628"/>
+        <location filename="../src/MainWindow.cpp" line="631"/>
         <source>Show Configuration Folder</source>
         <translation>Показать папку конфигурации</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="650"/>
+        <location filename="../src/MainWindow.cpp" line="653"/>
         <source>Ready</source>
         <translation>Готово</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="652"/>
+        <location filename="../src/MainWindow.cpp" line="655"/>
         <source>No rules loaded</source>
         <translation>Правила не загружены</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="684"/>
+        <location filename="../src/MainWindow.cpp" line="687"/>
         <source>Close Window</source>
         <translation>Закрыть окно</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="963"/>
+        <location filename="../src/MainWindow.cpp" line="982"/>
         <source>Loading…</source>
         <translation>Загрузка…</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1018"/>
+        <location filename="../src/MainWindow.cpp" line="1037"/>
         <source>Secure · Chromium system trust</source>
         <translation>Безопасно · системное доверие Chromium</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1021"/>
+        <location filename="../src/MainWindow.cpp" line="1040"/>
         <source>Not secure · HTTP connection</source>
         <translation>Небезопасно · соединение HTTP</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1023"/>
+        <location filename="../src/MainWindow.cpp" line="1042"/>
         <source>No HTTPS security information</source>
         <translation>Нет сведений о безопасности HTTPS</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1028"/>
+        <location filename="../src/MainWindow.cpp" line="1047"/>
         <source>Page loading failed</source>
         <translation>Не удалось загрузить страницу</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1081"/>
+        <location filename="../src/MainWindow.cpp" line="1100"/>
         <source>Blocked a form submission outside this web app&apos;s scope</source>
         <translation>Отправка формы за пределы области веб-приложения заблокирована</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1087"/>
+        <location filename="../src/MainWindow.cpp" line="1106"/>
         <source>Blocked automatic navigation outside this web app&apos;s scope</source>
         <translation>Автоматический переход за пределы области веб-приложения заблокирован</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1179"/>
+        <location filename="../src/MainWindow.cpp" line="1198"/>
         <source>The current page</source>
         <translation>Текущая страница</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1187"/>
+        <location filename="../src/MainWindow.cpp" line="1206"/>
         <source>Open external application?</source>
         <translation>Открыть внешнее приложение?</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1190"/>
+        <location filename="../src/MainWindow.cpp" line="1209"/>
         <source>Open this link in another application?</source>
         <translation>Открыть эту ссылку в другом приложении?</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1192"/>
+        <location filename="../src/MainWindow.cpp" line="1211"/>
         <source>%1 wants to open:
 
 %2</source>
@@ -1729,96 +1790,96 @@
 %2</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1195"/>
+        <location filename="../src/MainWindow.cpp" line="1214"/>
         <source>Open application</source>
         <translation>Открыть приложение</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1198"/>
-        <location filename="../src/MainWindow.cpp" line="1710"/>
+        <location filename="../src/MainWindow.cpp" line="1217"/>
+        <location filename="../src/MainWindow.cpp" line="1729"/>
         <source>Cancel</source>
         <translation>Отмена</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1221"/>
+        <location filename="../src/MainWindow.cpp" line="1240"/>
         <source>No application is available for the %1 link</source>
         <translation>Нет приложения для открытия ссылки %1</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1289"/>
-        <location filename="../src/MainWindow.cpp" line="1488"/>
+        <location filename="../src/MainWindow.cpp" line="1308"/>
+        <location filename="../src/MainWindow.cpp" line="1507"/>
         <source>Only web pages can be bookmarked</source>
         <translation>В закладки можно добавлять только веб-страницы</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1302"/>
+        <location filename="../src/MainWindow.cpp" line="1321"/>
         <source>Edit Bookmark (⌘D)</source>
         <translation>Изменить закладку (⌘D)</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1313"/>
+        <location filename="../src/MainWindow.cpp" line="1332"/>
         <source>Search with %1 or enter an address</source>
         <translation>Искать через %1 или ввести адрес</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1314"/>
+        <location filename="../src/MainWindow.cpp" line="1333"/>
         <source>Enter an address</source>
         <translation>Введите адрес</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1480"/>
+        <location filename="../src/MainWindow.cpp" line="1499"/>
         <source>Bookmarks are unavailable</source>
         <translation>Закладки недоступны</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1495"/>
+        <location filename="../src/MainWindow.cpp" line="1514"/>
         <source>Bookmarks unavailable</source>
         <translation>Закладки недоступны</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1591"/>
+        <location filename="../src/MainWindow.cpp" line="1610"/>
         <source>Open “%1”</source>
         <translation>Открыть «%1»</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1598"/>
+        <location filename="../src/MainWindow.cpp" line="1617"/>
         <source>Install “%1”…</source>
         <translation>Установить «%1»…</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1626"/>
+        <location filename="../src/MainWindow.cpp" line="1645"/>
         <source>Reading web app manifest…</source>
         <translation>Чтение манифеста веб-приложения…</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1642"/>
+        <location filename="../src/MainWindow.cpp" line="1661"/>
         <source>Timed out while reading the web app manifest</source>
         <translation>Истекло время ожидания при чтении манифеста веб-приложения</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1666"/>
-        <location filename="../src/MainWindow.cpp" line="1681"/>
-        <location filename="../src/MainWindow.cpp" line="1717"/>
+        <location filename="../src/MainWindow.cpp" line="1685"/>
+        <location filename="../src/MainWindow.cpp" line="1700"/>
+        <location filename="../src/MainWindow.cpp" line="1736"/>
         <source>Cannot install web app</source>
         <translation>Не удалось установить веб-приложение</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1667"/>
+        <location filename="../src/MainWindow.cpp" line="1686"/>
         <source>PanBrowser could not read the web app manifest: %1</source>
         <translation>PanBrowser не удалось прочитать манифест веб-приложения: %1</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1697"/>
+        <location filename="../src/MainWindow.cpp" line="1716"/>
         <source>Install web app</source>
         <translation>Установка веб-приложения</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1701"/>
+        <location filename="../src/MainWindow.cpp" line="1720"/>
         <source>Install “%1”?</source>
         <translation>Установить «%1»?</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1703"/>
+        <location filename="../src/MainWindow.cpp" line="1722"/>
         <source>The app will open in its own window and share PanBrowser cookies, site data, permissions, and trust rules.
 
 Start page: %1
@@ -1829,78 +1890,78 @@ Allowed scope: %2</source>
 Область действия: %2</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1709"/>
+        <location filename="../src/MainWindow.cpp" line="1728"/>
         <source>Install</source>
         <translation>Установить</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1726"/>
+        <location filename="../src/MainWindow.cpp" line="1745"/>
         <source>Web app installed without a system shortcut</source>
         <translation>Веб-приложение установлено без системного ярлыка</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1727"/>
+        <location filename="../src/MainWindow.cpp" line="1746"/>
         <source>PanBrowser installed the web app, but could not create its system shortcut: %1</source>
         <translation>PanBrowser установил веб-приложение, но не смог создать системный ярлык: %1</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1732"/>
+        <location filename="../src/MainWindow.cpp" line="1751"/>
         <source>“%1” installed</source>
         <translation>«%1» установлено</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1753"/>
+        <location filename="../src/MainWindow.cpp" line="1772"/>
         <source>No web apps installed</source>
         <translation>Нет установленных веб-приложений</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1759"/>
+        <location filename="../src/MainWindow.cpp" line="1778"/>
         <source>Manage Web Apps…</source>
         <translation>Управление веб-приложениями…</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1795"/>
+        <location filename="../src/MainWindow.cpp" line="1814"/>
         <source>The web app is no longer installed</source>
         <translation>Веб-приложение больше не установлено</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1896"/>
-        <location filename="../src/MainWindow.cpp" line="2048"/>
+        <location filename="../src/MainWindow.cpp" line="1915"/>
+        <location filename="../src/MainWindow.cpp" line="2067"/>
         <source>Rules error: %1</source>
         <translation>Ошибка правил: %1</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1937"/>
+        <location filename="../src/MainWindow.cpp" line="1956"/>
         <source>Restart PanBrowser to apply the new interface language and proxy settings.</source>
         <translation>Перезапустите PanBrowser, чтобы применить новый язык интерфейса и настройки прокси.</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1945"/>
+        <location filename="../src/MainWindow.cpp" line="1964"/>
         <source>Restart PanBrowser to apply the new proxy settings.</source>
         <translation>Перезапустите PanBrowser, чтобы применить новые настройки прокси.</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1949"/>
+        <location filename="../src/MainWindow.cpp" line="1968"/>
         <source>Restart required</source>
         <translation>Требуется перезапуск</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2330"/>
+        <location filename="../src/MainWindow.cpp" line="2349"/>
         <source>Network blocked because proxy settings are invalid.</source>
         <translation>Сеть заблокирована из-за некорректных настроек прокси.</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2335"/>
+        <location filename="../src/MainWindow.cpp" line="2354"/>
         <source>Network blocked</source>
         <translation>Сеть заблокирована</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2337"/>
+        <location filename="../src/MainWindow.cpp" line="2356"/>
         <source>PanBrowser blocked network access because the proxy settings could not be loaded.</source>
         <translation>PanBrowser заблокировал доступ к сети, поскольку не удалось загрузить настройки прокси.</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2340"/>
+        <location filename="../src/MainWindow.cpp" line="2359"/>
         <source>%1
 
 Open Proxy settings, save a valid configuration, and restart PanBrowser.</source>
@@ -1909,22 +1970,22 @@ Open Proxy settings, save a valid configuration, and restart PanBrowser.</source
 Откройте настройки прокси, сохраните корректную конфигурацию и перезапустите PanBrowser.</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2344"/>
+        <location filename="../src/MainWindow.cpp" line="2363"/>
         <source>Open Proxy settings</source>
         <translation>Открыть настройки прокси</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1941"/>
+        <location filename="../src/MainWindow.cpp" line="1960"/>
         <source>Restart PanBrowser to apply the new interface language.</source>
         <translation>Перезапустите PanBrowser, чтобы применить новый язык интерфейса.</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2047"/>
+        <location filename="../src/MainWindow.cpp" line="2066"/>
         <source>Rules unavailable</source>
         <translation>Правила недоступны</translation>
     </message>
     <message numerus="yes">
-        <location filename="../src/MainWindow.cpp" line="2054"/>
+        <location filename="../src/MainWindow.cpp" line="2073"/>
         <source>%n custom rule(s)</source>
         <translation>
             <numerusform>%n пользовательское правило</numerusform>
@@ -1933,42 +1994,42 @@ Open Proxy settings, save a valid configuration, and restart PanBrowser.</source
         </translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2056"/>
+        <location filename="../src/MainWindow.cpp" line="2075"/>
         <source>Trust rules loaded</source>
         <translation>Правила доверия загружены</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2073"/>
+        <location filename="../src/MainWindow.cpp" line="2092"/>
         <source>Blocked %1: no matching trust rule</source>
         <translation>%1 заблокирован: подходящее правило доверия не найдено</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2082"/>
+        <location filename="../src/MainWindow.cpp" line="2101"/>
         <source>Blocked %1: non-overridable certificate error</source>
         <translation>%1 заблокирован: эту ошибку сертификата нельзя переопределить</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2091"/>
+        <location filename="../src/MainWindow.cpp" line="2110"/>
         <source>Blocked %1: only an unknown CA may be overridden</source>
         <translation>%1 заблокирован: переопределить можно только ошибку неизвестного центра сертификации</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2100"/>
+        <location filename="../src/MainWindow.cpp" line="2119"/>
         <source>Blocked %1: system validation failed</source>
         <translation>%1 заблокирован: системная проверка не пройдена</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2120"/>
+        <location filename="../src/MainWindow.cpp" line="2139"/>
         <source>Secure · %1 · %2</source>
         <translation>Безопасно · %1 · %2</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2127"/>
+        <location filename="../src/MainWindow.cpp" line="2146"/>
         <source>Blocked %1: %2</source>
         <translation>%1 заблокирован: %2</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2148"/>
+        <location filename="../src/MainWindow.cpp" line="2167"/>
         <source>Secure</source>
         <translation>Безопасно</translation>
     </message>
@@ -2067,52 +2128,48 @@ Open Proxy settings, save a valid configuration, and restart PanBrowser.</source
 <context>
     <name>ProxyAuthenticationController</name>
     <message>
-        <location filename="../src/ProxyAuthenticationController.cpp" line="24"/>
+        <location filename="../src/ProxyAuthenticationController.cpp" line="19"/>
         <source>Unknown site</source>
         <translation>Неизвестный сайт</translation>
     </message>
     <message>
-        <location filename="../src/ProxyAuthenticationController.cpp" line="44"/>
+        <location filename="../src/ProxyAuthenticationController.cpp" line="70"/>
         <source>Proxy authentication</source>
         <translation>Аутентификация прокси</translation>
     </message>
     <message>
-        <location filename="../src/ProxyAuthenticationController.cpp" line="61"/>
         <source>Authentication failed. Check the credentials and try again.</source>
-        <translation>Не удалось выполнить вход. Проверьте учётные данные и попробуйте снова.</translation>
+        <translation type="vanished">Не удалось выполнить вход. Проверьте учётные данные и попробуйте снова.</translation>
     </message>
     <message>
-        <location filename="../src/ProxyAuthenticationController.cpp" line="73"/>
+        <location filename="../src/ProxyAuthenticationController.cpp" line="74"/>
         <source>The proxy “%1” requires a username and password.</source>
         <translation>Для прокси «%1» требуются имя пользователя и пароль.</translation>
     </message>
     <message>
-        <location filename="../src/ProxyAuthenticationController.cpp" line="84"/>
+        <location filename="../src/ProxyAuthenticationController.cpp" line="78"/>
         <source>Requesting site: %1</source>
         <translation>Запрашивающий сайт: %1</translation>
     </message>
     <message>
-        <location filename="../src/ProxyAuthenticationController.cpp" line="102"/>
         <source>Username</source>
-        <translation>Имя пользователя</translation>
+        <translation type="vanished">Имя пользователя</translation>
     </message>
     <message>
-        <location filename="../src/ProxyAuthenticationController.cpp" line="108"/>
         <source>Password</source>
-        <translation>Пароль</translation>
+        <translation type="vanished">Пароль</translation>
     </message>
     <message>
-        <location filename="../src/ProxyAuthenticationController.cpp" line="114"/>
+        <location filename="../src/ProxyAuthenticationController.cpp" line="83"/>
         <source>The password is used for this browser session and is never written to PanBrowser settings.</source>
         <translation>Пароль используется только в текущем сеансе браузера и никогда не записывается в настройки PanBrowser.</translation>
     </message>
     <message>
-        <location filename="../src/ProxyAuthenticationController.cpp" line="130"/>
         <source>Sign in</source>
-        <translation>Войти</translation>
+        <translation type="vanished">Войти</translation>
     </message>
     <message>
-        <location filename="../src/ProxyAuthenticationController.cpp" line="183"/>
+        <location filename="../src/ProxyAuthenticationController.cpp" line="57"/>
         <source>Unknown proxy</source>
         <translation>Неизвестный прокси</translation>
     </message>
@@ -2274,7 +2331,7 @@ Open Proxy settings, save a valid configuration, and restart PanBrowser.</source
     </message>
     <message>
         <location filename="../src/ProxySettingsPage.cpp" line="44"/>
-        <location filename="../tests/TrustConfigurationTests.cpp" line="757"/>
+        <location filename="../tests/TrustConfigurationTests.cpp" line="766"/>
         <source>Manual proxy</source>
         <translation>Ручной прокси</translation>
     </message>
@@ -2377,7 +2434,7 @@ Open Proxy settings, save a valid configuration, and restart PanBrowser.</source
     </message>
     <message>
         <location filename="../src/Localization.cpp" line="14"/>
-        <location filename="../tests/TrustConfigurationTests.cpp" line="761"/>
+        <location filename="../tests/TrustConfigurationTests.cpp" line="770"/>
         <source>Cancel</source>
         <translation>Отмена</translation>
     </message>
@@ -2722,7 +2779,7 @@ Warning: searches sent through HTTP are not encrypted.</source>
     </message>
     <message>
         <location filename="../src/SettingsDialog.cpp" line="223"/>
-        <location filename="../tests/TrustConfigurationTests.cpp" line="749"/>
+        <location filename="../tests/TrustConfigurationTests.cpp" line="758"/>
         <source>Settings</source>
         <translation>Настройки</translation>
     </message>

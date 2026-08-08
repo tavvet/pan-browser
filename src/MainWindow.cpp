@@ -13,6 +13,7 @@
 #include "ExternalNavigationPolicy.h"
 #include "FindBar.h"
 #include "AddressCompletionPopup.h"
+#include "HttpAuthenticationController.h"
 #include "PermissionController.h"
 #include "PermissionPrompt.h"
 #include "PrivateData.h"
@@ -190,6 +191,7 @@ MainWindow::MainWindow(
             m_activeProxySettings,
             this
         );
+        m_httpAuthenticationController = new HttpAuthenticationController(this);
     } else {
         Q_ASSERT(sharedProfile);
         Q_ASSERT(sharedDownloadManager);
@@ -215,6 +217,7 @@ MainWindow::MainWindow(
         m_proxyConfigurationError = primaryWindow->m_proxyConfigurationError;
         m_networkBlockedByProxyError = primaryWindow->m_networkBlockedByProxyError;
         m_proxyAuthenticationController = primaryWindow->m_proxyAuthenticationController;
+        m_httpAuthenticationController = primaryWindow->m_httpAuthenticationController;
         setAttribute(Qt::WA_DeleteOnClose);
     }
 
@@ -869,6 +872,30 @@ void MainWindow::activatePendingTab(QWebEngineView *webView)
 
 void MainWindow::connectBrowserSignals(QWebEngineView *webView)
 {
+    connect(
+        webView->page(),
+        &QWebEnginePage::authenticationRequired,
+        this,
+        [this, webView](const QUrl &requestUrl, QAuthenticator *authenticator) {
+            const auto state = m_tabStates.constFind(webView);
+            const bool promptAllowed = state != m_tabStates.cend()
+                && HttpAuthenticationPolicy::promptAllowed(
+                    requestUrl,
+                    state->topLevelUrl,
+                    webView == currentWebView(),
+                    isActiveWindow()
+                );
+            if (m_httpAuthenticationController && promptAllowed) {
+                m_httpAuthenticationController->requestAuthentication(
+                    this,
+                    requestUrl,
+                    authenticator
+                );
+            } else if (authenticator) {
+                *authenticator = QAuthenticator();
+            }
+        }
+    );
     connect(
         webView->page(),
         &QWebEnginePage::proxyAuthenticationRequired,

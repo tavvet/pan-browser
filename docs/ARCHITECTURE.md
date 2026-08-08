@@ -53,6 +53,7 @@ flowchart TD
     MW --> Bookmarks["BookmarkStore / SQLite"]
     MW --> Downloads["DownloadManager"]
     MW --> Permissions["PermissionController"]
+    MW --> HttpAuth["HttpAuthenticationController"]
     MW --> ProxyAuth["ProxyAuthenticationController"]
     MW --> Session["SessionStore"]
     MW --> WebApps["WebAppStore / web-apps.json"]
@@ -103,6 +104,8 @@ The primary window owns browser-wide resources:
 - `BookmarkStore` owns a separate named Qt SQL connection on the GUI thread.
 - `WebAppStore` owns the versioned, atomically written installed-app registry.
 - `PermissionController` serializes active-tab permission prompts.
+- `HttpAuthenticationController` serializes server credential prompts and
+  never persists passwords.
 - `ProxyAuthenticationController` serializes HTTP-proxy credential prompts and
   never persists passwords.
 - popup windows are children of the primary window and use
@@ -458,6 +461,38 @@ application step or use Chromium-supported mechanisms explicitly. Proxy mode
 is not a VPN boundary; external applications and traffic outside Chromium's
 HTTP proxy path are not covered.
 
+### 6.4 HTTP server authentication
+
+Every page forwards `QWebEnginePage::authenticationRequired` synchronously to
+the primary window, which accepts the challenge only from the current tab in
+the active window and only when the requesting origin matches that tab's
+tracked top-level navigation origin. This permits same-origin resources and
+cross-origin main-frame navigations while preventing background tabs and
+third-party subresources from raising credential prompts. Accepted challenges
+reach the `HttpAuthenticationController` owned by the primary window. Popup and
+installed web-app windows share that controller, so nested modal prompts cannot
+be opened by concurrent challenges. The controller fills Qt's request-scoped
+`QAuthenticator` before returning from the signal; rejected contexts and user
+cancellation explicitly reset the authenticator so Chromium does not retry with
+stale values.
+
+`CredentialPromptDialog` is shared with proxy authentication and displays only
+the normalized scheme, host, explicit port, and optional authentication realm.
+Path, query, fragment, and URL user information are never shown or copied into
+the prompt. Labels render untrusted server text as plain text; displayed realms
+are length-bounded and stripped of control and Unicode format characters. A
+challenge that
+returns after credentials were submitted receives retry feedback, keyed by
+normalized origin and realm. Plain HTTP is permitted for controlled intranet
+use but receives a prominent warning that credentials can be intercepted.
+
+PanBrowser has no server-credential store and never writes these usernames or
+passwords to settings, session files, diagnostics, history, or logs. Chromium
+may cache accepted HTTP authentication credentials for the remaining process
+lifetime. Version 0.1.0 guarantees the Basic challenge flow; HTML login forms,
+OAuth pages, client certificates, and operating-system password-manager
+integration are separate mechanisms.
+
 ## 7. Persistent data and privacy boundaries
 
 On macOS, application data is rooted at
@@ -786,6 +821,9 @@ Before merging a change, verify the relevant invariants:
   the configuration is repaired and the browser restarts;
 - proxy authentication passwords never enter settings, files, diagnostics, or
   application logs;
+- HTTP authentication passwords never enter settings, files, diagnostics, or
+  application logs; background and cross-origin subresource challenges are
+  rejected, and unencrypted challenges receive an explicit warning;
 - diagnostics do not expose custom DNS templates, proxy hosts, or usernames;
 - new persistent data is documented in both this file and the README data tree.
 

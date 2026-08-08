@@ -324,6 +324,16 @@ browser session. Chromium does not support SOCKS5 authentication, so SOCKS5
 servers must allow unauthenticated connections.
 Proxy changes take effect after restarting PanBrowser.
 
+Sites protected by HTTP Basic authentication open a browser-owned sign-in
+dialog showing the requesting origin and authentication realm. Credentials are
+passed only to Chromium for the current browser session and are not written to
+PanBrowser settings. A repeated challenge is shown as a failed attempt. Plain
+HTTP remains supported for intranet use, but the dialog warns that its username
+and password can be intercepted on an unencrypted connection. This mechanism is
+separate from login forms rendered by websites.
+Only the active tab may open this dialog, and cross-origin subresources cannot
+request credentials for a different site.
+
 Proxy mode is browser-wide: normal tabs, popup windows, installed web apps, and
 downloads share it. A failed manual proxy does not silently fall back to a
 direct connection. This feature is not a VPN and does not configure other

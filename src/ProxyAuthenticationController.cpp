@@ -1,15 +1,10 @@
 #include "ProxyAuthenticationController.h"
 
+#include "CredentialPromptDialog.h"
+
 #include <QAuthenticator>
 #include <QCoreApplication>
-#include <QDialog>
-#include <QDialogButtonBox>
-#include <QFormLayout>
-#include <QLabel>
-#include <QLineEdit>
-#include <QPushButton>
 #include <QUrl>
-#include <QVBoxLayout>
 
 namespace {
 
@@ -28,127 +23,6 @@ QString displayOrigin(const QUrl &url)
     origin.setPort(url.port());
     return origin.toDisplayString(QUrl::RemovePassword | QUrl::RemoveUserInfo);
 }
-
-class ProxyCredentialsDialog final : public QDialog {
-public:
-    ProxyCredentialsDialog(
-        const QString &proxyHost,
-        const QUrl &requestUrl,
-        const QString &suggestedUsername,
-        bool retry,
-        QWidget *parent
-    )
-        : QDialog(parent)
-    {
-        setObjectName(QStringLiteral("proxyAuthenticationDialog"));
-        setWindowTitle(uiText(QT_TRANSLATE_NOOP(
-            "ProxyAuthenticationController",
-            "Proxy authentication"
-        )));
-        setModal(true);
-        resize(520, 320);
-
-        auto *layout = new QVBoxLayout(this);
-        layout->setContentsMargins(22, 20, 22, 18);
-        layout->setSpacing(14);
-
-        auto *title = new QLabel(windowTitle(), this);
-        title->setObjectName(QStringLiteral("dialogTitle"));
-        layout->addWidget(title);
-
-        if (retry) {
-            auto *retryMessage = new QLabel(
-                uiText(QT_TRANSLATE_NOOP(
-                    "ProxyAuthenticationController",
-                    "Authentication failed. Check the credentials and try again."
-                )),
-                this
-            );
-            retryMessage->setObjectName(QStringLiteral("errorText"));
-            retryMessage->setWordWrap(true);
-            layout->addWidget(retryMessage);
-        }
-
-        auto *message = new QLabel(
-            uiText(QT_TRANSLATE_NOOP(
-                "ProxyAuthenticationController",
-                "The proxy “%1” requires a username and password."
-            )).arg(proxyHost),
-            this
-        );
-        message->setTextFormat(Qt::PlainText);
-        message->setWordWrap(true);
-        layout->addWidget(message);
-
-        auto *origin = new QLabel(
-            uiText(QT_TRANSLATE_NOOP(
-                "ProxyAuthenticationController",
-                "Requesting site: %1"
-            )).arg(displayOrigin(requestUrl)),
-            this
-        );
-        origin->setTextFormat(Qt::PlainText);
-        origin->setObjectName(QStringLiteral("fieldHint"));
-        origin->setTextInteractionFlags(Qt::TextSelectableByMouse);
-        origin->setWordWrap(true);
-        layout->addWidget(origin);
-
-        auto *form = new QFormLayout();
-        form->setHorizontalSpacing(18);
-        form->setVerticalSpacing(12);
-        form->setFieldGrowthPolicy(QFormLayout::AllNonFixedFieldsGrow);
-        m_username = new QLineEdit(suggestedUsername, this);
-        form->addRow(
-            uiText(QT_TRANSLATE_NOOP("ProxyAuthenticationController", "Username")),
-            m_username
-        );
-        m_password = new QLineEdit(this);
-        m_password->setEchoMode(QLineEdit::Password);
-        form->addRow(
-            uiText(QT_TRANSLATE_NOOP("ProxyAuthenticationController", "Password")),
-            m_password
-        );
-        layout->addLayout(form);
-
-        auto *privacyHint = new QLabel(
-            uiText(QT_TRANSLATE_NOOP(
-                "ProxyAuthenticationController",
-                "The password is used for this browser session and is never written to PanBrowser settings."
-            )),
-            this
-        );
-        privacyHint->setObjectName(QStringLiteral("fieldHint"));
-        privacyHint->setWordWrap(true);
-        layout->addWidget(privacyHint);
-
-        auto *buttons = new QDialogButtonBox(
-            QDialogButtonBox::Ok | QDialogButtonBox::Cancel,
-            Qt::Horizontal,
-            this
-        );
-        buttons->button(QDialogButtonBox::Ok)->setText(
-            uiText(QT_TRANSLATE_NOOP("ProxyAuthenticationController", "Sign in"))
-        );
-        layout->addWidget(buttons);
-        connect(buttons, &QDialogButtonBox::accepted, this, &QDialog::accept);
-        connect(buttons, &QDialogButtonBox::rejected, this, &QDialog::reject);
-        m_password->setFocus();
-    }
-
-    [[nodiscard]] QString username() const
-    {
-        return m_username->text();
-    }
-
-    [[nodiscard]] QString password() const
-    {
-        return m_password->text();
-    }
-
-private:
-    QLineEdit *m_username = nullptr;
-    QLineEdit *m_password = nullptr;
-};
 
 } // namespace
 
@@ -191,14 +65,29 @@ void ProxyAuthenticationController::requestAuthentication(
         suggestedUsername = m_activeSettings.username();
     }
 
+    CredentialPromptContent content;
+    content.objectName = QStringLiteral("proxyAuthenticationDialog");
+    content.title = uiText(QT_TRANSLATE_NOOP(
+        "ProxyAuthenticationController",
+        "Proxy authentication"
+    ));
+    content.message = uiText(QT_TRANSLATE_NOOP(
+        "ProxyAuthenticationController",
+        "The proxy “%1” requires a username and password."
+    )).arg(displayedHost);
+    content.details.append(uiText(QT_TRANSLATE_NOOP(
+        "ProxyAuthenticationController",
+        "Requesting site: %1"
+    )).arg(displayOrigin(requestUrl)));
+    content.suggestedUsername = suggestedUsername;
+    content.privacyHint = uiText(QT_TRANSLATE_NOOP(
+        "ProxyAuthenticationController",
+        "The password is used for this browser session and is never written to PanBrowser settings."
+    ));
+    content.retry = m_promptedHosts.contains(key);
+
     m_promptActive = true;
-    ProxyCredentialsDialog dialog(
-        displayedHost,
-        requestUrl,
-        suggestedUsername,
-        m_promptedHosts.contains(key),
-        parent
-    );
+    CredentialPromptDialog dialog(content, parent);
     const int result = dialog.exec();
     m_promptActive = false;
     if (result != QDialog::Accepted) {

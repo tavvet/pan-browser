@@ -12,9 +12,11 @@
 #include "ExternalNavigationPolicy.h"
 #include "FindBar.h"
 #include "HistoryStore.h"
+#include "HttpAuthenticationController.h"
 #include "Localization.h"
 #include "PermissionPolicy.h"
 #include "ProxySettings.h"
+#include "ProxyAuthenticationController.h"
 #include "SessionStore.h"
 #include "SearchSettings.h"
 #include "TrustConfiguration.h"
@@ -25,6 +27,8 @@
 #include "WindowChrome.h"
 
 #include <QApplication>
+#include <QAuthenticator>
+#include <QDialog>
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
@@ -41,6 +45,7 @@
 #include <QSettings>
 #include <QTemporaryDir>
 #include <QTest>
+#include <QTimer>
 #include <QTimeZone>
 #include <QTranslator>
 #include <QUuid>
@@ -94,6 +99,12 @@ private slots:
     void proxySettingsApplyGlobalModes();
     void proxySettingsCompareOnlyEffectiveConfiguration();
     void proxyFailureBlocksWebEngineNetworkSchemes();
+    void httpAuthenticationAcceptsCredentialsAndSanitizesDisplay();
+    void httpAuthenticationCancelClearsAuthenticator();
+    void httpAuthenticationRetriesAndWarnsForPlainHttp();
+    void httpAuthenticationPolicyRejectsUnsafePromptContexts();
+    void httpAuthenticationRealmDisplayRemovesControlCharacters();
+    void proxyAuthenticationUsesSharedCredentialDialog();
     void searchSettingsRoundTripAndCreateBackup();
     void searchSettingsRejectInvalidTemplatesAndDuplicates();
     void addressInputDistinguishesUrlsAndSearches();
@@ -1461,6 +1472,261 @@ void TrustConfigurationTests::proxyFailureBlocksWebEngineNetworkSchemes()
     QVERIFY(!BrowserProfile::shouldBlockForProxyConfigurationError(
         QUrl(QStringLiteral("data:text/plain,offline"))
     ));
+}
+
+void TrustConfigurationTests::httpAuthenticationAcceptsCredentialsAndSanitizesDisplay()
+{
+    HttpAuthenticationController controller;
+    QAuthenticator authenticator;
+    authenticator.setUser(QStringLiteral("suggested-user"));
+    bool handled = false;
+    bool originWasSanitized = false;
+    QString suggestedUsername;
+
+    QTimer::singleShot(0, &controller, [&] {
+        auto *dialog = qobject_cast<QDialog *>(QApplication::activeModalWidget());
+        if (!dialog)
+            return;
+        handled = true;
+        QString visibleText;
+        for (const QLabel *label : dialog->findChildren<QLabel *>())
+            visibleText += label->text() + QLatin1Char('\n');
+        originWasSanitized = visibleText.contains(QStringLiteral("https://example.com"))
+            && !visibleText.contains(QStringLiteral("alice"))
+            && !visibleText.contains(QStringLiteral("url-secret"))
+            && !visibleText.contains(QStringLiteral("private/path"));
+
+        auto *username = dialog->findChild<QLineEdit *>(
+            QStringLiteral("credentialUsername")
+        );
+        auto *password = dialog->findChild<QLineEdit *>(
+            QStringLiteral("credentialPassword")
+        );
+        if (!username || !password) {
+            dialog->reject();
+            return;
+        }
+        suggestedUsername = username->text();
+        username->setText(QStringLiteral("alice"));
+        password->setText(QStringLiteral("top-secret"));
+        dialog->accept();
+    });
+
+    controller.requestAuthentication(
+        nullptr,
+        QUrl(QStringLiteral(
+            "https://alice:url-secret@Example.COM/private/path?token=url-secret"
+        )),
+        &authenticator
+    );
+
+    QVERIFY(handled);
+    QVERIFY(originWasSanitized);
+    QCOMPARE(suggestedUsername, QStringLiteral("suggested-user"));
+    QCOMPARE(authenticator.user(), QStringLiteral("alice"));
+    QCOMPARE(authenticator.password(), QStringLiteral("top-secret"));
+}
+
+void TrustConfigurationTests::httpAuthenticationCancelClearsAuthenticator()
+{
+    HttpAuthenticationController controller;
+    QAuthenticator authenticator;
+    authenticator.setUser(QStringLiteral("stale-user"));
+    authenticator.setPassword(QStringLiteral("stale-password"));
+    bool handled = false;
+
+    QTimer::singleShot(0, &controller, [&] {
+        auto *dialog = qobject_cast<QDialog *>(QApplication::activeModalWidget());
+        if (!dialog)
+            return;
+        handled = true;
+        dialog->reject();
+    });
+    controller.requestAuthentication(
+        nullptr,
+        QUrl(QStringLiteral("https://example.com/protected")),
+        &authenticator
+    );
+
+    QVERIFY(handled);
+    QVERIFY(authenticator.isNull());
+    QVERIFY(authenticator.user().isEmpty());
+    QVERIFY(authenticator.password().isEmpty());
+}
+
+void TrustConfigurationTests::httpAuthenticationRetriesAndWarnsForPlainHttp()
+{
+    HttpAuthenticationController controller;
+    QAuthenticator firstAttempt;
+    bool firstHandled = false;
+    QTimer::singleShot(0, &controller, [&] {
+        auto *dialog = qobject_cast<QDialog *>(QApplication::activeModalWidget());
+        if (!dialog)
+            return;
+        firstHandled = true;
+        auto *username = dialog->findChild<QLineEdit *>(
+            QStringLiteral("credentialUsername")
+        );
+        auto *password = dialog->findChild<QLineEdit *>(
+            QStringLiteral("credentialPassword")
+        );
+        if (!username || !password) {
+            dialog->reject();
+            return;
+        }
+        username->setText(QStringLiteral("wrong-user"));
+        password->setText(QStringLiteral("wrong-password"));
+        dialog->accept();
+    });
+    controller.requestAuthentication(
+        nullptr,
+        QUrl(QStringLiteral("http://example.com/private")),
+        &firstAttempt
+    );
+    QVERIFY(firstHandled);
+
+    QAuthenticator retryAttempt;
+    bool retryHandled = false;
+    bool retryWasVisible = false;
+    bool warningWasVisible = false;
+    QTimer::singleShot(0, &controller, [&] {
+        auto *dialog = qobject_cast<QDialog *>(QApplication::activeModalWidget());
+        if (!dialog)
+            return;
+        retryHandled = true;
+        retryWasVisible = dialog->findChild<QLabel *>(QStringLiteral("errorText"));
+        warningWasVisible = dialog->findChild<QLabel *>(
+            QStringLiteral("insecureTransportWarning")
+        );
+        dialog->reject();
+    });
+    controller.requestAuthentication(
+        nullptr,
+        QUrl(QStringLiteral("http://EXAMPLE.com:80/another-path")),
+        &retryAttempt
+    );
+
+    QVERIFY(retryHandled);
+    QVERIFY(retryWasVisible);
+    QVERIFY(warningWasVisible);
+    QVERIFY(retryAttempt.isNull());
+}
+
+void TrustConfigurationTests::httpAuthenticationPolicyRejectsUnsafePromptContexts()
+{
+    const QUrl requestUrl(QStringLiteral("https://auth.example.com/private"));
+    const QUrl sameOrigin(QStringLiteral("https://AUTH.example.com:443/login"));
+
+    QVERIFY(HttpAuthenticationPolicy::promptAllowed(
+        requestUrl,
+        sameOrigin,
+        true,
+        true
+    ));
+    QVERIFY(!HttpAuthenticationPolicy::promptAllowed(
+        requestUrl,
+        sameOrigin,
+        false,
+        true
+    ));
+    QVERIFY(!HttpAuthenticationPolicy::promptAllowed(
+        requestUrl,
+        sameOrigin,
+        true,
+        false
+    ));
+    QVERIFY(!HttpAuthenticationPolicy::promptAllowed(
+        QUrl(QStringLiteral("https://third-party.example/protected.png")),
+        sameOrigin,
+        true,
+        true
+    ));
+    QVERIFY(!HttpAuthenticationPolicy::promptAllowed(
+        QUrl(QStringLiteral("http://auth.example.com/private")),
+        sameOrigin,
+        true,
+        true
+    ));
+    QVERIFY(!HttpAuthenticationPolicy::promptAllowed(
+        QUrl(QStringLiteral("https://auth.example.com:444/private")),
+        sameOrigin,
+        true,
+        true
+    ));
+    QVERIFY(!HttpAuthenticationPolicy::promptAllowed(
+        requestUrl,
+        QUrl(QStringLiteral("about:blank")),
+        true,
+        true
+    ));
+}
+
+void TrustConfigurationTests::httpAuthenticationRealmDisplayRemovesControlCharacters()
+{
+    const QString maliciousRealm = QStringLiteral("  Bank")
+        + QChar(0x202e) + QStringLiteral("evil") + QChar(0x202c)
+        + QLatin1Char('\n') + QStringLiteral("Admin")
+        + QChar(0x2066) + QStringLiteral("test") + QChar(0x2069)
+        + QStringLiteral("  ");
+    const QString displayed = HttpAuthenticationPolicy::realmForDisplay(maliciousRealm);
+    QCOMPARE(displayed, QStringLiteral("Bank evil Admin test"));
+    for (const QChar character : displayed) {
+        QVERIFY(character.category() != QChar::Other_Control);
+        QVERIFY(character.category() != QChar::Other_Format);
+        QVERIFY(character.category() != QChar::Separator_Line);
+        QVERIFY(character.category() != QChar::Separator_Paragraph);
+    }
+
+    const QString truncated = HttpAuthenticationPolicy::realmForDisplay(
+        QString(400, QLatin1Char('x'))
+    );
+    QCOMPARE(truncated.size(), 300);
+    QVERIFY(truncated.endsWith(QChar(0x2026)));
+}
+
+void TrustConfigurationTests::proxyAuthenticationUsesSharedCredentialDialog()
+{
+    ProxySettings settings = ProxySettings::defaults();
+    settings.setMode(ProxyMode::Manual);
+    settings.setManualType(ManualProxyType::Http);
+    settings.setHost(QStringLiteral("proxy.example.com"));
+    settings.setPort(3128);
+    settings.setUsername(QStringLiteral("configured-user"));
+    ProxyAuthenticationController controller(settings);
+    QAuthenticator authenticator;
+    bool handled = false;
+    QString suggestedUsername;
+
+    QTimer::singleShot(0, &controller, [&] {
+        auto *dialog = qobject_cast<QDialog *>(QApplication::activeModalWidget());
+        if (!dialog)
+            return;
+        handled = dialog->objectName() == QStringLiteral("proxyAuthenticationDialog");
+        auto *username = dialog->findChild<QLineEdit *>(
+            QStringLiteral("credentialUsername")
+        );
+        auto *password = dialog->findChild<QLineEdit *>(
+            QStringLiteral("credentialPassword")
+        );
+        if (!username || !password) {
+            dialog->reject();
+            return;
+        }
+        suggestedUsername = username->text();
+        password->setText(QStringLiteral("proxy-password"));
+        dialog->accept();
+    });
+    controller.requestAuthentication(
+        nullptr,
+        QUrl(QStringLiteral("https://example.com/private")),
+        &authenticator,
+        QStringLiteral("proxy.example.com")
+    );
+
+    QVERIFY(handled);
+    QCOMPARE(suggestedUsername, QStringLiteral("configured-user"));
+    QCOMPARE(authenticator.user(), QStringLiteral("configured-user"));
+    QCOMPARE(authenticator.password(), QStringLiteral("proxy-password"));
 }
 
 void TrustConfigurationTests::searchSettingsRoundTripAndCreateBackup()

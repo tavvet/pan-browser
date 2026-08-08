@@ -1023,3 +1023,74 @@ QDialog#bookmarksDialog QPushButton:disabled {
     background: #1b1e24;
     border-color: #292e37;
 }
+
+QDialog#httpAuthenticationDialog,
+QDialog#proxyAuthenticationDialog {
+    background: #15181e;
+    color: #dce1e9;
+}
+
+QDialog#httpAuthenticationDialog QLabel#dialogTitle,
+QDialog#proxyAuthenticationDialog QLabel#dialogTitle {
+    color: #f5f7fb;
+    font-size: 22px;
+    font-weight: 700;
+}
+
+QDialog#httpAuthenticationDialog QLabel#fieldHint,
+QDialog#proxyAuthenticationDialog QLabel#fieldHint {
+    color: #929baa;
+}
+
+QDialog#httpAuthenticationDialog QLabel#errorText,
+QDialog#proxyAuthenticationDialog QLabel#errorText {
+    color: #ff9aaa;
+}
+
+QDialog#httpAuthenticationDialog QLabel#insecureTransportWarning {
+    color: #ffd38a;
+    background: #332818;
+    border: 1px solid #66502b;
+    border-radius: 7px;
+    padding: 8px 10px;
+}
+
+QDialog#httpAuthenticationDialog QLineEdit,
+QDialog#proxyAuthenticationDialog QLineEdit {
+    min-height: 34px;
+    color: #edf0f6;
+    background: #20242c;
+    border: 1px solid #373e4a;
+    border-radius: 8px;
+    padding: 0 10px;
+    selection-background-color: #3d72d9;
+}
+
+QDialog#httpAuthenticationDialog QLineEdit:focus,
+QDialog#proxyAuthenticationDialog QLineEdit:focus {
+    border-color: #5b8def;
+    background: #242932;
+}
+
+QDialog#httpAuthenticationDialog QPushButton,
+QDialog#proxyAuthenticationDialog QPushButton {
+    min-height: 30px;
+    color: #e9edf5;
+    background: #2a303a;
+    border: 1px solid #3a424f;
+    border-radius: 7px;
+    padding: 2px 13px;
+}
+
+QDialog#httpAuthenticationDialog QPushButton:hover,
+QDialog#proxyAuthenticationDialog QPushButton:hover {
+    background: #343c48;
+    border-color: #4a5564;
+}
+
+QDialog#httpAuthenticationDialog QPushButton:default,
+QDialog#proxyAuthenticationDialog QPushButton:default {
+    color: #ffffff;
+    background: #3d72d9;
+    border-color: #5689ea;
+}

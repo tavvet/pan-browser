@@ -44,6 +44,8 @@ current tree, not previously shipped functionality.
 
 ### Networking
 
+- [x] Browser-owned HTTP Basic authentication dialog with retry feedback,
+  session-only credentials, and an explicit warning on unencrypted HTTP.
 - [x] Secure DNS manager with system default, built-in and custom DNS-over-HTTPS
   providers, fallback/strict modes, runtime application, and diagnostics.
 - [x] Browser-wide proxy manager with system, direct, HTTP, and unauthenticated
