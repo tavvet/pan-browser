@@ -4,7 +4,8 @@ This document explains how PanBrowser is put together, why the important
 boundaries exist, and which invariants must survive future changes. It is aimed
 at someone returning to the project after a long break.
 
-This document describes the **0.2.0** development baseline. Update it together
+This document describes the pre-release **0.1.0** development baseline. No
+stable PanBrowser version has been published yet. Update this document together
 with any change to component ownership, startup order, persistence, or a
 security boundary.
 
@@ -663,6 +664,11 @@ scripts/build-windows.ps1 -> dist/PanBrowser-windows-x64.zip
 scripts/build-linux.sh    -> dist/PanBrowser-linux-<architecture>.tar.gz
 ```
 
+The Linux executable uses a relative install RPATH to find the Qt libraries in
+the adjacent deployment tree. Before creating the archive, the packaging script
+runs `ldd` on the installed executable and rejects a bundle with unresolved
+runtime libraries.
+
 Windows packaging can additionally retain an unmodified baseline archive and
 then prune unsupported Chromium locale packs from the distribution candidate.
 `scripts/audit-bundle.cmake` emits per-file JSON plus a Markdown largest-file
@@ -684,6 +690,12 @@ native-validator tests, packaging script, browser startup, settings UI,
 downloads UI, native decorated window, and overflow menu were exercised. This
 is evidence for the shipped x64 artifact in that environment, not a native
 ARM64 validation or complete Windows 10/11 hardware matrix.
+
+The Linux ARM64 path was locally validated in August 2026 inside an Ubuntu
+ARM64 VMware Fusion guest. The Qt `gcc_arm64` build, native-validator tests,
+packaging script, packaged application startup, and primary GUI were exercised.
+This is evidence for the `aarch64` artifact in that environment, not an x86-64
+validation or a complete X11/Wayland desktop matrix.
 
 The Diagnostics settings page reports application, Qt WebEngine, Chromium,
 security-patch, graphics, sandbox, DNS mode/provider, proxy modes, runtime

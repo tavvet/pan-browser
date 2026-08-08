@@ -10,10 +10,11 @@ The current implementation uses Qt 6.11 or newer, Security.framework on macOS,
 Windows CryptoAPI on Windows 10 or newer, and OpenSSL 1.1.1 or newer on Linux.
 Unsupported platforms retain an explicit fail-closed validator boundary.
 
-The current development baseline is **0.2.0**. PanBrowser is usable for local
-testing, but its release archives are not yet a supported public distribution:
-macOS builds are ad-hoc signed rather than notarized, and automatic updates are
-not implemented.
+PanBrowser is currently being prepared for its first **0.1.0** release. No
+stable version has been published yet. The current packages are intended for
+development and cross-platform testing rather than supported public
+distribution: macOS builds are ad-hoc signed rather than notarized, and
+automatic updates are not implemented.
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for component ownership,
 startup order, security boundaries, data formats, tests, and maintenance
@@ -115,6 +116,11 @@ path. The output is `dist/PanBrowser-linux-<architecture>.tar.gz`, containing a
 relocatable Qt deployment directory. Build and distribution packages should be
 created on the oldest supported Linux distribution because glibc remains a
 host compatibility boundary.
+
+The ARM64 build, automated test suite, packaging path, packaged application
+startup, and primary GUI were smoke-tested on Ubuntu ARM64 in VMware Fusion.
+This confirms the `aarch64` package in that environment; it is not a substitute
+for Linux x86-64 or separate X11 and Wayland validation.
 
 The scripts use `build-linux`, `build-windows`, and `dist` by default. Override
 Linux paths with `PANBROWSER_BUILD_DIR` and `PANBROWSER_DIST_DIR`, or Windows

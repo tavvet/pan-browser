@@ -1,70 +1,92 @@
 # PanBrowser roadmap
 
-Current development baseline: **0.2.0**. Completed items describe the main
-branch; unfinished experiments kept on other branches remain unchecked here.
+Current release target: **0.1.0 (unreleased)**. The `main` branch is the
+pre-release development state; PanBrowser has no published stable version or
+release tag yet. Checked items describe what is implemented and verified in the
+current tree, not previously shipped functionality.
 
-## Completed foundation
+## 0.1.0 scope
 
-- [x] Domain-scoped custom CA validation on macOS.
+### Trust and profile isolation
+
+- [x] Domain-scoped custom CA validation on macOS, Windows, and Linux.
 - [x] Trust rule editor with certificate import and validation.
 - [x] Certificate details and SHA-256 fingerprint viewer.
-- [x] Safe restoration of window size and position.
 - [x] Dedicated persistent WebEngine profile for cookies, site data, and cache.
+- [x] Configurable retention of session cookies and restored tabs.
+- [x] Browsing data controls for cookies, site storage, and HTTP cache.
+- [x] Fail-closed handling of invalid trust, DNS, and proxy configuration.
+
+### Browser functionality
+
+- [x] Safe restoration of window size and position.
 - [x] Movable browser tabs with per-tab navigation and TLS status.
-- [x] Integrated native title-bar tab strip on macOS with a safe decorated-window
-  fallback on other platforms and installed web apps.
+- [x] Integrated native title-bar tab strip on macOS.
 - [x] Native decorated windows and an overflow application menu on Windows and
   Linux, without expanded-client-area or frameless-window flags.
-- [x] Unified settings window with General and Trust Rules sections.
+- [x] Unified settings window.
 - [x] Configurable start page and startup behavior.
-- [x] Optional session-cookie and tab restoration with lazy background tabs.
-- [x] Browsing data controls for cookies, site storage, and HTTP cache.
 - [x] Download manager with progress controls and persistent history.
 - [x] One-time permission prompts for camera, microphone, and location.
 - [x] Safe confirmation for external URL schemes and application deep links.
 - [x] User-initiated popup windows with shared profile and trust policy.
 - [x] Address-bar search with configurable built-in and custom search engines.
-- [x] Local browsing history with management controls and ranked address-bar completion.
-- [x] Runtime diagnostics page with application, Chromium, graphics, and profile details.
-- [x] English and Russian interface localization with system-language detection and explicit override.
-- [x] Manifest-based web app installation with scoped app windows, management UI, and macOS application shortcuts.
-- [x] Secure DNS manager with system default, built-in and custom DNS-over-HTTPS providers, fallback/strict modes, runtime application, and diagnostics.
-- [x] Browser-wide proxy manager with system, direct, HTTP, and unauthenticated SOCKS5 modes, session-only HTTP authentication, fail-closed startup, and diagnostics.
+- [x] Local history with management controls and ranked address completion.
+- [x] Bookmarks with management UI and address-completion integration.
+- [x] Find in page with keyboard navigation and match count.
+- [x] Runtime diagnostics for application, Chromium, graphics, and profile state.
+- [x] English and Russian localization with system-language detection and an
+  explicit override.
+- [x] Manifest-based web app installation with scoped app windows, management
+  UI, and macOS application shortcuts.
 
-## Browser essentials
+### Networking
 
-- [x] Bookmarks with an address-bar toggle, management UI, and autocomplete integration.
-- [x] Find in page with `Command+F`, next/previous match navigation, and match count.
+- [x] Secure DNS manager with system default, built-in and custom DNS-over-HTTPS
+  providers, fallback/strict modes, runtime application, and diagnostics.
+- [x] Browser-wide proxy manager with system, direct, HTTP, and unauthenticated
+  SOCKS5 modes, session-only HTTP authentication, fail-closed startup, and
+  diagnostics.
+
+### Build and release readiness
+
+- [x] Platform-specific build, test, and packaging scripts.
+- [x] macOS build, package, and GUI smoke test.
+- [x] Windows x64 build, automated tests, packaging, and GUI smoke test on
+  Windows 11 ARM64 under x64 emulation.
+- [x] Linux ARM64 build, automated tests, packaging, and GUI smoke test on
+  Ubuntu ARM64 in VMware Fusion.
+- [x] Bundle audit tooling and supported Chromium-locale pruning for Windows.
+- [x] Application version information in the UI.
+- [ ] Run a final regression pass using the packaged artifact on each tested
+  platform.
+- [ ] Prepare 0.1.0 release notes, archive checksums, and the `v0.1.0` tag.
+
+## Planned after 0.1.0
+
+### Browser improvements
+
 - [ ] Complete favicon support: persist icons received from WebEngine and show
   them in restored tabs, bookmarks, history, and address-bar suggestions.
-- [ ] Page zoom controls with keyboard shortcuts, per-site persistence, and reset to 100%.
+- [ ] Page zoom controls with keyboard shortcuts, per-site persistence, and
+  reset to 100%.
 - [ ] Allow user-initiated `chrome://` navigation from the address bar behind a
   safety warning. Keep redirects, page scripts, and popups blocked; offer a
   per-profile "Don't show again" preference that can be reset in settings.
 
-## Cross-platform
+### Trust, platform, and maintenance
 
-- [x] Windows certificate validator using the platform trust APIs.
-- [x] Linux certificate validator with an explicit OpenSSL trust backend.
-- [ ] Freshness-checked revocation cache for custom trust anchors.
-- [x] Platform-specific build and packaging scripts.
-- [x] Windows x64 build, automated tests, packaging, and GUI smoke test on
-  Windows 11 ARM64 under x64 emulation.
-- [ ] Windows Start Menu and Linux `.desktop` launchers for installed web apps.
+- [ ] Add a freshness-checked revocation cache for custom trust anchors.
+- [ ] Add Windows Start Menu and Linux `.desktop` launchers for installed web
+  apps.
 - [ ] Run native Windows 11 x64 and Windows 10 smoke tests outside emulation.
-- [ ] Run Linux package and GUI smoke tests on representative X11 and Wayland
-  desktops.
-
-## Packaging and maintenance
-
-- [x] Audit release bundles in Windows CI and prune unsupported Qt WebEngine
-  locale resources from the distribution candidate.
+- [ ] Run Linux package and GUI smoke tests on representative x86-64, X11, and
+  Wayland environments.
 - [ ] Evaluate further Qt plugin or resource removal with cross-platform smoke
   tests before changing the retained-runtime policy.
-- [x] Add application version information to the UI.
 - [ ] Add a controlled update mechanism.
 
-## Web app profiles
+### Web app profiles
 
 - [ ] Add an explicit per-app profile mode: shared with PanBrowser or isolated.
 - [ ] Isolate cookies, site storage, service workers, and cache for selected apps.
@@ -79,13 +101,13 @@ branch; unfinished experiments kept on other branches remain unchecked here.
 - [ ] Provide a safe migration path between shared and isolated profiles without
   silently copying cookies or authentication state.
 
-## Deferred distribution work
+### Distribution
 
 - [ ] Developer ID signing and notarization.
 - [ ] DMG packaging and first-run onboarding.
 - [ ] Importable and exportable trust profiles.
 
-## Deferred proxy extensions
+### Proxy extensions
 
 - [ ] Custom PAC URLs and explicit PAC diagnostics.
 - [ ] Per-domain proxy routing and bypass rules.
