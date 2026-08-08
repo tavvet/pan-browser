@@ -2,6 +2,7 @@
 
 #include <QCryptographicHash>
 #include <QDir>
+#include <QElapsedTimer>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QLocalServer>
@@ -190,12 +191,15 @@ SingleInstanceCoordinator::StartResult SingleInstanceCoordinator::start(
     }
 
     // The primary process can hold the lock just before its local server is ready.
-    for (int attempt = 0; attempt < 5; ++attempt) {
+    // Some Windows connection failures return immediately, so use elapsed time
+    // instead of a fixed attempt count to preserve the intended retry window.
+    QElapsedTimer retryTimer;
+    retryTimer.start();
+    do {
         if (forwardRequest(initialRequest))
             return StartResult::Forwarded;
-        if (attempt < 4)
-            QThread::msleep(50);
-    }
+        QThread::msleep(50);
+    } while (retryTimer.elapsed() < 2000);
     if (error)
         *error = tr("Another PanBrowser instance is running but did not accept the launch request");
     return StartResult::Error;

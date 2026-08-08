@@ -1825,7 +1825,11 @@ void TrustConfigurationTests::applicationLaunchRequestsAreForwardedToPrimaryInst
         launchClientPath,
         {serverName, QStringLiteral("open-web-app"), appId}
     );
-    QVERIFY2(webAppClient.waitForStarted(3000), qPrintable(webAppClient.errorString()));
+    QTRY_VERIFY_WITH_TIMEOUT(webAppClient.state() != QProcess::Starting, 3000);
+    QVERIFY2(
+        webAppClient.error() != QProcess::FailedToStart,
+        qPrintable(webAppClient.errorString())
+    );
     QTRY_VERIFY_WITH_TIMEOUT(
         webAppClient.state() == QProcess::NotRunning,
         5000
@@ -1847,7 +1851,11 @@ void TrustConfigurationTests::applicationLaunchRequestsAreForwardedToPrimaryInst
         launchClientPath,
         {serverName, QStringLiteral("open-url"), url.toString(QUrl::FullyEncoded)}
     );
-    QVERIFY2(urlClient.waitForStarted(3000), qPrintable(urlClient.errorString()));
+    QTRY_VERIFY_WITH_TIMEOUT(urlClient.state() != QProcess::Starting, 3000);
+    QVERIFY2(
+        urlClient.error() != QProcess::FailedToStart,
+        qPrintable(urlClient.errorString())
+    );
     QTRY_VERIFY_WITH_TIMEOUT(
         urlClient.state() == QProcess::NotRunning,
         5000
