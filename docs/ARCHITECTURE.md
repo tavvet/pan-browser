@@ -728,9 +728,12 @@ separate Qt WebEngine 6.11 repository layout. The extracted SDK is cached using
 the installer manifest hash. The locale allowlist and the files that must remain
 in every bundle are documented in `docs/BUNDLE_POLICY.md`.
 
-These outputs are suitable for local and cross-machine testing. Public
+These outputs are suitable for local and cross-machine testing. Public binary
 distribution still requires platform signing, a supported oldest Linux build
-host, license review, and the release work tracked in the roadmap.
+host, the version-specific work in [LICENSING.md](LICENSING.md), and the
+distribution work tracked in the roadmap. Publishing a source-only tag is a
+separate milestone and does not imply that these binaries are ready for public
+distribution.
 
 The x64 Windows path was locally validated in August 2026 inside a Windows 11
 ARM64 VMware Fusion guest using Windows' x64 emulation. The MSVC 2022 build,

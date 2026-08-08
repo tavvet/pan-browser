@@ -170,6 +170,7 @@ set_target_properties(PanBrowser PROPERTIES
     MACOSX_BUNDLE_SHORT_VERSION_STRING ${PROJECT_VERSION}
     MACOSX_BUNDLE_BUNDLE_VERSION ${PROJECT_VERSION}
     MACOSX_BUNDLE_ICON_FILE PanBrowser.icns
+    MACOSX_BUNDLE_COPYRIGHT "Copyright 2026 Anton Rudakov"
 )
 
 target_include_directories(PanBrowser PRIVATE src)
@@ -185,6 +186,17 @@ target_link_libraries(PanBrowser PRIVATE
 )
 
 if(APPLE)
+    set(PANBROWSER_LICENSE_DOCUMENTS
+        README.md
+        LICENSE
+        THIRD_PARTY_NOTICES.md
+        docs/LICENSING.md
+    )
+    set_source_files_properties(${PANBROWSER_LICENSE_DOCUMENTS} PROPERTIES
+        MACOSX_PACKAGE_LOCATION "Resources/Documentation"
+    )
+    target_sources(PanBrowser PRIVATE ${PANBROWSER_LICENSE_DOCUMENTS})
+
     set_target_properties(PanBrowser PROPERTIES
         MACOSX_BUNDLE_INFO_PLIST ${CMAKE_CURRENT_SOURCE_DIR}/src/Info.plist.in
     )
@@ -239,7 +251,7 @@ if(WIN32 OR CMAKE_SYSTEM_NAME STREQUAL "Linux")
     install(TARGETS PanBrowser
         RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
     )
-    install(FILES README.md THIRD_PARTY_NOTICES.md
+    install(FILES README.md LICENSE THIRD_PARTY_NOTICES.md docs/LICENSING.md
         DESTINATION ${CMAKE_INSTALL_DATADIR}/doc/PanBrowser
     )
     qt_generate_deploy_app_script(

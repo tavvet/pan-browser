@@ -62,9 +62,12 @@ current tree, not previously shipped functionality.
   Ubuntu ARM64 in VMware Fusion.
 - [x] Bundle audit tooling and supported Chromium-locale pruning for Windows.
 - [x] Application version information in the UI.
+- [x] License PanBrowser's original material under Apache-2.0 and document the
+  separate third-party and binary-distribution obligations.
 - [ ] Run a final regression pass using the packaged artifact on each tested
   platform.
-- [ ] Prepare 0.1.0 release notes, archive checksums, and the `v0.1.0` tag.
+- [ ] Prepare source milestone notes and the `v0.1.0` tag. A GitHub Release and
+  public binary archives are not required for this source milestone.
 
 ## Planned after 0.1.0
 
@@ -107,8 +110,13 @@ current tree, not previously shipped functionality.
 
 ### Distribution
 
+- [ ] Assemble version-matched Qt, Qt WebEngine/Chromium, OpenSSL, and asset
+  notices in every binary package, provide the required Qt source offer, and
+  expose an in-application open-source notice.
 - [ ] Developer ID signing and notarization.
 - [ ] DMG packaging and first-run onboarding.
+- [ ] Publish versioned binary archives and checksums when supported downloads
+  are ready.
 - [ ] Importable and exportable trust profiles.
 
 ### Proxy extensions

@@ -1,40 +1,113 @@
-# PanBrowser
+<p align="center">
+  <img src="src/assets/app-icon.svg" width="96" height="96" alt="PanBrowser icon">
+</p>
 
-PanBrowser is a small Qt WebEngine browser with domain-scoped TLS trust rules.
-Normal sites use Chromium's ordinary trust configuration. If Chromium rejects a
-certificate solely because its CA is unknown, PanBrowser can verify that chain
-against CA certificates selected by a matching domain rule. It never installs
-those certificates in the operating-system trust store.
+<h1 align="center">PanBrowser</h1>
 
-The current implementation uses Qt 6.11 or newer, Security.framework on macOS,
-Windows CryptoAPI on Windows 10 or newer, and OpenSSL 1.1.1 or newer on Linux.
-Unsupported platforms retain an explicit fail-closed validator boundary.
+<p align="center">
+  A focused Qt WebEngine browser for domain-scoped TLS trust rules.
+</p>
 
-PanBrowser is currently being prepared for its first **0.1.0** release. No
-stable version has been published yet. The current packages are intended for
-development and cross-platform testing rather than supported public
-distribution: macOS builds are ad-hoc signed rather than notarized, and
-automatic updates are not implemented.
+PanBrowser is an experimental desktop browser for opening services that use a
+private or otherwise non-standard certificate authority without installing
+that CA in the operating-system trust store. Ordinary websites continue to use
+Chromium's normal trust configuration. A custom CA is considered only for a
+hostname covered by an explicit PanBrowser rule.
 
-See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for component ownership,
-startup order, security boundaries, data formats, tests, and maintenance
-invariants, and [docs/BUNDLE_POLICY.md](docs/BUNDLE_POLICY.md) for deployment
-auditing and size-optimization rules. See [ROADMAP.md](ROADMAP.md) for completed
-work and planned browser features.
+PanBrowser started as a small trust-policy viewer. It now includes the browser
+features needed for practical daily use while keeping its original security
+boundary visible and auditable.
 
-Keyboard shortcuts below use macOS notation. Qt maps standard shortcuts to
-their platform equivalents, normally <kbd>Ctrl</kbd> instead of
-<kbd>Command</kbd> on Windows and Linux.
+> [!WARNING]
+> PanBrowser is not yet a security-maintained replacement for a general-purpose
+> browser. It has no automatic update mechanism, and its macOS packages are
+> ad-hoc signed rather than notarized. The current tree targets version `0.1.0`,
+> but no prebuilt public release is available. Build and evaluate it from source.
 
-Menu paths such as **PanBrowser → Settings…** refer to the system application
-menu on macOS and to the **⋮** overflow menu at the right of the navigation bar
-on Windows and Linux.
+## Why PanBrowser?
 
-## Build and package
+Installing an additional root CA system-wide expands trust for every
+application that uses the system store. PanBrowser provides a narrower model:
+
+- configured certificates stay inside the PanBrowser data directory;
+- trust rules are scoped to exact domains and explicit wildcard domains;
+- custom validation runs only when Chromium reports an unknown CA;
+- the complete chain and hostname are checked by the native platform backend;
+- unrelated TLS failures remain blocked.
+
+This makes PanBrowser useful for private services, corporate infrastructure,
+test environments, and other deliberately scoped trust configurations.
+
+## Highlights
+
+- Domain-scoped custom CA rules with `system-only`, `system-plus-custom`, and
+  `custom-only` modes.
+- Native certificate validation through Security.framework on macOS, CryptoAPI
+  on Windows, and OpenSSL on Linux.
+- A dedicated WebEngine profile for cookies, storage, cache, history,
+  bookmarks, downloads, and installed web apps.
+- Tabs, session restoration, popup handling, find in page, local address
+  completion, configurable search engines, and a download manager.
+- Browser-owned prompts for camera, microphone, location, external schemes,
+  HTTP Basic authentication, and HTTP proxy authentication.
+- Browser-wide System/Direct/HTTP/SOCKS5 proxy modes and configurable
+  DNS-over-HTTPS providers.
+- Manifest-based web app installation, including lightweight application
+  shortcuts on macOS.
+- English and Russian interfaces with system-language detection.
+- Diagnostics for the application, Chromium, graphics, sandbox, profile,
+  DNS, and proxy state.
+
+See [ROADMAP.md](ROADMAP.md) for the implemented `0.1.0` scope and planned
+work.
+
+## Trust model
+
+When Chromium encounters a certificate error, PanBrowser follows this flow:
+
+1. Errors other than `CertificateAuthorityInvalid` are rejected.
+2. PanBrowser looks for a rule matching the challenged hostname.
+3. If the rule permits custom trust, PanBrowser validates the complete chain
+   and hostname with the platform-native validator and the configured anchors.
+4. Qt WebEngine is allowed to continue only when that validation succeeds.
+
+| Mode | Behavior |
+| --- | --- |
+| `system-only` | Use ordinary Chromium and operating-system trust. |
+| `system-plus-custom` | Allow recovery through either system roots or the configured anchors. |
+| `custom-only` | Allow the unknown-CA recovery path only through the configured anchors. |
+
+`custom-only` cannot reject a connection that Chromium has already accepted
+through its normal roots; Qt exposes the application hook only after Chromium
+reports a certificate error. It is therefore not certificate pinning.
+
+Trusting a CA still allows that CA to issue certificates for every hostname
+covered by the rule. Keep rules narrow, obtain certificates from a verified
+source, and compare their SHA-256 fingerprints before use.
+
+## Platform status
+
+PanBrowser requires Qt 6.11 or newer and a C++20 compiler.
+
+| Platform | Validation backend | Current verification |
+| --- | --- | --- |
+| macOS | Security.framework | Build, tests, packaged application, and GUI smoke test |
+| Windows 10+ | CryptoAPI | Windows x64 build, tests, package, and GUI smoke test on Windows 11 ARM64 under x64 emulation |
+| Linux | OpenSSL 1.1.1+ | Linux ARM64 build, tests, package, and GUI smoke test on Ubuntu ARM64 |
+
+The Windows result is not a native ARM64 build. The Linux result does not yet
+cover x86-64, X11, and Wayland as separate test environments. Unsupported
+platforms use an explicit fail-closed validator boundary.
+
+## Build from source
+
+The platform scripts configure a release build, run the automated tests, and
+create a self-contained package under `dist/`.
 
 ### macOS
 
-Requirements: Xcode command-line tools, Homebrew, and Qt 6.11 or newer.
+Requirements: Xcode command-line tools, Homebrew, CMake, Ninja, and Qt
+WebEngine 6.11 or newer.
 
 ```sh
 brew install qtwebengine cmake ninja
@@ -42,34 +115,28 @@ brew install qtwebengine cmake ninja
 open dist/PanBrowser.app
 ```
 
-The script uses the `macdeployqt` recorded by CMake for the selected Qt build.
-Set `QT_ROOT` when using a standalone Qt installation.
-
-The script creates a self-contained, ad-hoc signed application at
-`dist/PanBrowser.app`. Qt WebEngine makes the bundle approximately 300 MB.
+Set `QT_ROOT` when using a standalone Qt installation. The resulting
+application is ad-hoc signed for local testing; it is not notarized.
 
 ### Windows
 
-Run the packaging script with Qt 6.11 MSVC and CMake available. The default
-Ninja generator also requires Ninja and an x64 Visual Studio 2022 developer
-shell. Set `QT_ROOT` when Qt is not already discoverable:
+Use an x64 Visual Studio 2022 toolchain, CMake, and Qt 6.11 built for MSVC.
+From a developer shell:
 
 ```powershell
 $env:QT_ROOT = "C:\Qt\6.11.1\msvc2022_64"
 .\scripts\build-windows.ps1
 ```
 
-The default generator is Ninja. When using a normal Visual Studio installation
-instead of its developer shell, CMake can initialize MSVC through the Visual
-Studio generator:
+From a regular PowerShell session, let the Visual Studio generator initialize
+MSVC:
 
 ```powershell
 .\scripts\build-windows.ps1 -Generator "Visual Studio 17 2022"
 ```
 
-The repository can install its pinned minimal Qt SDK directly from Qt's
-official archives. This path requires 7-Zip and avoids the interactive Qt
-installer:
+The repository can download its pinned minimal Qt SDK from Qt's official
+archives. This requires 7-Zip and avoids the interactive Qt installer:
 
 ```powershell
 .\scripts\install-qt-windows.ps1 `
@@ -81,29 +148,10 @@ installer:
   -Architecture x64
 ```
 
-It produces `dist\PanBrowser-windows-x64.zip`. The archive includes the
-application, compiler runtime selected by Qt, plugins, `QtWebEngineProcess`,
-Chromium resources, and locales.
-
-Pass `-OptimizeBundle` to retain only the supported `en-US` and `ru` Chromium
-locale packs. Add `-KeepBaselineArchive` to also preserve the unmodified Qt
-deployment for comparison:
-
-```powershell
-.\scripts\build-windows.ps1 -OptimizeBundle -KeepBaselineArchive
-```
-
-The script writes JSON and Markdown bundle reports next to the archives. A
-manual **Windows bundle** workflow under GitHub Actions runs this comparison on
-a Windows runner and uploads both archives and their reports; no Windows build
-tools need to be installed on the developer workstation. The workflow downloads
-the pinned Qt 6.11.1 build from Qt's official repository, verifies each archive
-against its published checksum, and caches the extracted SDK between runs.
-
-The local x64 build, automated test suite, packaging path, and primary GUI were
-smoke-tested on Windows 11 ARM64 in VMware Fusion using Windows' x64 emulation.
-This confirms the x64 package in that environment; it is not a native ARM64
-build or a substitute for separate Windows 10 and native Windows 11 x64 tests.
+The output is `dist\PanBrowser-windows-x64.zip`. Add `-OptimizeBundle` to keep
+only the supported English and Russian Chromium locale packs. The manual
+[Windows bundle workflow](.github/workflows/windows-bundle.yml) performs the
+same build and uploads temporary CI artifacts without publishing a release.
 
 ### Linux
 
@@ -114,24 +162,17 @@ Ninja, and a C++20 compiler, then run:
 ./scripts/build-linux.sh
 ```
 
-Set `QT_ROOT=/path/to/Qt/6.11.0/gcc_64` if Qt is outside the normal CMake search
-path. The output is `dist/PanBrowser-linux-<architecture>.tar.gz`, containing a
-relocatable Qt deployment directory. Build and distribution packages should be
-created on the oldest supported Linux distribution because glibc remains a
-host compatibility boundary.
+If Qt is not in CMake's default search path:
 
-The ARM64 build, automated test suite, packaging path, packaged application
-startup, and primary GUI were smoke-tested on Ubuntu ARM64 in VMware Fusion.
-This confirms the `aarch64` package in that environment; it is not a substitute
-for Linux x86-64 or separate X11 and Wayland validation.
+```sh
+QT_ROOT=/path/to/Qt/6.11.1/gcc_64 ./scripts/build-linux.sh
+```
 
-The scripts use `build-linux`, `build-windows`, and `dist` by default. Override
-Linux paths with `PANBROWSER_BUILD_DIR` and `PANBROWSER_DIST_DIR`, or Windows
-paths with the `-BuildDir` and `-DistDir` parameters.
+The output is `dist/PanBrowser-linux-<architecture>.tar.gz`. Linux packages
+should be built on the oldest distribution they intend to support because
+glibc remains a host compatibility boundary.
 
-### Development build
-
-For a development build:
+### Development build and tests
 
 ```sh
 cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug
@@ -139,266 +180,15 @@ cmake --build build --parallel
 ctest --test-dir build --output-on-failure
 ```
 
-The Windows build evaluates configured anchors in temporary memory stores. It
-does not require administrator rights and does not modify the user or machine
-certificate stores.
+## Configure trust rules
 
-On Linux, install the Qt WebEngine development package for Qt 6.11 or newer,
-CMake, Ninja, a C++20 compiler, and the OpenSSL development package. The build
-uses OpenSSL's configured default CA file/directory for `system-plus-custom` and
-an in-memory store for configured anchors; it does not modify distro CA files.
-Custom recovery validation does not fetch CRLs or OCSP responses: Chromium-known
-revocations remain blocked, while otherwise unavailable status is soft-fail.
+Open **Settings → Trust Rules** to import CA certificates and manage rules. The
+editor validates the complete configuration, writes it atomically, and reloads
+the active policy. No administrator privileges are required, and PanBrowser
+does not modify the user or machine certificate stores.
 
-## Local data and profile
-
-PanBrowser stores its profile below the platform's per-user application-data
-directory. The exact application-data and cache paths are shown under
-**Settings → Diagnostics**. On macOS the data directory is
-`~/Library/Application Support/PanBrowser/`; its layout is:
-
-```text
-~/Library/Application Support/PanBrowser/
-├── WebEngine/
-├── session.json        # when tab restoration is enabled
-├── downloads.json      # download history
-├── history.sqlite      # browsing history and autocomplete data
-├── bookmarks.sqlite    # bookmarks and their autocomplete data
-├── web-apps.json       # installed web app metadata and icons
-├── search-engines.json # address-bar search configuration
-├── dns-settings.json   # secure DNS mode and custom providers
-├── proxy-settings.json # browser-wide proxy mode and endpoint (no password)
-├── rules.json
-└── Certificates/
-```
-
-On Unix-like systems PanBrowser restricts its application-data and cache
-directories to the current user. Session, history, bookmarks, downloads,
-installed-app metadata, and native preference files are also migrated to
-owner-only permissions when opened.
-
-Web content uses a dedicated disk-backed profile. Persistent cookies and site
-storage are kept under `WebEngine/Profile`. By default, session cookies are
-discarded when the application exits; they can be retained from Settings when
-the user explicitly chooses to keep sign-ins. The HTTP cache is isolated at
-the platform's per-user cache location (`~/Library/Caches/PanBrowser/WebEngine/`
-on macOS).
-
-## Browser behavior
-
-### Tabs and popup windows
-
-Tabs share that profile while keeping their own navigation history, loading
-progress, and TLS status. Press <kbd>⌘T</kbd> to open a tab and <kbd>⌘W</kbd> to
-close the current tab. User-initiated links that request a new tab are opened
-inside the same PanBrowser window. User-initiated requests for a separate
-window open a full PanBrowser window with visible URL and TLS status, even when
-the site asks for a chromeless dialog. Popup windows share cookies, cache,
-downloads, permissions, and trust rules with the primary window, but are not
-saved in the restored tab session. Automatic popups remain blocked.
-
-On macOS, normal browser and popup windows place the tab strip in the native
-title-bar area while retaining system window controls. Safe-area margins keep
-tabs clear of those controls, and the unused part of the strip can drag or
-maximize the window without interfering with tab reordering. Windows and Linux
-deliberately retain their normal system-decorated title bars; PanBrowser does
-not set expanded-client-area or frameless-window flags there. Installed web
-apps also retain a compact normal native title bar on every platform.
-
-### Installed web apps
-
-HTTPS pages with a same-origin web app manifest can be installed from the
-PanBrowser menu. Installed web apps open in focused windows without tabs or an
-address field, while retaining compact navigation controls and the
-browser-owned TLS status bar. They share the main PanBrowser profile, so
-sign-ins, permissions, downloads, and domain trust rules behave consistently.
-User-clicked HTTP/HTTPS links outside the manifest scope open in a normal
-PanBrowser tab. Automatic out-of-scope navigation is blocked, as are form
-submissions whose POST body cannot be transferred safely to a browser tab.
-Installed apps are listed under **Settings → Web Apps**, where they can be
-opened, removed, or have their system shortcut repaired. On macOS, installation
-also creates a small signed launcher application under
-`~/Applications/PanBrowser Apps`. Launchers reuse an existing PanBrowser
-process through a user-only local command channel, so every app continues to
-use the same browser profile. Removing an app also removes its managed
-shortcut, while keeping cookies and site data. Offline behavior depends on the
-service worker supplied by the website.
-
-The current web app implementation does not yet create Windows Start Menu
-shortcuts or Linux `.desktop` files, and it does not implement manifest share
-targets, protocol/file handlers, badges, or manifest-defined app shortcuts.
-
-### Address bar, search, history, and bookmarks
-
-The address bar opens explicit HTTP/HTTPS URLs, domains, IP addresses, and
-`localhost` directly. Other input is sent to the selected search engine only
-after Enter is pressed. Prefix a query with `?` to force a search, or use an
-engine keyword such as `@g qt webengine` or `@ddg certificate validation` for a
-one-off choice. Dotless intranet hosts must be entered with an explicit
-`http://` or `https://` prefix.
-
-The **Search** settings section selects the default engine and manages enabled
-engines. DuckDuckGo, Google, Bing, and Brave Search are included by default;
-custom engines use an HTTP or HTTPS URL template containing `{searchTerms}`
-exactly once. HTTP templates are allowed but expose search queries in transit.
-Search suggestions are deliberately not requested. Configuration is saved
-atomically in `search-engines.json`, with the previous version retained as
-`search-engines.json.backup`.
-
-Successful top-level HTTP and HTTPS visits are stored locally in
-`history.sqlite`. Failed loads, external schemes, and tabs loaded only as part
-of session restoration are not added. Credentials and URL fragments are
-removed before storage; query parameters are retained so pages can be reopened
-accurately. History is limited to the 50,000 most recent visits.
-
-Address-bar completion combines local bookmarks and history and never contacts
-a suggestion service. Match quality is ranked first; a bookmark wins when two
-results are equally relevant, while history results are otherwise ordered by
-the most recent visit with a small preference for manually entered and
-frequently visited addresses. Duplicate URLs are shown once. Use
-<kbd>↑</kbd>/<kbd>↓</kbd>, Enter, Escape, or the mouse to choose a result. When
-the best matching address begins with the text already entered, its remaining
-suffix is shown as a muted inline completion. Enter opens it; <kbd>Tab</kbd> or
-<kbd>→</kbd> accepts the suffix without navigating immediately.
-
-Use the star in the address bar or press <kbd>⌘D</kbd> to add, edit, or remove
-the current HTTP or HTTPS page. Open **PanBrowser → Bookmarks…** or press
-<kbd>⌥⌘B</kbd> to filter bookmarks, edit their names and URLs, remove selected
-items, clear the list, or open an item in the current or a new tab. Bookmark
-completion remains available when browsing-history collection is disabled.
-
-Press <kbd>⌘F</kbd> to search within the current page. The find bar reports the
-active match and total count; Enter or <kbd>⌘G</kbd> moves forward, while
-<kbd>⇧</kbd>+Enter or <kbd>⇧⌘G</kbd> moves backward. Matches wrap at the end of
-the page. Escape closes the bar and clears WebEngine's match highlights. When
-the bar remains open, switching tabs or finishing a new navigation reruns the
-same query on the current page.
-
-Open **PanBrowser → Settings… → History** to filter visits, view their local
-dates, remove selected entries, clear all history, or stop saving new history.
-Disabling history removes history results from address-bar completion but does
-not erase existing records or disable bookmark results. Clearing browsing
-history does not remove bookmarks, cookies, sign-ins, site data, downloads, or
-trust settings.
-
-### Startup, language, and privacy
-
-Open **PanBrowser → Settings…** or press <kbd>⌘,</kbd> to choose the start page,
-restore previous tabs, or retain session-cookie sign-ins. Restored background
-tabs are loaded only when selected. Tab URLs and titles are stored atomically in
-`session.json`; form contents, scroll position, and navigation history are not
-restored.
-
-The General page also offers **System default**, **English**, and **Русский**
-for the interface language. With no saved choice, PanBrowser follows the first
-supported system UI language and falls back to English. Language changes apply
-after restarting the application. Application and standard dialog translations
-are embedded in the executable, so release bundles do not depend on a separate
-Qt translation package.
-
-The **Privacy & Data** section can clear the HTTP cache or all cookies
-immediately. A full site-data reset is scheduled for the next launch so the
-WebEngine profile can be removed before Chromium opens it. This reset removes
-cookies, local storage, IndexedDB, service workers, and cache while preserving
-settings, trust rules, certificates, and saved tabs; a scheduled reset can be
-cancelled before restarting.
-
-### DNS and proxy
-
-The **DNS** section uses the operating-system resolver by default. It can
-instead configure DNS-over-HTTPS with system-DNS fallback or in strict mode.
-AdGuard DNS (default, unfiltered, and family protection), Cloudflare, Quad9,
-and Google Public DNS are included; custom providers accept one to four HTTPS
-server templates. DNS mode is browser-wide and applies to normal tabs, popup
-windows, and installed web apps without changing the operating-system DNS.
-Configuration is saved atomically in `dns-settings.json`, with the previous
-version retained as `dns-settings.json.backup`.
-
-The **Proxy** section uses the operating-system proxy by default. It can also
-disable proxy use or route browser traffic through one manually configured
-HTTP or SOCKS5 proxy. The HTTP option covers both HTTP traffic and HTTPS via
-CONNECT. Manual settings contain only proxy type, host, port, and an optional
-HTTP-proxy username. If HTTP proxy authentication is required, PanBrowser asks
-for the password when the proxy is first used and keeps it only for the current
-browser session. Chromium does not support SOCKS5 authentication, so SOCKS5
-servers must allow unauthenticated connections.
-Proxy changes take effect after restarting PanBrowser.
-
-Sites protected by HTTP Basic authentication open a browser-owned sign-in
-dialog showing the requesting origin and authentication realm. Credentials are
-passed only to Chromium for the current browser session and are not written to
-PanBrowser settings. A repeated challenge is shown as a failed attempt. Plain
-HTTP remains supported for intranet use, but the dialog warns that its username
-and password can be intercepted on an unencrypted connection. This mechanism is
-separate from login forms rendered by websites.
-Only the active tab may open this dialog, and cross-origin subresources cannot
-request credentials for a different site.
-
-Proxy mode is browser-wide: normal tabs, popup windows, installed web apps, and
-downloads share it. A failed manual proxy does not silently fall back to a
-direct connection. This feature is not a VPN and does not configure other
-applications; protocols that do not use Chromium's HTTP proxy path, including
-some WebRTC traffic, are outside its guarantee. PAC and platform-specific
-automatic configuration can be inherited in **System proxy** mode, but custom
-PAC URLs and per-domain routing are not yet exposed by PanBrowser.
-Configuration is saved atomically in `proxy-settings.json`, with the previous
-version retained as `proxy-settings.json.backup`.
-If an existing proxy configuration cannot be loaded, PanBrowser blocks all
-WebEngine network requests instead of falling back to a direct or system
-connection. The configuration can then be repaired in Settings and applied by
-restarting the browser.
-
-### Downloads, permissions, and external links
-
-Downloads always use a system destination picker and never open files
-automatically. The toolbar download button shows active progress and persistent
-history with pause, resume, cancel, open, and reveal actions. History stores the
-local path and source hostname, but not the complete source URL, and is limited
-to the 200 most recent records. Clearing history does not delete downloaded
-files. The reveal action is named **Show in Finder** on macOS, **Show in File
-Explorer** on Windows, and **Show in File Manager** on Linux.
-
-Camera, microphone, and location requests are shown in a browser-owned prompt
-only for the active tab on a secure HTTPS origin. Access is granted for the
-current request only and permission decisions are never stored. Requests from
-HTTP pages or background tabs are denied, as are notifications and unsupported
-sensitive permissions. macOS may show its own system prompt after PanBrowser's
-**Allow once** action.
-
-Links that leave the browser, such as `mailto:`, `tel:`, or application deep
-links, require an explicit confirmation that displays both the requesting site
-and destination. Only direct actions in the active tab can produce this prompt;
-scripted requests and background tabs are rejected. Local and executable
-schemes such as `file:` and `javascript:` are always blocked. PanBrowser passes
-an approved URL directly to the operating system without invoking a shell.
-
-### Trust settings and diagnostics
-
-Open **PanBrowser → Settings… → Trust Rules** to edit domain trust policy. The
-editor imports certificates into the application data directory, validates the
-complete configuration, saves it
-atomically, and reloads the active policy. The previous file is retained as
-`rules.json.backup`.
-
-The **Diagnostics** settings section shows the PanBrowser, Qt WebEngine, and
-Chromium versions; operating-system details; configured graphics and sandbox
-state; active DNS mode and provider; active and configured proxy modes; runtime
-overrides; and profile paths. It can copy a plain-text report for
-troubleshooting. Custom DNS endpoint URLs are
-not included because they may contain account-specific identifiers. Proxy
-hostnames and usernames are likewise omitted from the report. Exact
-active GPU and ANGLE/RHI backend information remains available through Qt
-WebEngine diagnostic logging.
-
-For advanced troubleshooting, use **PanBrowser → Show Configuration Folder**
-to reveal the files in the system file manager. After editing `rules.json`
-manually, select
-**PanBrowser → Reload Trust Rules** or press <kbd>⇧⌘R</kbd>.
-
-## Trust rules
-
-Place DER (`.cer`, `.der`) or PEM (`.pem`) CA certificates in the
-`Certificates` directory. Paths in `anchors` are relative to `rules.json`.
+Rules are stored in `rules.json`. Imported DER (`.cer`, `.der`) and PEM
+(`.pem`) certificates are stored in the adjacent `Certificates` directory.
 
 ```json
 {
@@ -409,61 +199,91 @@ Place DER (`.cer`, `.der`) or PEM (`.pem`) CA certificates in the
       "name": "Example service",
       "enabled": true,
       "domains": [
-        "example-service.ru",
-        "*.example-service.ru"
+        "example-service.test",
+        "*.example-service.test"
       ],
-      "mode": "custom-only",
+      "mode": "system-plus-custom",
       "anchors": [
-        "Certificates/russian-trusted-root-ca.cer"
+        "Certificates/example-root-ca.cer"
       ]
     }
   ]
 }
 ```
 
-For compatibility, version 1 trust files still contain `startPage`. PanBrowser
-imports it into the application preferences on first launch; the value selected
-in Settings is authoritative afterwards.
+`*.example.com` matches subdomains such as `www.example.com`, but not the base
+domain `example.com`; list the base separately when both are required. Broad
+public-suffix wildcards such as `*.com` are rejected. API, CDN, and other
+subresource hosts need their own matching entries.
 
-Modes:
+Version 1 files retain the legacy `startPage` field for compatibility. After
+its first import, the start page selected in Settings is authoritative.
 
-- `system-only`: use ordinary Chromium/system trust evaluation.
-- `system-plus-custom`: accept chains ending at either a system root or one of
-  the configured anchors.
-- `custom-only`: accept only chains ending at one of the configured anchors.
+## Security and privacy notes
 
-In the Qt implementation, custom validation runs when Chromium reports an
-unknown-CA error. Consequently, `custom-only` is exclusive for the recovery
-path, but it cannot reject a certificate that Chromium already accepted through
-its system roots. `system-plus-custom` is therefore the most accurate mode for
-this MVP; full exclusive pinning of otherwise valid Chromium connections
-requires a lower-level network hook.
+- Custom trust recovery is limited to unknown-CA errors. Hostname mismatch,
+  expiry, Chromium-known revocation, certificate transparency, and pinning
+  failures remain blocked.
+- History, bookmarks, address suggestions, downloads, and search-engine
+  settings are local. PanBrowser does not request online search suggestions.
+- HTTP Basic and proxy passwords are kept only for the current process and are
+  not written to PanBrowser settings or diagnostics.
+- Permission and external-application prompts require a direct action in the
+  active tab. Background and cross-origin authentication prompts are rejected.
+- Invalid trust or proxy configuration fails closed. Invalid DNS configuration
+  falls back to System DNS without overwriting the unreadable file.
+- DNS and proxy settings are browser-wide. PanBrowser is not a VPN, and some
+  WebRTC traffic may not use Chromium's HTTP proxy path.
+- Installed web apps currently share the main PanBrowser profile, including
+  cookies, permissions, proxy, DNS, and trust rules.
+- Custom recovery validation does not fetch CRLs or OCSP responses. Revocations
+  already known to Chromium remain blocked; otherwise unavailable status is a
+  soft failure.
 
-`*.example.com` matches subdomains such as `www.example.com`, but deliberately
-does not match the base domain `example.com`; list the base separately if it is
-needed. A wildcard like `*.com` is rejected.
+For the complete threat boundaries and maintenance invariants, read
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
-Rules are matched against the host of every TLS authentication challenge,
-including subresources. Add API or CDN hostnames explicitly. If configuration
-loading fails, PanBrowser loads no custom anchors and reports the error in its
-status bar.
+## Local data
 
-## Security boundary
+PanBrowser uses the platform's per-user application-data and cache locations.
+Open **Settings → Diagnostics** to see their exact paths. The profile contains
+WebEngine cookies and site data together with PanBrowser's session, download,
+history, bookmark, web-app, search, DNS, proxy, and trust configuration.
 
-PanBrowser only considers overriding Chromium's `CertificateAuthorityInvalid`
-error. All other errors—including hostname mismatch, expiration, revocation,
-certificate transparency, and pinning failures—are rejected. It then verifies
-the complete chain and hostname through the platform backend—Security.framework
-on macOS, CryptoAPI on Windows, or OpenSSL on Linux—before asking Qt to
-continue. No backend writes configured anchors to a system trust store. A
-matching hostname is never a blanket “ignore certificate errors” exception.
+On macOS, application data is stored under:
 
-Nevertheless, trusting a CA means that CA can issue certificates for every
-hostname covered by the rule. Keep rules narrow, obtain certificates from a
-verified source, and compare their SHA-256 fingerprints before use.
-
-## Tests
-
-```sh
-ctest --test-dir build --output-on-failure
+```text
+~/Library/Application Support/PanBrowser/
 ```
+
+PanBrowser never stores imported CA certificates in a system trust directory.
+On Unix-like systems, managed data directories and private files are restricted
+to the current user.
+
+## Documentation
+
+- [Architecture and security boundaries](docs/ARCHITECTURE.md)
+- [Bundle auditing and size policy](docs/BUNDLE_POLICY.md)
+- [Licensing and binary-distribution checklist](docs/LICENSING.md)
+- [Roadmap](ROADMAP.md)
+- [Third-party notices](THIRD_PARTY_NOTICES.md)
+
+## Feedback and contributing
+
+Focused bug reports and pull requests are welcome. Please include the operating
+system, Qt version, reproduction steps, and relevant output from **Settings →
+Diagnostics**. Changes to certificate handling, navigation policy, permissions,
+authentication, profile lifetime, or persisted data should preserve the
+invariants documented in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
+Do not include credentials, private certificate material, account-specific DNS
+templates, proxy endpoints, or complete private URLs in an issue.
+
+## License
+
+PanBrowser's original source code, documentation, translations, and build
+scripts are licensed under the [Apache License 2.0](LICENSE), copyright 2026
+Anton Rudakov. Third-party assets and runtime components remain under their
+respective licenses; see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+Qt, Chromium, and OpenSSL obligations for future binary packages are tracked
+separately in [docs/LICENSING.md](docs/LICENSING.md).
