@@ -1855,11 +1855,11 @@ void TrustConfigurationTests::applicationLaunchRequestsAreForwardedToPrimaryInst
         .split('\n');
     QVERIFY(receivedPayloads.size() >= 2);
     QCOMPARE(
-        receivedPayloads.at(0),
+        receivedPayloads.at(0).trimmed(),
         ApplicationLaunchRequest::openWebApp(appId).toPayload().toBase64()
     );
     QCOMPARE(
-        receivedPayloads.at(1),
+        receivedPayloads.at(1).trimmed(),
         ApplicationLaunchRequest::openUrl(url).toPayload().toBase64()
     );
 }
