@@ -26,6 +26,17 @@ QString uiText(const char *source)
     return QCoreApplication::translate("DownloadsPanel", source);
 }
 
+QString revealFileText()
+{
+#if defined(Q_OS_MACOS)
+    return uiText(QT_TRANSLATE_NOOP("DownloadsPanel", "Show in Finder"));
+#elif defined(Q_OS_WIN)
+    return uiText(QT_TRANSLATE_NOOP("DownloadsPanel", "Show in File Explorer"));
+#else
+    return uiText(QT_TRANSLATE_NOOP("DownloadsPanel", "Show in File Manager"));
+#endif
+}
+
 bool isActive(DownloadStatus status)
 {
     return status == DownloadStatus::InProgress || status == DownloadStatus::Paused;
@@ -174,7 +185,7 @@ public:
             && QFileInfo::exists(record.filePath);
         m_primary->setText(uiText(QT_TRANSLATE_NOOP("DownloadsPanel", "Open")));
         m_primary->setVisible(completedFile);
-        m_secondary->setText(uiText(QT_TRANSLATE_NOOP("DownloadsPanel", "Show in Finder")));
+        m_secondary->setText(revealFileText());
         m_secondary->setVisible(completedFile);
         m_remove->show();
     }
