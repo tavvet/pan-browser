@@ -13,6 +13,8 @@ branch; unfinished experiments kept on other branches remain unchecked here.
 - [x] Movable browser tabs with per-tab navigation and TLS status.
 - [x] Integrated native title-bar tab strip on macOS with a safe decorated-window
   fallback on other platforms and installed web apps.
+- [x] Native decorated windows and an overflow application menu on Windows and
+  Linux, without expanded-client-area or frameless-window flags.
 - [x] Unified settings window with General and Trust Rules sections.
 - [x] Configurable start page and startup behavior.
 - [x] Optional session-cookie and tab restoration with lazy background tabs.
@@ -46,9 +48,12 @@ branch; unfinished experiments kept on other branches remain unchecked here.
 - [x] Linux certificate validator with an explicit OpenSSL trust backend.
 - [ ] Freshness-checked revocation cache for custom trust anchors.
 - [x] Platform-specific build and packaging scripts.
+- [x] Windows x64 build, automated tests, packaging, and GUI smoke test on
+  Windows 11 ARM64 under x64 emulation.
 - [ ] Windows Start Menu and Linux `.desktop` launchers for installed web apps.
-- [ ] Validate and polish the experimental integrated title bar on Windows
-  10/11, including caption controls, drag/Snap, and mixed-DPI displays.
+- [ ] Run native Windows 11 x64 and Windows 10 smoke tests outside emulation.
+- [ ] Run Linux package and GUI smoke tests on representative X11 and Wayland
+  desktops.
 
 ## Packaging and maintenance
 

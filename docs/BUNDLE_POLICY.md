@@ -93,5 +93,11 @@ files selected by Qt's deployment tooling. The installer also writes Qt's
 standard relocatable `bin/qt.conf`; qmake-specific patches and IDE shortcuts
 from the interactive Qt installer are unnecessary for the CMake build.
 
+The same packaging entry point was locally validated in August 2026 in a
+Windows 11 ARM64 VMware Fusion guest with the x64 MSVC/Qt toolchain running
+under Windows emulation. The build, tests, deployment, and packaged application
+startup completed successfully. This does not establish native ARM64 support;
+the package and pinned SDK remain `msvc2022_64`/x64.
+
 Changing the Qt version, architecture, deployment options, locale allowlist,
 or GitHub Action revisions requires inspection of a fresh baseline report.

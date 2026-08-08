@@ -25,6 +25,10 @@ Keyboard shortcuts below use macOS notation. Qt maps standard shortcuts to
 their platform equivalents, normally <kbd>Ctrl</kbd> instead of
 <kbd>Command</kbd> on Windows and Linux.
 
+Menu paths such as **PanBrowser → Settings…** refer to the system application
+menu on macOS and to the **⋮** overflow menu at the right of the navigation bar
+on Windows and Linux.
+
 ## Build and package
 
 ### macOS
@@ -59,6 +63,20 @@ Studio generator:
 .\scripts\build-windows.ps1 -Generator "Visual Studio 17 2022"
 ```
 
+The repository can install its pinned minimal Qt SDK directly from Qt's
+official archives. This path requires 7-Zip and avoids the interactive Qt
+installer:
+
+```powershell
+.\scripts\install-qt-windows.ps1 `
+  -Destination "$PWD\build-tools\Qt\6.11.1\msvc2022_64"
+
+.\scripts\build-windows.ps1 `
+  -QtRoot "$PWD\build-tools\Qt\6.11.1\msvc2022_64" `
+  -Generator "Visual Studio 17 2022" `
+  -Architecture x64
+```
+
 It produces `dist\PanBrowser-windows-x64.zip`. The archive includes the
 application, compiler runtime selected by Qt, plugins, `QtWebEngineProcess`,
 Chromium resources, and locales.
@@ -77,6 +95,11 @@ a Windows runner and uploads both archives and their reports; no Windows build
 tools need to be installed on the developer workstation. The workflow downloads
 the pinned Qt 6.11.1 build from Qt's official repository, verifies each archive
 against its published checksum, and caches the extracted SDK between runs.
+
+The local x64 build, automated test suite, packaging path, and primary GUI were
+smoke-tested on Windows 11 ARM64 in VMware Fusion using Windows' x64 emulation.
+This confirms the x64 package in that environment; it is not a native ARM64
+build or a substitute for separate Windows 10 and native Windows 11 x64 tests.
 
 ### Linux
 
@@ -163,11 +186,10 @@ saved in the restored tab session. Automatic popups remain blocked.
 On macOS, normal browser and popup windows place the tab strip in the native
 title-bar area while retaining system window controls. Safe-area margins keep
 tabs clear of those controls, and the unused part of the strip can drag or
-maximize the window without interfering with tab reordering. The equivalent
-Windows path is implemented but remains experimental until it has been tested
-against Windows 10/11 caption controls, Snap, and mixed-DPI displays. Installed
-web apps and platforms without reliable expanded-title-bar support retain a
-normal native title bar.
+maximize the window without interfering with tab reordering. Windows and Linux
+deliberately retain their normal system-decorated title bars; PanBrowser does
+not set expanded-client-area or frameless-window flags there. Installed web
+apps also retain a compact normal native title bar on every platform.
 
 ### Installed web apps
 
@@ -309,7 +331,8 @@ automatically. The toolbar download button shows active progress and persistent
 history with pause, resume, cancel, open, and reveal actions. History stores the
 local path and source hostname, but not the complete source URL, and is limited
 to the 200 most recent records. Clearing history does not delete downloaded
-files.
+files. The reveal action is named **Show in Finder** on macOS, **Show in File
+Explorer** on Windows, and **Show in File Manager** on Linux.
 
 Camera, microphone, and location requests are shown in a browser-owned prompt
 only for the active tab on a secure HTTPS origin. Access is granted for the

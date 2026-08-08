@@ -605,7 +605,9 @@ Files never open automatically. Pause, resume, cancel, open, and reveal are
 explicit user actions. Active records are saved on a short timer; terminal
 states are saved immediately. Records left active when PanBrowser shuts down or
 starts again are marked interrupted. Clearing download history does not delete
-files.
+files. Reveal text is selected at compile time for the native file manager:
+Finder on macOS, File Explorer on Windows, and a generic File Manager label on
+Linux. Every platform string has an explicit Russian translation.
 
 ## 11. Startup and shutdown sequence
 
@@ -676,6 +678,13 @@ These outputs are suitable for local and cross-machine testing. Public
 distribution still requires platform signing, a supported oldest Linux build
 host, license review, and the release work tracked in the roadmap.
 
+The x64 Windows path was locally validated in August 2026 inside a Windows 11
+ARM64 VMware Fusion guest using Windows' x64 emulation. The MSVC 2022 build,
+native-validator tests, packaging script, browser startup, settings UI,
+downloads UI, native decorated window, and overflow menu were exercised. This
+is evidence for the shipped x64 artifact in that environment, not a native
+ARM64 validation or complete Windows 10/11 hardware matrix.
+
 The Diagnostics settings page reports application, Qt WebEngine, Chromium,
 security-patch, graphics, sandbox, DNS mode/provider, proxy modes, runtime
 flags, and profile-path information. It infers forced overrides from arguments and
@@ -695,8 +704,8 @@ behavior; ghost completion; find-bar keyboard behavior; web-app manifest
 validation, scope enforcement, and registry persistence; DNS settings
 validation, persistence, and mode application; and native custom-anchor,
 hostname, and weak-key validation on Windows and Linux. Window-chrome tests
-verify that platform safe areas cannot reduce ordinary layout margins or cover
-system caption controls.
+verify the macOS safe-area calculations and verify that unsupported platforms
+do not receive expanded-client-area flags.
 
 The test target deliberately excludes `MainWindow` and a live WebEngine process,
 so signal wiring and visual state still need a short manual smoke test after
@@ -735,6 +744,8 @@ Before merging a change, verify the relevant invariants:
 - popup windows retain visible browser chrome and share the isolated profile;
 - integrated title bars retain native window controls and reserve their
   reported safe areas without intercepting tab interaction;
+- Windows and Linux retain native system decorations and never opt into the
+  macOS expanded-client-area path;
 - installed web apps cannot navigate their app window outside their validated
   HTTPS origin and scope;
 - web app manifests and icons remain size-bounded, and registry writes remain
