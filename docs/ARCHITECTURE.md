@@ -158,10 +158,15 @@ AppleEvent by restoring and activating the primary browser window.
 activates the browser, opens a validated HTTP(S) URL, or opens an installed app
 by its validated SHA-256 ID. `SingleInstanceCoordinator` exposes that contract
 over a bounded, user-only `QLocalServer`; a second process forwards its request
-and exits before opening the persistent WebEngine profile. Shortcut and URL
-launches can therefore reuse an already-running browser safely. Command-line
-options are parsed before this contract is created and are never interpreted as
-restorable tab URLs.
+and exits before opening the persistent WebEngine profile. The primary process
+acknowledges each valid request before dispatching it; the secondary process
+does not report success based only on a socket write, which prevents a Windows
+write-status race from retrying and dispatching the same request twice. Every
+payload carries a generated request ID, and the primary keeps a bounded set of
+recent IDs so a retry is acknowledged without being dispatched again. Shortcut
+and URL launches can therefore reuse an already-running browser safely.
+Command-line options are parsed before this contract is created and are never
+interpreted as restorable tab URLs.
 
 On macOS, `WebAppShortcutManager` creates signed launcher bundles below
 `~/Applications/PanBrowser Apps`. Each bundle contains a small shared Mach-O

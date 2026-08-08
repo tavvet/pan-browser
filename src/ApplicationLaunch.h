@@ -3,6 +3,8 @@
 #include <QByteArray>
 #include <QLockFile>
 #include <QObject>
+#include <QQueue>
+#include <QSet>
 #include <QString>
 #include <QUrl>
 
@@ -19,6 +21,7 @@ struct ApplicationLaunchRequest {
     };
 
     Command command = Command::Activate;
+    QString requestId;
     QString webAppId;
     QUrl url;
 
@@ -63,4 +66,6 @@ private:
     QString m_serverName;
     QLockFile m_instanceLock;
     QLocalServer *m_server = nullptr;
+    QQueue<QString> m_recentRequestIds;
+    QSet<QString> m_recentRequestIdSet;
 };
