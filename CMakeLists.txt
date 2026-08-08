@@ -216,6 +216,9 @@ endif()
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     find_package(OpenSSL 1.1.1 REQUIRED COMPONENTS Crypto)
     target_link_libraries(PanBrowser PRIVATE OpenSSL::Crypto)
+    set_target_properties(PanBrowser PROPERTIES
+        INSTALL_RPATH "$ORIGIN/../${CMAKE_INSTALL_LIBDIR}"
+    )
 endif()
 
 if(WIN32 OR CMAKE_SYSTEM_NAME STREQUAL "Linux")

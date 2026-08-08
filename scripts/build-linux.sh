@@ -10,7 +10,7 @@ package_name="PanBrowser-linux-$architecture"
 package_dir="$dist_dir/$package_name"
 archive="$dist_dir/$package_name.tar.gz"
 
-for command_name in cmake ctest ninja; do
+for command_name in cmake ctest ldd ninja; do
     if ! command -v "$command_name" >/dev/null 2>&1; then
         echo "Required command not found: $command_name" >&2
         exit 1
@@ -54,6 +54,13 @@ fi
 if ! find "$package_dir" -type f -path '*/qtwebengine_locales/*.pak' -print -quit \
     | grep -q .; then
     echo "Deployment is missing Qt WebEngine locales" >&2
+    exit 1
+fi
+
+dependency_report="$(ldd "$executable")"
+if [[ "$dependency_report" == *"not found"* ]]; then
+    echo "Deployment has unresolved runtime dependencies:" >&2
+    echo "$dependency_report" >&2
     exit 1
 fi
 
