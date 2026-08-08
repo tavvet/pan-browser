@@ -233,6 +233,20 @@ if(WIN32 OR CMAKE_SYSTEM_NAME STREQUAL "Linux")
 endif()
 
 enable_testing()
+qt_add_executable(PanBrowserLaunchClient
+    tests/ApplicationLaunchClient.cpp
+    src/ApplicationLaunch.cpp
+    src/ApplicationLaunch.h
+)
+if(WIN32)
+    set_target_properties(PanBrowserLaunchClient PROPERTIES WIN32_EXECUTABLE FALSE)
+endif()
+target_include_directories(PanBrowserLaunchClient PRIVATE src)
+target_link_libraries(PanBrowserLaunchClient PRIVATE
+    Qt6::Core
+    Qt6::Network
+)
+
 qt_add_executable(PanBrowserTests
     src/ApplicationLaunch.cpp
     src/ApplicationLaunch.h
@@ -284,6 +298,7 @@ qt_add_executable(PanBrowserTests
     src/WindowChrome.cpp
     src/WindowChrome.h
     src/WindowChromePlatform.h
+    src/resources.qrc
 )
 if(WIN32)
     set_target_properties(PanBrowserTests PROPERTIES WIN32_EXECUTABLE FALSE)
@@ -297,6 +312,7 @@ target_link_libraries(PanBrowserTests PRIVATE
     Qt6::WebEngineCore
     Qt6::Widgets
 )
+add_dependencies(PanBrowserTests PanBrowserLaunchClient)
 
 if(APPLE)
     target_sources(PanBrowserTests PRIVATE src/WindowChromeMac.mm)

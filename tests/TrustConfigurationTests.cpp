@@ -35,6 +35,7 @@
 #include <QNetworkProxy>
 #include <QNetworkProxyFactory>
 #include <QPlatformSurfaceEvent>
+#include <QProcess>
 #include <QSignalSpy>
 #include <QSettings>
 #include <QTemporaryDir>
@@ -43,9 +44,6 @@
 #include <QTranslator>
 #include <QUuid>
 #include <QWindow>
-
-#include <chrono>
-#include <future>
 
 class TrustConfigurationTests final : public QObject {
     Q_OBJECT
@@ -1813,23 +1811,30 @@ void TrustConfigurationTests::applicationLaunchRequestsAreForwardedToPrimaryInst
     QVERIFY2(error.isEmpty(), qPrintable(error));
 
     QSignalSpy requestSpy(&primary, &SingleInstanceCoordinator::launchRequested);
+    QString launchClientPath = QDir(QCoreApplication::applicationDirPath()).filePath(
+        QStringLiteral("PanBrowserLaunchClient")
+    );
+#if defined(Q_OS_WIN)
+    launchClientPath += QStringLiteral(".exe");
+#endif
+    QVERIFY2(QFileInfo::exists(launchClientPath), qPrintable(launchClientPath));
+
     const QString appId(64, QLatin1Char('c'));
-    auto webAppFuture = std::async(std::launch::async, [serverName, appId] {
-        SingleInstanceCoordinator secondary(serverName);
-        QString secondaryError;
-        const SingleInstanceCoordinator::StartResult result = secondary.start(
-            ApplicationLaunchRequest::openWebApp(appId),
-            &secondaryError
-        );
-        return qMakePair(result, secondaryError);
-    });
+    QProcess webAppClient;
+    webAppClient.start(
+        launchClientPath,
+        {serverName, QStringLiteral("open-web-app"), appId}
+    );
+    QVERIFY2(webAppClient.waitForStarted(3000), qPrintable(webAppClient.errorString()));
     QTRY_VERIFY_WITH_TIMEOUT(
-        webAppFuture.wait_for(std::chrono::milliseconds(0)) == std::future_status::ready,
+        webAppClient.state() == QProcess::NotRunning,
         5000
     );
-    const auto webAppResult = webAppFuture.get();
-    QCOMPARE(webAppResult.first, SingleInstanceCoordinator::StartResult::Forwarded);
-    QVERIFY2(webAppResult.second.isEmpty(), qPrintable(webAppResult.second));
+    const QByteArray webAppClientError = webAppClient.readAllStandardError();
+    QVERIFY2(
+        webAppClient.exitStatus() == QProcess::NormalExit && webAppClient.exitCode() == 0,
+        webAppClientError.constData()
+    );
     QTRY_COMPARE(requestSpy.count(), 1);
     const ApplicationLaunchRequest request =
         qvariant_cast<ApplicationLaunchRequest>(requestSpy.takeFirst().at(0));
@@ -1837,22 +1842,21 @@ void TrustConfigurationTests::applicationLaunchRequestsAreForwardedToPrimaryInst
     QCOMPARE(request.webAppId, appId);
 
     const QUrl url(QStringLiteral("https://example.com/from-secondary"));
-    auto urlFuture = std::async(std::launch::async, [serverName, url] {
-        SingleInstanceCoordinator secondary(serverName);
-        QString secondaryError;
-        const SingleInstanceCoordinator::StartResult result = secondary.start(
-            ApplicationLaunchRequest::openUrl(url),
-            &secondaryError
-        );
-        return qMakePair(result, secondaryError);
-    });
+    QProcess urlClient;
+    urlClient.start(
+        launchClientPath,
+        {serverName, QStringLiteral("open-url"), url.toString(QUrl::FullyEncoded)}
+    );
+    QVERIFY2(urlClient.waitForStarted(3000), qPrintable(urlClient.errorString()));
     QTRY_VERIFY_WITH_TIMEOUT(
-        urlFuture.wait_for(std::chrono::milliseconds(0)) == std::future_status::ready,
+        urlClient.state() == QProcess::NotRunning,
         5000
     );
-    const auto urlResult = urlFuture.get();
-    QCOMPARE(urlResult.first, SingleInstanceCoordinator::StartResult::Forwarded);
-    QVERIFY2(urlResult.second.isEmpty(), qPrintable(urlResult.second));
+    const QByteArray urlClientError = urlClient.readAllStandardError();
+    QVERIFY2(
+        urlClient.exitStatus() == QProcess::NormalExit && urlClient.exitCode() == 0,
+        urlClientError.constData()
+    );
     QTRY_COMPARE(requestSpy.count(), 1);
     const ApplicationLaunchRequest urlRequest =
         qvariant_cast<ApplicationLaunchRequest>(requestSpy.takeFirst().at(0));
