@@ -520,7 +520,11 @@ void MainWindow::createInterface()
     );
     connect(m_bookmarkStore, &BookmarkStore::bookmarksChanged, this, &MainWindow::updateBookmarkAction);
 
+#if defined(Q_OS_MACOS)
     QMenu *fileMenu = menuBar()->addMenu(tr("PanBrowser"));
+#else
+    auto *fileMenu = new QMenu(tr("PanBrowser"), this);
+#endif
     QAction *newTabAction = fileMenu->addAction(
         QIcon(QStringLiteral(":/assets/icons/plus.svg")),
         tr("New Tab")
@@ -617,6 +621,20 @@ void MainWindow::createInterface()
             QFileInfo(m_configurationPath).absolutePath()
         ));
     });
+
+#if !defined(Q_OS_MACOS)
+    auto *mainMenuButton = new QToolButton(toolbar);
+    mainMenuButton->setObjectName(QStringLiteral("mainMenuButton"));
+    mainMenuButton->setIcon(
+        QIcon(QStringLiteral(":/assets/icons/ellipsis-vertical.svg"))
+    );
+    mainMenuButton->setToolTip(fileMenu->title());
+    mainMenuButton->setAccessibleName(fileMenu->title());
+    mainMenuButton->setFocusPolicy(Qt::NoFocus);
+    mainMenuButton->setPopupMode(QToolButton::InstantPopup);
+    mainMenuButton->setMenu(fileMenu);
+    toolbar->addWidget(mainMenuButton);
+#endif
 
     m_trustStatus = new QLabel(tr("Ready"), this);
     m_trustStatus->setObjectName(QStringLiteral("trustStatus"));

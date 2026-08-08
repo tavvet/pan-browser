@@ -206,6 +206,12 @@ title bar. Windows and Linux always retain ordinary system decorations: Windows
 uses its native non-client frame, while Linux leaves decoration policy to the
 active X11 or Wayland window manager.
 
+The application menu follows the same platform split. On macOS, Qt exposes the
+`PanBrowser` menu through the system menu bar. Windows and Linux do not create a
+`QMenuBar`; the same actions are attached to the compact overflow button at the
+right edge of the navigation toolbar, avoiding a second application-name row
+below the native window title.
+
 ## 4. TLS trust model
 
 ### 4.1 Normal path
