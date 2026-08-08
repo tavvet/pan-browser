@@ -23,7 +23,6 @@ class QStackedWidget;
 class QTabBar;
 class QTimer;
 class QToolBar;
-class QToolButton;
 class QMenu;
 class QAction;
 class BookmarkStore;
@@ -37,7 +36,6 @@ class PermissionController;
 class PermissionPrompt;
 class ProxyAuthenticationController;
 class QCloseEvent;
-class QEvent;
 class QWebEngineCertificateError;
 class QWebEngineNewWindowRequest;
 class QWebEngineView;
@@ -63,7 +61,6 @@ public:
     [[nodiscard]] bool launchInstalledWebApp(const QString &id);
 
 protected:
-    void changeEvent(QEvent *event) override;
     void closeEvent(QCloseEvent *event) override;
 
 private:
@@ -155,7 +152,6 @@ private:
     void restoreInitialTabs();
     void scheduleSessionSave();
     void saveSession();
-    void updateWindowCaptionControls();
     BrowserSession currentSession() const;
     void handleCertificateError(
         QWebEngineView *webView,
@@ -189,7 +185,6 @@ private:
     QPointer<QWebEngineView> m_externalUrlSource;
     QPointer<QWebEngineView> m_findView;
     QTabBar *m_tabBar = nullptr;
-    QToolButton *m_windowMaximizeButton = nullptr;
     QStackedWidget *m_tabStack = nullptr;
     AddressLineEdit *m_address = nullptr;
     QAction *m_backAction = nullptr;

@@ -66,34 +66,6 @@ QToolBar#tabsBar QToolButton#newTabButton:pressed {
     background: #343b47;
 }
 
-QToolBar#tabsBar QToolButton[windowCaptionButton="true"] {
-    min-width: 42px;
-    max-width: 42px;
-    min-height: 30px;
-    max-height: 30px;
-    margin-bottom: 1px;
-    background: transparent;
-    border: none;
-    border-radius: 5px;
-    padding: 0;
-}
-
-QToolBar#tabsBar QToolButton[windowCaptionButton="true"]:hover {
-    background: #343a45;
-}
-
-QToolBar#tabsBar QToolButton[windowCaptionButton="true"]:pressed {
-    background: #414957;
-}
-
-QToolBar#tabsBar QToolButton#windowCloseButton:hover {
-    background: #c42b1c;
-}
-
-QToolBar#tabsBar QToolButton#windowCloseButton:pressed {
-    background: #a52316;
-}
-
 QToolBar#navigationBar {
     background: #181b21;
     border: none;

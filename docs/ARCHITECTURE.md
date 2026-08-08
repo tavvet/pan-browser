@@ -178,20 +178,18 @@ separate explicit privacy action.
 
 ### 3.2 Window chrome
 
-Normal browser and popup windows use `WindowChromeController` on macOS and an
-experimental Windows path. Before the native window is created both request
-`Qt::ExpandedClientAreaHint` and `Qt::NoTitleBarBackgroundHint`.
-`Qt::WA_LayoutOnEntireRect` is required as well: without it, `QMainWindow`
-reserves the safe top margin and leaves the tab toolbar in a second row even
-though the native title bar is transparent.
+Normal browser and popup windows use `WindowChromeController` on macOS. Before
+the native window is created it requests `Qt::ExpandedClientAreaHint` and
+`Qt::NoTitleBarBackgroundHint`. `Qt::WA_LayoutOnEntireRect` is required as well:
+without it, `QMainWindow` reserves the safe top margin and leaves the tab toolbar
+in a second row even though the native title bar is transparent.
 
-macOS retains its native frame and window controls. Windows additionally uses
-`Qt::FramelessWindowHint`, because the expanded-client hints alone can leave a
-separate system caption above a QWidget toolbar. The tab layout then supplies
-client-side minimize, maximize/restore, and close buttons. Qt 6.11 retains the
-invisible resize border, shadow, window animations, and system-move Snap
-behavior for the frameless window. Windows caption behavior and mixed-DPI
-geometry remain explicit native-test targets before release.
+Windows deliberately uses the ordinary decorated-window fallback. Testing a
+Windows 11 on ARM guest with the emulated x64 Qt build showed that the
+expanded-client and frameless hints can leave the native caption in place,
+which would produce duplicate caption controls. A future Windows implementation
+must use and test a dedicated native non-client-area strategy rather than
+assuming the cross-platform flags were honored.
 
 After the platform window exists, the controller observes
 `QWindow::safeAreaMarginsChanged`. The macOS adapter also hides the native
@@ -733,7 +731,7 @@ Before merging a change, verify the relevant invariants:
 - external applications and sensitive permissions require browser-owned,
   active-tab user interaction;
 - popup windows retain visible browser chrome and share the isolated profile;
-- integrated title bars retain platform-appropriate window controls and reserve
+- integrated title bars retain native window controls and reserve their
   reported safe areas without intercepting tab interaction;
 - installed web apps cannot navigate their app window outside their validated
   HTTPS origin and scope;

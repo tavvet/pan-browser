@@ -29,7 +29,6 @@
 #include <QDesktopServices>
 #include <QDateTime>
 #include <QDir>
-#include <QEvent>
 #include <QFile>
 #include <QFileInfo>
 #include <QGuiApplication>
@@ -283,13 +282,6 @@ void MainWindow::closeEvent(QCloseEvent *event)
     QMainWindow::closeEvent(event);
 }
 
-void MainWindow::changeEvent(QEvent *event)
-{
-    QMainWindow::changeEvent(event);
-    if (event->type() == QEvent::WindowStateChange)
-        updateWindowCaptionControls();
-}
-
 void MainWindow::createInterface()
 {
     QFile themeFile(QStringLiteral(":/assets/theme.qss"));
@@ -343,41 +335,6 @@ void MainWindow::createInterface()
     newTabButton->setToolTip(tr("New Tab (⌘T)"));
     tabsLayout->addWidget(newTabButton, 0, Qt::AlignBottom);
     tabsLayout->addStretch(1);
-
-    if (WindowChromeController::platformUsesClientCaptionButtons()) {
-        auto *minimizeButton = new QToolButton(tabsContainer);
-        minimizeButton->setObjectName(QStringLiteral("windowMinimizeButton"));
-        minimizeButton->setProperty("windowCaptionButton", true);
-        minimizeButton->setIcon(style()->standardIcon(QStyle::SP_TitleBarMinButton));
-        minimizeButton->setToolTip(tr("Minimize"));
-        minimizeButton->setFocusPolicy(Qt::NoFocus);
-        tabsLayout->addWidget(minimizeButton, 0, Qt::AlignBottom);
-
-        m_windowMaximizeButton = new QToolButton(tabsContainer);
-        m_windowMaximizeButton->setObjectName(QStringLiteral("windowMaximizeButton"));
-        m_windowMaximizeButton->setProperty("windowCaptionButton", true);
-        m_windowMaximizeButton->setFocusPolicy(Qt::NoFocus);
-        tabsLayout->addWidget(m_windowMaximizeButton, 0, Qt::AlignBottom);
-
-        auto *closeButton = new QToolButton(tabsContainer);
-        closeButton->setObjectName(QStringLiteral("windowCloseButton"));
-        closeButton->setProperty("windowCaptionButton", true);
-        closeButton->setIcon(style()->standardIcon(QStyle::SP_TitleBarCloseButton));
-        closeButton->setToolTip(tr("Close"));
-        closeButton->setFocusPolicy(Qt::NoFocus);
-        tabsLayout->addWidget(closeButton, 0, Qt::AlignBottom);
-
-        connect(minimizeButton, &QToolButton::clicked, this, &QWidget::showMinimized);
-        connect(m_windowMaximizeButton, &QToolButton::clicked, this, [this] {
-            if (isMaximized())
-                showNormal();
-            else
-                showMaximized();
-        });
-        connect(closeButton, &QToolButton::clicked, this, &QWidget::close);
-        updateWindowCaptionControls();
-    }
-
     tabsToolbar->addWidget(tabsContainer);
 
     if (m_integratedWindowChrome) {
@@ -706,18 +663,6 @@ void MainWindow::createInterface()
         m_ruleCount->hide();
     }
 
-}
-
-void MainWindow::updateWindowCaptionControls()
-{
-    if (!m_windowMaximizeButton)
-        return;
-
-    const bool maximized = isMaximized();
-    m_windowMaximizeButton->setIcon(style()->standardIcon(
-        maximized ? QStyle::SP_TitleBarNormalButton : QStyle::SP_TitleBarMaxButton
-    ));
-    m_windowMaximizeButton->setToolTip(maximized ? tr("Restore") : tr("Maximize"));
 }
 
 MainWindow *MainWindow::createPopupWindow(
