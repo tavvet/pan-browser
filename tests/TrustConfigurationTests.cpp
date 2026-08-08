@@ -472,7 +472,7 @@ void TrustConfigurationTests::oversizedWindowFitsSmallerResolution()
 
 void TrustConfigurationTests::integratedChromePreservesBaseMarginsAndAvoidsSystemControls()
 {
-#if defined(Q_OS_MACOS) || defined(Q_OS_WIN)
+#if defined(Q_OS_MACOS)
     QVERIFY(WindowChromeController::platformSupportsIntegratedTitleBar());
     QWidget window;
     WindowChromeController::applyIntegratedTitleBar(&window);
@@ -482,6 +482,11 @@ void TrustConfigurationTests::integratedChromePreservesBaseMarginsAndAvoidsSyste
     QVERIFY(!window.testAttribute(Qt::WA_ContentsMarginsRespectsSafeArea));
 #else
     QVERIFY(!WindowChromeController::platformSupportsIntegratedTitleBar());
+    QWidget window;
+    WindowChromeController::applyIntegratedTitleBar(&window);
+    QVERIFY(!window.windowFlags().testFlag(Qt::ExpandedClientAreaHint));
+    QVERIFY(!window.windowFlags().testFlag(Qt::NoTitleBarBackgroundHint));
+    QVERIFY(!window.testAttribute(Qt::WA_LayoutOnEntireRect));
 #endif
 
     QCOMPARE(

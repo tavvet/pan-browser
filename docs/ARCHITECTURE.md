@@ -178,9 +178,8 @@ separate explicit privacy action.
 
 ### 3.2 Window chrome
 
-Normal browser and popup windows use `WindowChromeController` on macOS. The
-same Qt path is enabled experimentally on Windows pending native testing. Before
-the native window is created it requests
+Normal browser and popup windows use `WindowChromeController` only on macOS.
+Before the native window is created it requests
 `Qt::ExpandedClientAreaHint` and `Qt::NoTitleBarBackgroundHint`, allowing the
 existing tab toolbar to occupy the native title-bar area without replacing the
 system frame or window controls. `Qt::WA_LayoutOnEntireRect` is required as
@@ -203,8 +202,9 @@ new-tab button untouched. A double click on the same empty area toggles the
 maximized state. Surface-destruction events disconnect the native handle before
 queued geometry updates can run, and guarded pointers protect layouts owned by
 the toolbar during teardown. Installed web apps retain their compact native
-title bar, and Linux retains ordinary window-manager decorations as a reliable
-fallback for differing X11 and Wayland decoration policies.
+title bar. Windows and Linux always retain ordinary system decorations: Windows
+uses its native non-client frame, while Linux leaves decoration policy to the
+active X11 or Wayland window manager.
 
 ## 4. TLS trust model
 

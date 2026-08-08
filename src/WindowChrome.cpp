@@ -36,7 +36,7 @@ QMargins integratedChromeContentMargins(
 
 bool WindowChromeController::platformSupportsIntegratedTitleBar()
 {
-#if defined(Q_OS_MACOS) || defined(Q_OS_WIN)
+#if defined(Q_OS_MACOS)
     return true;
 #else
     return false;
