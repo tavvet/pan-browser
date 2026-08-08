@@ -10,27 +10,12 @@
 #include <QRegularExpression>
 #include <QStandardPaths>
 #include <QThread>
-#include <QUuid>
 
 #include <utility>
 
 namespace {
 
 constexpr qsizetype maximumLaunchPayloadBytes = 4096;
-constexpr qsizetype maximumRememberedLaunchRequests = 128;
-const QByteArray launchAcknowledgement = QByteArrayLiteral("OK\n");
-
-QString newRequestId()
-{
-    return QUuid::createUuid().toString(QUuid::WithoutBraces);
-}
-
-bool isValidRequestId(const QString &id)
-{
-    const QUuid uuid(id);
-    return !uuid.isNull()
-        && uuid.toString(QUuid::WithoutBraces).compare(id, Qt::CaseInsensitive) == 0;
-}
 
 bool isValidWebAppId(const QString &id)
 {
@@ -73,16 +58,13 @@ QString lockFilePath(const QString &serverName)
 
 ApplicationLaunchRequest ApplicationLaunchRequest::activate()
 {
-    ApplicationLaunchRequest request;
-    request.requestId = newRequestId();
-    return request;
+    return ApplicationLaunchRequest();
 }
 
 ApplicationLaunchRequest ApplicationLaunchRequest::openWebApp(const QString &id)
 {
     ApplicationLaunchRequest request;
     request.command = Command::OpenWebApp;
-    request.requestId = newRequestId();
     request.webAppId = id;
     return request;
 }
@@ -91,15 +73,12 @@ ApplicationLaunchRequest ApplicationLaunchRequest::openUrl(const QUrl &url)
 {
     ApplicationLaunchRequest request;
     request.command = Command::OpenUrl;
-    request.requestId = newRequestId();
     request.url = url;
     return request;
 }
 
 bool ApplicationLaunchRequest::isValid() const
 {
-    if (!isValidRequestId(requestId))
-        return false;
     switch (command) {
     case Command::Activate:
         return webAppId.isEmpty() && url.isEmpty();
@@ -117,7 +96,6 @@ QByteArray ApplicationLaunchRequest::toPayload() const
         return QByteArray();
     QJsonObject object;
     object.insert(QStringLiteral("version"), 1);
-    object.insert(QStringLiteral("requestId"), requestId);
     QString commandName;
     switch (command) {
     case Command::Activate:
@@ -154,7 +132,6 @@ std::optional<ApplicationLaunchRequest> ApplicationLaunchRequest::fromPayload(
         return std::nullopt;
 
     ApplicationLaunchRequest request;
-    request.requestId = object.value(QStringLiteral("requestId")).toString();
     const QString command = object.value(QStringLiteral("command")).toString();
     if (command == QStringLiteral("activate")) {
         request.command = Command::Activate;
@@ -237,25 +214,14 @@ bool SingleInstanceCoordinator::forwardRequest(
         return false;
 
     QLocalSocket socket;
-    socket.connectToServer(m_serverName, QIODevice::ReadWrite);
+    socket.connectToServer(m_serverName, QIODevice::WriteOnly);
     if (!socket.waitForConnected(500))
         return false;
     const QByteArray message = payload + '\n';
     if (socket.write(message) != message.size())
         return false;
-    if (socket.bytesToWrite() > 0)
-        socket.waitForBytesWritten(1000);
-
-    QElapsedTimer acknowledgementTimer;
-    acknowledgementTimer.start();
-    while (!socket.canReadLine()) {
-        const int remaining = 1000 - static_cast<int>(acknowledgementTimer.elapsed());
-        if (remaining <= 0 || !socket.waitForReadyRead(remaining))
-            return false;
-    }
-    if (socket.readLine() != launchAcknowledgement)
+    if (socket.bytesToWrite() > 0 && !socket.waitForBytesWritten(1000))
         return false;
-
     socket.disconnectFromServer();
     return true;
 }
@@ -291,22 +257,7 @@ void SingleInstanceCoordinator::consumeSocket(QLocalSocket *socket)
     }
     const std::optional<ApplicationLaunchRequest> request =
         ApplicationLaunchRequest::fromPayload(buffer.left(newline));
-    if (request) {
-        const bool firstDelivery = !m_recentRequestIdSet.contains(request->requestId);
-        if (firstDelivery) {
-            m_recentRequestIds.enqueue(request->requestId);
-            m_recentRequestIdSet.insert(request->requestId);
-            if (m_recentRequestIds.size() > maximumRememberedLaunchRequests)
-                m_recentRequestIdSet.remove(m_recentRequestIds.dequeue());
-        }
-
-        if (socket->write(launchAcknowledgement) == launchAcknowledgement.size()) {
-            socket->flush();
-            if (socket->bytesToWrite() > 0)
-                socket->waitForBytesWritten(1000);
-        }
-        if (firstDelivery)
-            emit launchRequested(*request);
-    }
+    if (request)
+        emit launchRequested(*request);
     socket->disconnectFromServer();
 }

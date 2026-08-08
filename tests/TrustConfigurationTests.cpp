@@ -472,13 +472,12 @@ void TrustConfigurationTests::oversizedWindowFitsSmallerResolution()
 
 void TrustConfigurationTests::integratedChromePreservesBaseMarginsAndAvoidsSystemControls()
 {
-#if defined(Q_OS_MACOS)
+#if defined(Q_OS_MACOS) || defined(Q_OS_WIN)
     QVERIFY(WindowChromeController::platformSupportsIntegratedTitleBar());
     QWidget window;
     WindowChromeController::applyIntegratedTitleBar(&window);
     QVERIFY(window.windowFlags().testFlag(Qt::ExpandedClientAreaHint));
     QVERIFY(window.windowFlags().testFlag(Qt::NoTitleBarBackgroundHint));
-    QVERIFY(!window.windowFlags().testFlag(Qt::FramelessWindowHint));
     QVERIFY(window.testAttribute(Qt::WA_LayoutOnEntireRect));
     QVERIFY(!window.testAttribute(Qt::WA_ContentsMarginsRespectsSafeArea));
 #else
@@ -1769,7 +1768,6 @@ void TrustConfigurationTests::applicationLaunchRequestsAreValidatedAndRoundTrip(
         ApplicationLaunchRequest::fromPayload(activate.toPayload());
     QVERIFY(restoredActivate.has_value());
     QCOMPARE(restoredActivate->command, ApplicationLaunchRequest::Command::Activate);
-    QCOMPARE(restoredActivate->requestId, activate.requestId);
 
     const QString appId(64, QLatin1Char('a'));
     const ApplicationLaunchRequest open = ApplicationLaunchRequest::openWebApp(appId);
@@ -1778,7 +1776,6 @@ void TrustConfigurationTests::applicationLaunchRequestsAreValidatedAndRoundTrip(
         ApplicationLaunchRequest::fromPayload(open.toPayload());
     QVERIFY(restoredOpen.has_value());
     QCOMPARE(restoredOpen->command, ApplicationLaunchRequest::Command::OpenWebApp);
-    QCOMPARE(restoredOpen->requestId, open.requestId);
     QCOMPARE(restoredOpen->webAppId, appId);
 
     const QUrl url(QStringLiteral("https://example.com/account?section=cards"));
@@ -1788,7 +1785,6 @@ void TrustConfigurationTests::applicationLaunchRequestsAreValidatedAndRoundTrip(
         ApplicationLaunchRequest::fromPayload(openUrl.toPayload());
     QVERIFY(restoredUrl.has_value());
     QCOMPARE(restoredUrl->command, ApplicationLaunchRequest::Command::OpenUrl);
-    QCOMPARE(restoredUrl->requestId, openUrl.requestId);
     QCOMPARE(restoredUrl->url, url);
 
     QVERIFY(!ApplicationLaunchRequest::openWebApp(QStringLiteral("../unsafe")).isValid());
@@ -1822,17 +1818,10 @@ void TrustConfigurationTests::applicationLaunchRequestsAreForwardedToPrimaryInst
     QCOMPARE(server.readLine().trimmed(), QByteArrayLiteral("READY"));
 
     const QString appId(64, QLatin1Char('c'));
-    const QString webAppRequestId = QUuid::createUuid().toString(QUuid::WithoutBraces);
     QProcess webAppClient;
     webAppClient.start(
         launchClientPath,
-        {
-            QStringLiteral("client"),
-            serverName,
-            QStringLiteral("open-web-app"),
-            appId,
-            webAppRequestId,
-        }
+        {QStringLiteral("client"), serverName, QStringLiteral("open-web-app"), appId}
     );
     QVERIFY2(webAppClient.waitForStarted(3000), qPrintable(webAppClient.errorString()));
     QVERIFY2(webAppClient.waitForFinished(5000), qPrintable(webAppClient.errorString()));
@@ -1840,32 +1829,6 @@ void TrustConfigurationTests::applicationLaunchRequestsAreForwardedToPrimaryInst
     QVERIFY2(
         webAppClient.exitStatus() == QProcess::NormalExit && webAppClient.exitCode() == 0,
         webAppClientError.constData()
-    );
-
-    QProcess duplicateWebAppClient;
-    duplicateWebAppClient.start(
-        launchClientPath,
-        {
-            QStringLiteral("client"),
-            serverName,
-            QStringLiteral("open-web-app"),
-            appId,
-            webAppRequestId,
-        }
-    );
-    QVERIFY2(
-        duplicateWebAppClient.waitForStarted(3000),
-        qPrintable(duplicateWebAppClient.errorString())
-    );
-    QVERIFY2(
-        duplicateWebAppClient.waitForFinished(5000),
-        qPrintable(duplicateWebAppClient.errorString())
-    );
-    const QByteArray duplicateClientError = duplicateWebAppClient.readAllStandardError();
-    QVERIFY2(
-        duplicateWebAppClient.exitStatus() == QProcess::NormalExit
-            && duplicateWebAppClient.exitCode() == 0,
-        duplicateClientError.constData()
     );
 
     const QUrl url(QStringLiteral("https://example.com/from-secondary"));
@@ -1891,22 +1854,14 @@ void TrustConfigurationTests::applicationLaunchRequestsAreForwardedToPrimaryInst
     const QList<QByteArray> receivedPayloads = server.readAllStandardOutput()
         .split('\n');
     QVERIFY(receivedPayloads.size() >= 2);
-    const std::optional<ApplicationLaunchRequest> receivedWebApp =
-        ApplicationLaunchRequest::fromPayload(
-            QByteArray::fromBase64(receivedPayloads.at(0).trimmed())
-        );
-    const std::optional<ApplicationLaunchRequest> receivedUrl =
-        ApplicationLaunchRequest::fromPayload(
-            QByteArray::fromBase64(receivedPayloads.at(1).trimmed())
-        );
-    QVERIFY(receivedWebApp.has_value());
-    QVERIFY(receivedUrl.has_value());
-    QCOMPARE(receivedWebApp->command, ApplicationLaunchRequest::Command::OpenWebApp);
-    QCOMPARE(receivedWebApp->requestId, webAppRequestId);
-    QCOMPARE(receivedWebApp->webAppId, appId);
-    QCOMPARE(receivedUrl->command, ApplicationLaunchRequest::Command::OpenUrl);
-    QCOMPARE(receivedUrl->url, url);
-    QVERIFY(receivedWebApp->requestId != receivedUrl->requestId);
+    QCOMPARE(
+        receivedPayloads.at(0).trimmed(),
+        ApplicationLaunchRequest::openWebApp(appId).toPayload().toBase64()
+    );
+    QCOMPARE(
+        receivedPayloads.at(1).trimmed(),
+        ApplicationLaunchRequest::openUrl(url).toPayload().toBase64()
+    );
 }
 
 void TrustConfigurationTests::webAppManifestIsValidatedAndNormalized()

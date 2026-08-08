@@ -64,10 +64,9 @@ int main(int argc, char *argv[])
         return application.exec();
     }
 
-    if (mode != QStringLiteral("client")
-        || (arguments.size() != 5 && arguments.size() != 6)) {
+    if (mode != QStringLiteral("client") || arguments.size() != 5) {
         QTextStream(stderr)
-            << "Usage: PanBrowserLaunchClient client <server> <command> <value> [request-id]\n";
+            << "Usage: PanBrowserLaunchClient client <server> <command> <value>\n";
         return 2;
     }
 
@@ -81,8 +80,6 @@ int main(int argc, char *argv[])
         QTextStream(stderr) << "Unsupported launch command: " << command << '\n';
         return 2;
     }
-    if (arguments.size() == 6)
-        request.requestId = arguments.at(5);
 
     SingleInstanceCoordinator coordinator(arguments.at(2));
     QString error;

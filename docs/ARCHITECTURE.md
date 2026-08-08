@@ -158,15 +158,10 @@ AppleEvent by restoring and activating the primary browser window.
 activates the browser, opens a validated HTTP(S) URL, or opens an installed app
 by its validated SHA-256 ID. `SingleInstanceCoordinator` exposes that contract
 over a bounded, user-only `QLocalServer`; a second process forwards its request
-and exits before opening the persistent WebEngine profile. The primary process
-acknowledges each valid request before dispatching it; the secondary process
-does not report success based only on a socket write, which prevents a Windows
-write-status race from retrying and dispatching the same request twice. Every
-payload carries a generated request ID, and the primary keeps a bounded set of
-recent IDs so a retry is acknowledged without being dispatched again. Shortcut
-and URL launches can therefore reuse an already-running browser safely.
-Command-line options are parsed before this contract is created and are never
-interpreted as restorable tab URLs.
+and exits before opening the persistent WebEngine profile. Shortcut and URL
+launches can therefore reuse an already-running browser safely. Command-line
+options are parsed before this contract is created and are never interpreted as
+restorable tab URLs.
 
 On macOS, `WebAppShortcutManager` creates signed launcher bundles below
 `~/Applications/PanBrowser Apps`. Each bundle contains a small shared Mach-O
@@ -183,18 +178,14 @@ separate explicit privacy action.
 
 ### 3.2 Window chrome
 
-Normal browser and popup windows use `WindowChromeController` on macOS. Before
-the native window is created it requests `Qt::ExpandedClientAreaHint` and
-`Qt::NoTitleBarBackgroundHint`. `Qt::WA_LayoutOnEntireRect` is required as well:
-without it, `QMainWindow` reserves the safe top margin and leaves the tab toolbar
-in a second row even though the native title bar is transparent.
-
-Windows deliberately uses the ordinary decorated-window fallback. Testing a
-Windows 11 on ARM guest with the emulated x64 Qt build showed that the
-expanded-client and frameless hints can leave the native caption in place,
-which would produce duplicate caption controls. A future Windows implementation
-must use and test a dedicated native non-client-area strategy rather than
-assuming the cross-platform flags were honored.
+Normal browser and popup windows use `WindowChromeController` on macOS. The
+same Qt path is enabled experimentally on Windows pending native testing. Before
+the native window is created it requests
+`Qt::ExpandedClientAreaHint` and `Qt::NoTitleBarBackgroundHint`, allowing the
+existing tab toolbar to occupy the native title-bar area without replacing the
+system frame or window controls. `Qt::WA_LayoutOnEntireRect` is required as
+well: without it, `QMainWindow` reserves the safe top margin and leaves the tab
+toolbar in a second row even though the native title bar is transparent.
 
 After the platform window exists, the controller observes
 `QWindow::safeAreaMarginsChanged`. The macOS adapter also hides the native
