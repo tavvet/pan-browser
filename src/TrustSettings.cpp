@@ -1,5 +1,8 @@
 #include "TrustSettings.h"
 
+#include "PrivateData.h"
+#include "UrlSanitization.h"
+
 #include <QCoreApplication>
 #include <QDir>
 #include <QFile>
@@ -67,12 +70,15 @@ bool trustModeFromString(const QString &source, TrustMode *mode)
 
 bool TrustSettings::load(const QString &path, QString *error)
 {
+    if (!PrivateData::restrictFile(path, error))
+        return false;
     QFile file(path);
     if (!file.open(QIODevice::ReadOnly))
         return fail(error, QCoreApplication::translate("TrustSettings", "Cannot open %1: %2").arg(path, file.errorString()));
 
     QJsonParseError parseError;
     const QJsonDocument document = QJsonDocument::fromJson(file.readAll(), &parseError);
+    file.close();
     if (parseError.error != QJsonParseError::NoError || !document.isObject())
         return fail(error, QCoreApplication::translate("TrustSettings", "Invalid JSON: %1").arg(parseError.errorString()));
 
@@ -80,12 +86,12 @@ bool TrustSettings::load(const QString &path, QString *error)
     if (root.value(QStringLiteral("version")).toInt(-1) != 1)
         return fail(error, QCoreApplication::translate("TrustSettings", "Unsupported rules version"));
 
-    const QUrl startPage(root.value(QStringLiteral("startPage")).toString(
-        QStringLiteral("https://example.com")
+    const QUrl startPage = UrlSanitization::httpUrlForPersistence(QUrl(
+        root.value(QStringLiteral("startPage")).toString(
+            QStringLiteral("https://example.com")
+        )
     ));
-    if (!startPage.isValid()
-        || (startPage.scheme() != QStringLiteral("http")
-            && startPage.scheme() != QStringLiteral("https"))) {
+    if (!startPage.isValid()) {
         return fail(error, QCoreApplication::translate("TrustSettings", "Invalid startPage"));
     }
 
@@ -157,7 +163,10 @@ bool TrustSettings::save(const QString &path, QString *error) const
 
     QJsonObject root;
     root.insert(QStringLiteral("version"), 1);
-    root.insert(QStringLiteral("startPage"), m_startPage.toString());
+    root.insert(
+        QStringLiteral("startPage"),
+        UrlSanitization::httpUrlForPersistence(m_startPage).toString(QUrl::FullyEncoded)
+    );
     root.insert(QStringLiteral("rules"), jsonRules);
 
     if (QFile::exists(path)) {
@@ -166,6 +175,8 @@ bool TrustSettings::save(const QString &path, QString *error) const
             return fail(error, QCoreApplication::translate("TrustSettings", "Cannot replace backup %1").arg(backupPath));
         if (!QFile::copy(path, backupPath))
             return fail(error, QCoreApplication::translate("TrustSettings", "Cannot create backup %1").arg(backupPath));
+        if (!PrivateData::restrictFile(backupPath, error))
+            return false;
     }
 
     QSaveFile file(path);
@@ -177,14 +188,12 @@ bool TrustSettings::save(const QString &path, QString *error) const
         return fail(error, QCoreApplication::translate("TrustSettings", "Cannot write %1: %2").arg(path, file.errorString()));
     if (!file.commit())
         return fail(error, QCoreApplication::translate("TrustSettings", "Cannot commit %1: %2").arg(path, file.errorString()));
-    return true;
+    return PrivateData::restrictFile(path, error);
 }
 
 bool TrustSettings::validate(const QString &path, QString *error) const
 {
-    if (!m_startPage.isValid()
-        || (m_startPage.scheme() != QStringLiteral("http")
-            && m_startPage.scheme() != QStringLiteral("https"))) {
+    if (!UrlSanitization::httpUrlForPersistence(m_startPage).isValid()) {
         return fail(error, QCoreApplication::translate("TrustSettings", "Invalid start page"));
     }
 
@@ -254,7 +263,7 @@ QUrl TrustSettings::startPage() const
 
 void TrustSettings::setStartPage(const QUrl &startPage)
 {
-    m_startPage = startPage;
+    m_startPage = UrlSanitization::httpUrlForPersistence(startPage);
 }
 
 const QList<TrustRuleSettings> &TrustSettings::rules() const

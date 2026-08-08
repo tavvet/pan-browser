@@ -1,5 +1,7 @@
 #include "BookmarkStore.h"
 
+#include "PrivateData.h"
+
 #include <QCoreApplication>
 #include <QDir>
 #include <QFileInfo>
@@ -94,8 +96,8 @@ bool BookmarkStore::open(QString *error)
 {
     if (isOpen())
         return true;
-    if (!QDir().mkpath(QFileInfo(m_path).absolutePath()))
-        return fail(error, tr("Cannot create bookmarks directory"));
+    if (!PrivateData::ensureDirectory(QFileInfo(m_path).absolutePath(), error))
+        return false;
 
     m_database = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), m_connectionName);
     m_database.setDatabaseName(m_path);
@@ -105,6 +107,10 @@ bool BookmarkStore::open(QString *error)
             error,
             tr("Cannot open bookmarks: %1").arg(m_database.lastError().text())
         );
+    }
+    if (!PrivateData::restrictFile(m_path, error)) {
+        m_database.close();
+        return false;
     }
 
     QSqlQuery pragma(m_database);
@@ -125,6 +131,10 @@ bool BookmarkStore::open(QString *error)
         return fail(error, message);
     }
     if (!createSchema(error)) {
+        m_database.close();
+        return false;
+    }
+    if (!PrivateData::restrictDatabaseFiles(m_path, error)) {
         m_database.close();
         return false;
     }

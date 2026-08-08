@@ -1,8 +1,10 @@
 #include "BrowserProfile.h"
 
-#include <QCoreApplication>
 #include "BrowserDataCleanup.h"
+#include "PrivateData.h"
 
+#include <QCoreApplication>
+#include <QDebug>
 #include <QDir>
 #include <QSettings>
 #include <QStandardPaths>
@@ -75,8 +77,11 @@ BrowserProfile::BrowserProfile(
     const QString storagePath = profilePath();
     const QString cachePath = webEngineCachePath();
 
-    QDir().mkpath(storagePath);
-    QDir().mkpath(cachePath);
+    QString directoryError;
+    if (!PrivateData::ensureDirectory(storagePath, &directoryError))
+        qWarning().noquote() << "[PanBrowser profile]" << directoryError;
+    if (!PrivateData::ensureDirectory(cachePath, &directoryError))
+        qWarning().noquote() << "[PanBrowser cache]" << directoryError;
 
     setPersistentStoragePath(storagePath);
     setCachePath(cachePath);

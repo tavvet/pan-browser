@@ -17,8 +17,11 @@ enum class InterfaceLanguage {
 
 class BrowserPreferences {
 public:
-    static BrowserPreferences load(const QUrl &legacyStartPage = QUrl());
-    static InterfaceLanguage loadInterfaceLanguage();
+    static BrowserPreferences load(
+        const QUrl &legacyStartPage = QUrl(),
+        QString *error = nullptr
+    );
+    static InterfaceLanguage loadInterfaceLanguage(QString *error = nullptr);
     static InterfaceLanguage loadInterfaceLanguage(const QSettings &settings);
 
     bool save(QString *error = nullptr) const;

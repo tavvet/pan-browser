@@ -1,5 +1,7 @@
 #include "DownloadHistoryStore.h"
 
+#include "PrivateData.h"
+
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
@@ -73,6 +75,8 @@ QList<DownloadRecord> DownloadHistoryStore::load(QString *error) const
     QList<DownloadRecord> records;
     QFile file(m_path);
     if (!file.exists())
+        return records;
+    if (!PrivateData::restrictFile(m_path, error))
         return records;
     if (!file.open(QIODevice::ReadOnly)) {
         fail(error, QStringLiteral("Cannot open %1: %2").arg(m_path, file.errorString()));
@@ -156,8 +160,8 @@ bool DownloadHistoryStore::save(const QList<DownloadRecord> &records, QString *e
     root.insert(QStringLiteral("version"), 1);
     root.insert(QStringLiteral("downloads"), items);
 
-    if (!QDir().mkpath(QFileInfo(m_path).absolutePath()))
-        return fail(error, QStringLiteral("Cannot create download history directory"));
+    if (!PrivateData::ensureDirectory(QFileInfo(m_path).absolutePath(), error))
+        return false;
     QSaveFile file(m_path);
     if (!file.open(QIODevice::WriteOnly))
         return fail(error, QStringLiteral("Cannot write %1: %2").arg(m_path, file.errorString()));
@@ -166,7 +170,7 @@ bool DownloadHistoryStore::save(const QList<DownloadRecord> &records, QString *e
         return fail(error, QStringLiteral("Cannot write %1: %2").arg(m_path, file.errorString()));
     if (!file.commit())
         return fail(error, QStringLiteral("Cannot commit %1: %2").arg(m_path, file.errorString()));
-    return true;
+    return PrivateData::restrictFile(m_path, error);
 }
 
 bool DownloadHistoryStore::clear(QString *error) const

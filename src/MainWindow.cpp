@@ -15,6 +15,7 @@
 #include "AddressCompletionPopup.h"
 #include "PermissionController.h"
 #include "PermissionPrompt.h"
+#include "PrivateData.h"
 #include "ProxyAuthenticationController.h"
 #include "SettingsDialog.h"
 #include "WindowPlacement.h"
@@ -139,7 +140,12 @@ MainWindow::MainWindow(
         m_configurationPath = ensureConfiguration();
         QString bootstrapError;
         m_trustPolicy.load(m_configurationPath, &bootstrapError);
-        m_preferences = BrowserPreferences::load(m_trustPolicy.startPage());
+        m_preferences = BrowserPreferences::load(
+            m_trustPolicy.startPage(),
+            &m_startupError
+        );
+        if (!m_startupError.isEmpty())
+            return;
         initializeSearchSettings();
         initializeDnsSettings();
         initializeProxySettings();
@@ -258,6 +264,11 @@ MainWindow::~MainWindow()
     m_bookmarkStore = nullptr;
     m_webAppStore = nullptr;
     m_profile = nullptr;
+}
+
+QString MainWindow::startupError() const
+{
+    return m_startupError;
 }
 
 void MainWindow::closeEvent(QCloseEvent *event)
@@ -2185,10 +2196,20 @@ void MainWindow::restoreWindowPlacement()
 QString MainWindow::ensureConfiguration()
 {
     const QString directory = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
-    QDir().mkpath(QDir(directory).filePath(QStringLiteral("Certificates")));
+    QString permissionError;
+    if (!PrivateData::ensureDirectory(directory, &permissionError)
+        || !PrivateData::ensureDirectory(
+            QDir(directory).filePath(QStringLiteral("Certificates")),
+            &permissionError
+        )) {
+        qWarning().noquote() << "[PanBrowser configuration]" << permissionError;
+    }
     const QString path = QDir(directory).filePath(QStringLiteral("rules.json"));
-    if (QFile::exists(path))
+    if (QFile::exists(path)) {
+        if (!PrivateData::restrictFile(path, &permissionError))
+            qWarning().noquote() << "[PanBrowser configuration]" << permissionError;
         return path;
+    }
 
     QJsonObject root;
     root.insert(QStringLiteral("version"), 1);
@@ -2198,7 +2219,8 @@ QString MainWindow::ensureConfiguration()
     QSaveFile file(path);
     if (file.open(QIODevice::WriteOnly)) {
         file.write(QJsonDocument(root).toJson(QJsonDocument::Indented));
-        file.commit();
+        if (file.commit() && !PrivateData::restrictFile(path, &permissionError))
+            qWarning().noquote() << "[PanBrowser configuration]" << permissionError;
     }
     return path;
 }

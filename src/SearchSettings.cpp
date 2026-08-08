@@ -1,5 +1,7 @@
 #include "SearchSettings.h"
 
+#include "PrivateData.h"
+
 #include <QCoreApplication>
 #include <QFile>
 #include <QHostAddress>
@@ -146,6 +148,8 @@ SearchSettings SearchSettings::defaults()
 
 bool SearchSettings::load(const QString &path, QString *error)
 {
+    if (!PrivateData::restrictFile(path, error))
+        return false;
     QFile file(path);
     if (!file.open(QIODevice::ReadOnly))
         return fail(error, QCoreApplication::translate("SearchSettings", "Cannot open %1: %2").arg(path, file.errorString()));
@@ -212,6 +216,8 @@ bool SearchSettings::save(const QString &path, QString *error) const
             return fail(error, QCoreApplication::translate("SearchSettings", "Cannot replace backup %1").arg(backupPath));
         if (!QFile::copy(path, backupPath))
             return fail(error, QCoreApplication::translate("SearchSettings", "Cannot create backup %1").arg(backupPath));
+        if (!PrivateData::restrictFile(backupPath, error))
+            return false;
     }
 
     QSaveFile file(path);
@@ -222,7 +228,7 @@ bool SearchSettings::save(const QString &path, QString *error) const
         return fail(error, QCoreApplication::translate("SearchSettings", "Cannot write %1: %2").arg(path, file.errorString()));
     if (!file.commit())
         return fail(error, QCoreApplication::translate("SearchSettings", "Cannot commit %1: %2").arg(path, file.errorString()));
-    return true;
+    return PrivateData::restrictFile(path, error);
 }
 
 bool SearchSettings::validate(QString *error) const

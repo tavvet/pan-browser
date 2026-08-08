@@ -5,15 +5,41 @@ set -euo pipefail
 project_dir="$(cd "$(dirname "$0")/.." && pwd)"
 build_dir="$project_dir/build"
 destination="$project_dir/dist/PanBrowser.app"
+qt_root="${QT_ROOT:-}"
+
+cmake_arguments=(
+    -S "$project_dir"
+    -B "$build_dir"
+    -G Ninja
+    -DCMAKE_BUILD_TYPE=Release
+)
+if [[ -n "$qt_root" ]]; then
+    cmake_arguments+=("-DCMAKE_PREFIX_PATH=$qt_root")
+fi
 
 # macdeployqt mutates the generated bundle and installs a helper symlink.
 # Reusing that deployed bundle makes a later deployment recurse through itself.
 cmake -E remove_directory "$build_dir/PanBrowser.app"
-cmake -S "$project_dir" -B "$build_dir" -G Ninja -DCMAKE_BUILD_TYPE=Release
+cmake "${cmake_arguments[@]}"
+
+macdeployqt_path=""
+while IFS= read -r cache_line; do
+    case "$cache_line" in
+        MACDEPLOYQT_EXECUTABLE:FILEPATH=*)
+            macdeployqt_path="${cache_line#*=}"
+            break
+            ;;
+    esac
+done < "$build_dir/CMakeCache.txt"
+if [[ ! -x "$macdeployqt_path" ]]; then
+    echo "CMake did not select an executable macdeployqt: $macdeployqt_path" >&2
+    exit 1
+fi
+
 cmake --build "$build_dir" --parallel
 ctest --test-dir "$build_dir" --output-on-failure
 
-/opt/homebrew/opt/qtbase/bin/macdeployqt \
+"$macdeployqt_path" \
     "$build_dir/PanBrowser.app" \
     -always-overwrite \
     -codesign=-
@@ -23,7 +49,7 @@ helper_binary="$helper_contents/MacOS/QtWebEngineProcess"
 
 # Homebrew distributes Qt modules across formulae, so macdeployqt needs a
 # second pass to rewrite the nested Chromium helper's absolute dependencies.
-/opt/homebrew/opt/qtbase/bin/macdeployqt \
+"$macdeployqt_path" \
     "$build_dir/PanBrowser.app" \
     -always-overwrite \
     -codesign=- \

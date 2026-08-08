@@ -42,6 +42,9 @@ brew install qtwebengine cmake ninja
 open dist/PanBrowser.app
 ```
 
+The script uses the `macdeployqt` recorded by CMake for the selected Qt build.
+Set `QT_ROOT` when using a standalone Qt installation.
+
 The script creates a self-contained, ad-hoc signed application at
 `dist/PanBrowser.app`. Qt WebEngine makes the bundle approximately 300 MB.
 
@@ -168,6 +171,11 @@ directory. The exact application-data and cache paths are shown under
 ├── rules.json
 └── Certificates/
 ```
+
+On Unix-like systems PanBrowser restricts its application-data and cache
+directories to the current user. Session, history, bookmarks, downloads,
+installed-app metadata, and native preference files are also migrated to
+owner-only permissions when opened.
 
 Web content uses a dedicated disk-backed profile. Persistent cookies and site
 storage are kept under `WebEngine/Profile`. By default, session cookies are

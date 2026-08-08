@@ -25,6 +25,7 @@
 #include "WindowChrome.h"
 
 #include <QApplication>
+#include <QDir>
 #include <QFile>
 #include <QFileInfo>
 #include <QHBoxLayout>
@@ -64,6 +65,7 @@ private slots:
     void integratedChromePreservesBaseMarginsAndAvoidsSystemControls();
     void integratedChromeSurvivesSurfaceAndLayoutTeardown();
     void browserPreferencesValidateStartPage();
+    void privateDataFilesUseOwnerOnlyPermissions();
     void interfaceLanguagePreferenceRoundTrips();
     void interfaceLanguageSettingsParsing();
     void systemInterfaceLanguageUsesFirstSupportedLanguage();
@@ -312,7 +314,9 @@ void TrustConfigurationTests::settingsRoundTripAndCreateBackup()
     const QString path = directory.filePath(QStringLiteral("rules.json"));
 
     TrustSettings settings;
-    settings.setStartPage(QUrl(QStringLiteral("https://start.example")));
+    settings.setStartPage(QUrl(QStringLiteral(
+        "https://alice:secret@start.example/private"
+    )));
 
     TrustRuleSettings rule;
     rule.name = QStringLiteral("Example");
@@ -329,9 +333,35 @@ void TrustConfigurationTests::settingsRoundTripAndCreateBackup()
     QVERIFY2(settings.save(path, &error), qPrintable(error));
     QVERIFY(QFile::exists(path + QStringLiteral(".backup")));
 
+    QFile legacy(path);
+    QVERIFY(legacy.open(QIODevice::ReadWrite));
+    QByteArray legacyContents = legacy.readAll();
+    QVERIFY(legacyContents.contains("https://start.example/private"));
+    legacyContents.replace(
+        "https://start.example/private",
+        "https://alice:secret@start.example/private"
+    );
+    QVERIFY(legacy.resize(0));
+    QVERIFY(legacy.seek(0));
+    QCOMPARE(legacy.write(legacyContents), legacyContents.size());
+    legacy.close();
+
     TrustSettings loaded;
     QVERIFY2(loaded.load(path, &error), qPrintable(error));
-    QCOMPARE(loaded.startPage(), QUrl(QStringLiteral("https://start.example")));
+    QCOMPARE(
+        loaded.startPage(),
+        QUrl(QStringLiteral("https://start.example/private"))
+    );
+    TrustPolicy runtimePolicy;
+    QVERIFY2(runtimePolicy.load(path, &error), qPrintable(error));
+    QCOMPARE(
+        runtimePolicy.startPage(),
+        QUrl(QStringLiteral("https://start.example/private"))
+    );
+    QFile saved(path);
+    QVERIFY(saved.open(QIODevice::ReadOnly));
+    QVERIFY(!saved.readAll().contains("secret"));
+    saved.close();
     QCOMPARE(loaded.rules().size(), 1);
     QCOMPARE(loaded.rules().at(0).name, QStringLiteral("Renamed"));
     QCOMPARE(loaded.rules().at(0).domains, rule.domains);
@@ -561,6 +591,76 @@ void TrustConfigurationTests::browserPreferencesValidateStartPage()
 
     preferences.setStartPage(QUrl(QStringLiteral("https://example.com/start")));
     QVERIFY2(preferences.validate(&error), qPrintable(error));
+
+    preferences.setStartPage(QUrl(QStringLiteral(
+        "https://alice:secret@Example.COM/private#section"
+    )));
+    QVERIFY2(preferences.validate(&error), qPrintable(error));
+    QCOMPARE(
+        preferences.startPage(),
+        QUrl(QStringLiteral("https://example.com/private#section"))
+    );
+}
+
+void TrustConfigurationTests::privateDataFilesUseOwnerOnlyPermissions()
+{
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+    const QString privateDirectory = directory.filePath(QStringLiteral("private"));
+
+    QString error;
+    const QString sessionPath = QDir(privateDirectory).filePath(QStringLiteral("session.json"));
+    SessionStore sessionStore(sessionPath);
+    BrowserSession session;
+    session.tabs = {
+        {QUrl(QStringLiteral("https://example.com")), QStringLiteral("Example")},
+    };
+    QVERIFY2(sessionStore.save(session, &error), qPrintable(error));
+
+    const QString downloadsPath = QDir(privateDirectory).filePath(
+        QStringLiteral("downloads.json")
+    );
+    DownloadHistoryStore downloadStore(downloadsPath);
+    QVERIFY2(downloadStore.save({}, &error), qPrintable(error));
+
+    const QString historyPath = QDir(privateDirectory).filePath(
+        QStringLiteral("history.sqlite")
+    );
+    HistoryStore historyStore(historyPath);
+    QVERIFY2(historyStore.open(&error), qPrintable(error));
+
+    const QString bookmarksPath = QDir(privateDirectory).filePath(
+        QStringLiteral("bookmarks.sqlite")
+    );
+    BookmarkStore bookmarkStore(bookmarksPath);
+    QVERIFY2(bookmarkStore.open(&error), qPrintable(error));
+
+#if defined(Q_OS_UNIX)
+    const QFileDevice::Permissions publicPermissions = QFileDevice::ReadGroup
+        | QFileDevice::WriteGroup | QFileDevice::ExeGroup
+        | QFileDevice::ReadOther | QFileDevice::WriteOther | QFileDevice::ExeOther;
+    const auto isOwnerOnly = [publicPermissions](const QString &path) {
+        const QFileDevice::Permissions permissions = QFileInfo(path).permissions();
+        return permissions.testFlag(QFileDevice::ReadOwner)
+            && permissions.testFlag(QFileDevice::WriteOwner)
+            && (permissions & publicPermissions) == QFileDevice::Permissions();
+    };
+
+    QVERIFY(isOwnerOnly(privateDirectory));
+    QVERIFY(QFileInfo(privateDirectory).permissions().testFlag(QFileDevice::ExeOwner));
+    QVERIFY(isOwnerOnly(sessionPath));
+    QVERIFY(isOwnerOnly(downloadsPath));
+    QVERIFY(isOwnerOnly(historyPath));
+    QVERIFY(isOwnerOnly(bookmarksPath));
+    if (QFileInfo::exists(historyPath + QStringLiteral("-wal")))
+        QVERIFY(isOwnerOnly(historyPath + QStringLiteral("-wal")));
+    if (QFileInfo::exists(historyPath + QStringLiteral("-shm")))
+        QVERIFY(isOwnerOnly(historyPath + QStringLiteral("-shm")));
+    if (QFileInfo::exists(bookmarksPath + QStringLiteral("-wal")))
+        QVERIFY(isOwnerOnly(bookmarksPath + QStringLiteral("-wal")));
+    if (QFileInfo::exists(bookmarksPath + QStringLiteral("-shm")))
+        QVERIFY(isOwnerOnly(bookmarksPath + QStringLiteral("-shm")));
+#endif
 }
 
 void TrustConfigurationTests::interfaceLanguagePreferenceRoundTrips()
@@ -844,13 +944,13 @@ void TrustConfigurationTests::sessionRoundTripFiltersInvalidUrls()
 {
     QTemporaryDir directory;
     QVERIFY(directory.isValid());
-    const QString path = directory.filePath(QStringLiteral("session.json"));
+    const QString path = directory.filePath(QStringLiteral("private/session.json"));
     SessionStore store(path);
 
     BrowserSession source;
     source.activeIndex = 8;
     source.tabs = {
-        {QUrl(QStringLiteral("https://one.example/path")), QStringLiteral("One")},
+        {QUrl(QStringLiteral("https://alice:secret@one.example/path")), QStringLiteral("One")},
         {QUrl(QStringLiteral("file:///tmp/private")), QStringLiteral("Private")},
         {QUrl(QStringLiteral("http://two.example")), QStringLiteral("Two")},
     };
@@ -861,8 +961,32 @@ void TrustConfigurationTests::sessionRoundTripFiltersInvalidUrls()
     QVERIFY2(error.isEmpty(), qPrintable(error));
     QCOMPARE(restored.tabs.size(), 2);
     QCOMPARE(restored.tabs.at(0).title, QStringLiteral("One"));
+    QCOMPARE(restored.tabs.at(0).url, QUrl(QStringLiteral("https://one.example/path")));
     QCOMPARE(restored.tabs.at(1).url, QUrl(QStringLiteral("http://two.example")));
     QCOMPARE(restored.activeIndex, 1);
+
+    QFile saved(path);
+    QVERIFY(saved.open(QIODevice::ReadOnly));
+    QVERIFY(!saved.readAll().contains("secret"));
+    saved.close();
+
+    QFile legacy(path);
+    QVERIFY(legacy.open(QIODevice::WriteOnly | QIODevice::Truncate));
+    const QByteArray legacyContents = QByteArrayLiteral(
+        R"json({"version":1,"activeIndex":0,"tabs":[{"url":"https://bob:legacy-secret@legacy.example/path","title":"Legacy"}]})json"
+    );
+    QCOMPARE(legacy.write(legacyContents), legacyContents.size());
+    legacy.close();
+
+    const BrowserSession migrated = store.load(&error);
+    QVERIFY2(error.isEmpty(), qPrintable(error));
+    QCOMPARE(migrated.tabs.size(), 1);
+    QCOMPARE(
+        migrated.tabs.constFirst().url,
+        QUrl(QStringLiteral("https://legacy.example/path"))
+    );
+    QVERIFY(saved.open(QIODevice::ReadOnly));
+    QVERIFY(!saved.readAll().contains("legacy-secret"));
 }
 
 void TrustConfigurationTests::invalidSessionFileFailsClosed()

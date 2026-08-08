@@ -59,6 +59,7 @@ public:
     void activatePrimaryWindow();
     void openUrlInPrimaryWindow(const QUrl &url);
     [[nodiscard]] bool launchInstalledWebApp(const QString &id);
+    [[nodiscard]] QString startupError() const;
 
 protected:
     void closeEvent(QCloseEvent *event) override;
@@ -217,6 +218,7 @@ private:
     QString m_proxyConfigurationError;
     QString m_historyError;
     QString m_bookmarkError;
+    QString m_startupError;
     MainWindow *m_primaryWindow = nullptr;
     WindowRole m_windowRole = WindowRole::Primary;
     WebApp m_webApp;

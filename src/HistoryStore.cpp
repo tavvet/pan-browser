@@ -1,6 +1,7 @@
 #include "HistoryStore.h"
 
 #include "AddressSuggestion.h"
+#include "PrivateData.h"
 
 #include <QDir>
 #include <QFileInfo>
@@ -85,14 +86,18 @@ bool HistoryStore::open(QString *error)
 {
     if (isOpen())
         return true;
-    if (!QDir().mkpath(QFileInfo(m_path).absolutePath()))
-        return fail(error, tr("Cannot create history directory"));
+    if (!PrivateData::ensureDirectory(QFileInfo(m_path).absolutePath(), error))
+        return false;
 
     m_database = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), m_connectionName);
     m_database.setDatabaseName(m_path);
     m_database.setConnectOptions(QStringLiteral("QSQLITE_BUSY_TIMEOUT=3000"));
     if (!m_database.open())
         return fail(error, tr("Cannot open history: %1").arg(m_database.lastError().text()));
+    if (!PrivateData::restrictFile(m_path, error)) {
+        m_database.close();
+        return false;
+    }
 
     QSqlQuery pragma(m_database);
     if (!pragma.exec(QStringLiteral("PRAGMA foreign_keys = ON"))) {
@@ -111,6 +116,10 @@ bool HistoryStore::open(QString *error)
         return fail(error, message);
     }
     if (!createSchema(error)) {
+        m_database.close();
+        return false;
+    }
+    if (!PrivateData::restrictDatabaseFiles(m_path, error)) {
         m_database.close();
         return false;
     }

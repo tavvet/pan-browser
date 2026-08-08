@@ -1,5 +1,8 @@
 #include "BrowserPreferences.h"
 
+#include "PrivateData.h"
+#include "UrlSanitization.h"
+
 #include <QSettings>
 #include <QCoreApplication>
 
@@ -13,14 +16,6 @@ bool fail(QString *error, const QString &message)
     if (error)
         *error = message;
     return false;
-}
-
-bool isHttpUrl(const QUrl &url)
-{
-    return url.isValid()
-        && !url.host().isEmpty()
-        && (url.scheme() == QStringLiteral("http")
-            || url.scheme() == QStringLiteral("https"));
 }
 
 InterfaceLanguage languageFromSetting(const QString &value)
@@ -47,20 +42,28 @@ QString languageSetting(InterfaceLanguage language)
 
 } // namespace
 
-BrowserPreferences BrowserPreferences::load(const QUrl &legacyStartPage)
+BrowserPreferences BrowserPreferences::load(const QUrl &legacyStartPage, QString *error)
 {
+    if (error)
+        error->clear();
     QSettings settings(QString::fromLatin1(organization), QString::fromLatin1(application));
     BrowserPreferences preferences;
 
     const QString startPageKey = QStringLiteral("Browser/startPage");
     if (!settings.contains(startPageKey)) {
-        if (isHttpUrl(legacyStartPage))
-            preferences.m_startPage = legacyStartPage;
+        const QUrl safeLegacyStartPage =
+            UrlSanitization::httpUrlForPersistence(legacyStartPage);
+        if (safeLegacyStartPage.isValid())
+            preferences.m_startPage = safeLegacyStartPage;
         settings.setValue(startPageKey, preferences.m_startPage.toString());
     } else {
         const QUrl configured(settings.value(startPageKey).toString());
-        if (isHttpUrl(configured))
-            preferences.m_startPage = configured;
+        const QUrl safeConfigured = UrlSanitization::httpUrlForPersistence(configured);
+        if (safeConfigured.isValid()) {
+            preferences.m_startPage = safeConfigured;
+            if (safeConfigured != configured)
+                settings.setValue(startPageKey, safeConfigured.toString(QUrl::FullyEncoded));
+        }
     }
 
     preferences.m_startupMode = settings.value(
@@ -77,15 +80,36 @@ BrowserPreferences BrowserPreferences::load(const QUrl &legacyStartPage)
         QStringLiteral("Browser/saveBrowsingHistory"),
         true
     ).toBool();
-    preferences.m_interfaceLanguage = loadInterfaceLanguage();
+    preferences.m_interfaceLanguage = loadInterfaceLanguage(settings);
     settings.sync();
+    if (settings.status() != QSettings::NoError) {
+        fail(error, QCoreApplication::translate(
+            "BrowserPreferences",
+            "Cannot read or migrate application settings"
+        ));
+        return BrowserPreferences();
+    }
+    if (!PrivateData::restrictFile(settings.fileName(), error))
+        return BrowserPreferences();
     return preferences;
 }
 
-InterfaceLanguage BrowserPreferences::loadInterfaceLanguage()
+InterfaceLanguage BrowserPreferences::loadInterfaceLanguage(QString *error)
 {
+    if (error)
+        error->clear();
     QSettings settings(QString::fromLatin1(organization), QString::fromLatin1(application));
-    return loadInterfaceLanguage(settings);
+    const InterfaceLanguage language = loadInterfaceLanguage(settings);
+    if (settings.status() != QSettings::NoError) {
+        fail(error, QCoreApplication::translate(
+            "BrowserPreferences",
+            "Cannot read application settings"
+        ));
+        return InterfaceLanguage::System;
+    }
+    if (!PrivateData::restrictFile(settings.fileName(), error))
+        return InterfaceLanguage::System;
+    return language;
 }
 
 InterfaceLanguage BrowserPreferences::loadInterfaceLanguage(const QSettings &settings)
@@ -101,8 +125,13 @@ bool BrowserPreferences::save(QString *error) const
     if (!validate(error))
         return false;
 
+    const QUrl safeStartPage = UrlSanitization::httpUrlForPersistence(m_startPage);
+
     QSettings settings(QString::fromLatin1(organization), QString::fromLatin1(application));
-    settings.setValue(QStringLiteral("Browser/startPage"), m_startPage.toString());
+    settings.setValue(
+        QStringLiteral("Browser/startPage"),
+        safeStartPage.toString(QUrl::FullyEncoded)
+    );
     settings.setValue(
         QStringLiteral("Browser/startupMode"),
         m_startupMode == StartupMode::RestoreTabs
@@ -118,12 +147,12 @@ bool BrowserPreferences::save(QString *error) const
             "BrowserPreferences",
             "Cannot write application settings"
         ));
-    return true;
+    return PrivateData::restrictFile(settings.fileName(), error);
 }
 
 bool BrowserPreferences::validate(QString *error) const
 {
-    if (!isHttpUrl(m_startPage))
+    if (!UrlSanitization::httpUrlForPersistence(m_startPage).isValid())
         return fail(error, QCoreApplication::translate(
             "BrowserPreferences",
             "Start page must be a valid HTTP or HTTPS URL"
@@ -138,7 +167,7 @@ QUrl BrowserPreferences::startPage() const
 
 void BrowserPreferences::setStartPage(const QUrl &startPage)
 {
-    m_startPage = startPage;
+    m_startPage = UrlSanitization::httpUrlForPersistence(startPage);
 }
 
 StartupMode BrowserPreferences::startupMode() const

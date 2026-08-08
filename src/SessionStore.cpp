@@ -1,5 +1,8 @@
 #include "SessionStore.h"
 
+#include "PrivateData.h"
+#include "UrlSanitization.h"
+
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
@@ -19,14 +22,6 @@ bool fail(QString *error, const QString &message)
     return false;
 }
 
-bool isRestorableUrl(const QUrl &url)
-{
-    return url.isValid()
-        && !url.host().isEmpty()
-        && (url.scheme() == QStringLiteral("http")
-            || url.scheme() == QStringLiteral("https"));
-}
-
 } // namespace
 
 SessionStore::SessionStore(QString path)
@@ -42,6 +37,8 @@ BrowserSession SessionStore::load(QString *error) const
     QFile file(m_path);
     if (!file.exists())
         return session;
+    if (!PrivateData::restrictFile(m_path, error))
+        return session;
     if (!file.open(QIODevice::ReadOnly)) {
         fail(error, QStringLiteral("Cannot open %1: %2").arg(m_path, file.errorString()));
         return session;
@@ -49,6 +46,7 @@ BrowserSession SessionStore::load(QString *error) const
 
     QJsonParseError parseError;
     const QJsonDocument document = QJsonDocument::fromJson(file.readAll(), &parseError);
+    file.close();
     if (parseError.error != QJsonParseError::NoError || !document.isObject()) {
         fail(error, QStringLiteral("Invalid session file: %1").arg(parseError.errorString()));
         return session;
@@ -61,13 +59,22 @@ BrowserSession SessionStore::load(QString *error) const
     }
 
     const QJsonArray tabs = root.value(QStringLiteral("tabs")).toArray();
+    bool requiresRewrite = false;
     for (const QJsonValue &value : tabs) {
-        if (session.tabs.size() >= maximumRestoredTabs)
-            break;
-        const QJsonObject object = value.toObject();
-        const QUrl url(object.value(QStringLiteral("url")).toString());
-        if (!isRestorableUrl(url))
+        if (session.tabs.size() >= maximumRestoredTabs) {
+            requiresRewrite = true;
             continue;
+        }
+        const QJsonObject object = value.toObject();
+        const QUrl storedUrl(object.value(QStringLiteral("url")).toString());
+        const QUrl url = UrlSanitization::httpUrlForPersistence(
+            storedUrl
+        );
+        if (!url.isValid()) {
+            requiresRewrite = true;
+            continue;
+        }
+        requiresRewrite = requiresRewrite || storedUrl != url;
         session.tabs.append({url, object.value(QStringLiteral("title")).toString()});
     }
 
@@ -75,6 +82,8 @@ BrowserSession SessionStore::load(QString *error) const
     session.activeIndex = session.tabs.isEmpty()
         ? 0
         : qBound(0, requestedIndex, static_cast<int>(session.tabs.size() - 1));
+    if (requiresRewrite && !save(session, error))
+        return {};
     return session;
 }
 
@@ -88,12 +97,13 @@ bool SessionStore::save(const BrowserSession &session, QString *error) const
         if (tabs.size() >= maximumRestoredTabs)
             break;
         const SessionTab &tab = session.tabs.at(index);
-        if (!isRestorableUrl(tab.url))
+        const QUrl url = UrlSanitization::httpUrlForPersistence(tab.url);
+        if (!url.isValid())
             continue;
         if (index <= session.activeIndex)
             persistedActiveIndex = static_cast<int>(tabs.size());
         QJsonObject object;
-        object.insert(QStringLiteral("url"), tab.url.toString());
+        object.insert(QStringLiteral("url"), url.toString(QUrl::FullyEncoded));
         object.insert(QStringLiteral("title"), tab.title);
         tabs.append(object);
     }
@@ -103,8 +113,8 @@ bool SessionStore::save(const BrowserSession &session, QString *error) const
     root.insert(QStringLiteral("activeIndex"), persistedActiveIndex);
     root.insert(QStringLiteral("tabs"), tabs);
 
-    if (!QDir().mkpath(QFileInfo(m_path).absolutePath()))
-        return fail(error, QStringLiteral("Cannot create session directory"));
+    if (!PrivateData::ensureDirectory(QFileInfo(m_path).absolutePath(), error))
+        return false;
 
     QSaveFile file(m_path);
     if (!file.open(QIODevice::WriteOnly))
@@ -114,7 +124,7 @@ bool SessionStore::save(const BrowserSession &session, QString *error) const
         return fail(error, QStringLiteral("Cannot write %1: %2").arg(m_path, file.errorString()));
     if (!file.commit())
         return fail(error, QStringLiteral("Cannot commit %1: %2").arg(m_path, file.errorString()));
-    return true;
+    return PrivateData::restrictFile(m_path, error);
 }
 
 bool SessionStore::clear(QString *error) const

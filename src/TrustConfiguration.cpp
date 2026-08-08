@@ -1,5 +1,8 @@
 #include "TrustConfiguration.h"
 
+#include "PrivateData.h"
+#include "UrlSanitization.h"
+
 #include <QCoreApplication>
 #include <QCryptographicHash>
 #include <QDir>
@@ -8,6 +11,7 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QSaveFile>
 #include <QSet>
 
 namespace {
@@ -138,6 +142,9 @@ bool TrustPolicy::load(const QString &path, QString *error)
     m_startPage = QUrl(QStringLiteral("https://example.com"));
     m_sourcePath.clear();
 
+    if (!PrivateData::restrictFile(path, error))
+        return false;
+
     QFile file(path);
     if (!file.open(QIODevice::ReadOnly))
         return fail(error, QCoreApplication::translate("TrustConfiguration", "Cannot open %1: %2").arg(path, file.errorString()));
@@ -148,16 +155,15 @@ bool TrustPolicy::load(const QString &path, QString *error)
         return fail(error, QCoreApplication::translate("TrustConfiguration", "Invalid JSON: %1").arg(parseError.errorString()));
     }
 
-    const QJsonObject root = document.object();
+    QJsonObject root = document.object();
     if (root.value(QStringLiteral("version")).toInt(-1) != 1)
         return fail(error, QCoreApplication::translate("TrustConfiguration", "Unsupported rules version"));
 
-    const QUrl startPage(root.value(QStringLiteral("startPage")).toString(
+    const QUrl storedStartPage(root.value(QStringLiteral("startPage")).toString(
         QStringLiteral("https://example.com")
     ));
-    if (!startPage.isValid()
-        || (startPage.scheme() != QStringLiteral("http")
-            && startPage.scheme() != QStringLiteral("https"))) {
+    const QUrl startPage = UrlSanitization::httpUrlForPersistence(storedStartPage);
+    if (!startPage.isValid()) {
         return fail(error, QCoreApplication::translate("TrustConfiguration", "Invalid startPage"));
     }
 
@@ -254,6 +260,31 @@ bool TrustPolicy::load(const QString &path, QString *error)
         }
 
         rules.append(rule);
+    }
+
+    if (storedStartPage != startPage) {
+        root.insert(
+            QStringLiteral("startPage"),
+            startPage.toString(QUrl::FullyEncoded)
+        );
+        QSaveFile migrationFile(path);
+        if (!migrationFile.open(QIODevice::WriteOnly)) {
+            return fail(
+                error,
+                QCoreApplication::translate("TrustConfiguration", "Cannot write %1: %2")
+                    .arg(path, migrationFile.errorString())
+            );
+        }
+        const QByteArray contents = QJsonDocument(root).toJson(QJsonDocument::Indented);
+        if (migrationFile.write(contents) != contents.size() || !migrationFile.commit()) {
+            return fail(
+                error,
+                QCoreApplication::translate("TrustConfiguration", "Cannot commit %1: %2")
+                    .arg(path, migrationFile.errorString())
+            );
+        }
+        if (!PrivateData::restrictFile(path, error))
+            return false;
     }
 
     m_rules = rules;

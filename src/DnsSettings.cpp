@@ -163,6 +163,8 @@ DnsSettings DnsSettings::defaults()
 
 bool DnsSettings::load(const QString &path, QString *error)
 {
+    if (!restrictFilePermissions(path, error))
+        return false;
     QFile file(path);
     if (!file.open(QIODevice::ReadOnly))
         return fail(error, text(QT_TRANSLATE_NOOP("DnsSettings", "Cannot open %1: %2")).arg(path, file.errorString()));

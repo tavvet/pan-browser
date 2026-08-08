@@ -2,6 +2,7 @@
 #include "MainWindow.h"
 #include "BrowserPreferences.h"
 #include "Localization.h"
+#include "PrivateData.h"
 #ifdef Q_OS_MACOS
 #include "MacApplicationReopen.h"
 #endif
@@ -14,6 +15,7 @@
 #include <QStyleFactory>
 #include <QLocale>
 #include <QMessageBox>
+#include <QStandardPaths>
 
 int main(int argc, char *argv[])
 {
@@ -21,18 +23,11 @@ int main(int argc, char *argv[])
     application.setStyle(QStyleFactory::create(QStringLiteral("Fusion")));
     application.setWindowIcon(QIcon(QStringLiteral(":/assets/app-icon.svg")));
     QCoreApplication::setApplicationName(QStringLiteral("PanBrowser"));
-    QCoreApplication::setApplicationVersion(QStringLiteral("0.1.0"));
+    QCoreApplication::setApplicationVersion(QStringLiteral(PANBROWSER_VERSION));
     // Keep AppDataLocation stable at ~/Library/Application Support/PanBrowser.
     // Window preferences use an explicit QSettings identity instead.
     QCoreApplication::setOrganizationName(QString());
     QCoreApplication::setOrganizationDomain(QStringLiteral("panbrowser.dev"));
-
-    LocalizationManager localization;
-    localization.install(
-        application,
-        BrowserPreferences::loadInterfaceLanguage(),
-        QLocale::system().uiLanguages()
-    );
 
     QCommandLineParser parser;
     parser.setApplicationDescription(QStringLiteral("PanBrowser"));
@@ -50,6 +45,47 @@ int main(int argc, char *argv[])
         QStringLiteral("[url]")
     );
     parser.process(application);
+
+    QString preferencesError;
+    const InterfaceLanguage interfaceLanguage =
+        BrowserPreferences::loadInterfaceLanguage(&preferencesError);
+    LocalizationManager localization;
+    localization.install(
+        application,
+        interfaceLanguage,
+        QLocale::system().uiLanguages()
+    );
+    if (!preferencesError.isEmpty()) {
+        QMessageBox::critical(
+            nullptr,
+            QStringLiteral("PanBrowser"),
+            QCoreApplication::translate(
+                "main",
+                "PanBrowser cannot securely load its preferences."
+            ) + QLatin1Char('\n') + preferencesError
+        );
+        return 1;
+    }
+
+    QString privateDataError;
+    if (!PrivateData::ensureDirectory(
+            QStandardPaths::writableLocation(QStandardPaths::AppDataLocation),
+            &privateDataError
+        )
+        || !PrivateData::ensureDirectory(
+            QStandardPaths::writableLocation(QStandardPaths::CacheLocation),
+            &privateDataError
+        )) {
+        QMessageBox::critical(
+            nullptr,
+            QStringLiteral("PanBrowser"),
+            QCoreApplication::translate(
+                "main",
+                "PanBrowser cannot secure its private data directory."
+            ) + QLatin1Char('\n') + privateDataError
+        );
+        return 1;
+    }
 
     const QString startupAppId = parser.value(appIdOption).trimmed();
     const QStringList positionalArguments = parser.positionalArguments();
@@ -80,6 +116,17 @@ int main(int argc, char *argv[])
             ? MainWindow::StartupPresentation::Browser
             : MainWindow::StartupPresentation::Background
     );
+    if (!window.startupError().isEmpty()) {
+        QMessageBox::critical(
+            nullptr,
+            QStringLiteral("PanBrowser"),
+            QCoreApplication::translate(
+                "main",
+                "PanBrowser cannot securely load its preferences."
+            ) + QLatin1Char('\n') + window.startupError()
+        );
+        return 1;
+    }
     const auto handleLaunchRequest = [&window](const ApplicationLaunchRequest &request) {
         switch (request.command) {
         case ApplicationLaunchRequest::Command::OpenWebApp:

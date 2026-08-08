@@ -1,5 +1,7 @@
 #include "WebAppStore.h"
 
+#include "PrivateData.h"
+
 #include <QCoreApplication>
 #include <QCryptographicHash>
 #include <QDir>
@@ -176,6 +178,8 @@ bool WebAppStore::load(QString *error)
         m_available = true;
         return true;
     }
+    if (!PrivateData::restrictFile(m_path, error))
+        return false;
     if (!file.open(QIODevice::ReadOnly))
         return fail(error, text(QT_TRANSLATE_NOOP("WebAppStore", "Cannot open installed web apps: %1")).arg(file.errorString()));
     constexpr qint64 maximumStoreBytes = 40LL * 1024 * 1024;
@@ -433,8 +437,8 @@ bool WebAppStore::save(QString *error) const
     root.insert(QStringLiteral("apps"), items);
     const QByteArray contents = QJsonDocument(root).toJson(QJsonDocument::Indented);
 
-    if (!QDir().mkpath(QFileInfo(m_path).absolutePath()))
-        return fail(error, text(QT_TRANSLATE_NOOP("WebAppStore", "Cannot create the installed web apps directory")));
+    if (!PrivateData::ensureDirectory(QFileInfo(m_path).absolutePath(), error))
+        return false;
     QSaveFile file(m_path);
     if (!file.open(QIODevice::WriteOnly))
         return fail(error, text(QT_TRANSLATE_NOOP("WebAppStore", "Cannot write installed web apps: %1")).arg(file.errorString()));
@@ -442,5 +446,5 @@ bool WebAppStore::save(QString *error) const
         return fail(error, text(QT_TRANSLATE_NOOP("WebAppStore", "Cannot write installed web apps: %1")).arg(file.errorString()));
     if (!file.commit())
         return fail(error, text(QT_TRANSLATE_NOOP("WebAppStore", "Cannot save installed web apps: %1")).arg(file.errorString()));
-    return true;
+    return PrivateData::restrictFile(m_path, error);
 }

@@ -15,7 +15,9 @@ current tree, not previously shipped functionality.
 - [x] Dedicated persistent WebEngine profile for cookies, site data, and cache.
 - [x] Configurable retention of session cookies and restored tabs.
 - [x] Browsing data controls for cookies, site storage, and HTTP cache.
-- [x] Fail-closed handling of invalid trust, DNS, and proxy configuration.
+- [x] Fail-closed handling of invalid trust and proxy configuration. Invalid
+  DNS configuration uses the documented System DNS fallback without
+  overwriting the unreadable file.
 
 ### Browser functionality
 

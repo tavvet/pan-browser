@@ -4,6 +4,7 @@
 #include "DiagnosticsPage.h"
 #include "DnsSettingsPage.h"
 #include "HistorySettingsPage.h"
+#include "PrivateData.h"
 #include "ProxySettingsPage.h"
 #include "SearchSettingsPage.h"
 #include "TrustRulesDialog.h"
@@ -107,7 +108,7 @@ bool restoreFile(const FileSnapshot &snapshot, QString *error)
             ).arg(snapshot.path, file.errorString());
         return false;
     }
-    return true;
+    return PrivateData::restrictFile(snapshot.path, error);
 }
 
 QString rollbackSettings(

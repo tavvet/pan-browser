@@ -465,6 +465,14 @@ On macOS, application data is rooted at
 `~/Library/Caches/PanBrowser`. Exact paths are obtained through
 `QStandardPaths`, not hard-coded in implementation code.
 
+`PrivateData` creates application-data, cache, and managed subdirectories with
+owner-only permissions on Unix-like systems. PanBrowser-owned JSON, SQLite,
+session, download, web-app, and native preference files are restricted to the
+owner when read or written; SQLite database permissions are applied before WAL
+mode is enabled and rechecked for existing WAL, shared-memory, and journal
+files. Windows relies on the ACL inherited from the per-user application-data
+directory.
+
 | Data | Owner | Format and behavior |
 | --- | --- | --- |
 | `WebEngine/Profile/` | `BrowserProfile` | Cookies, local storage, IndexedDB, service workers, and other Chromium profile data. |
@@ -478,7 +486,7 @@ On macOS, application data is rooted at
 | `bookmarks.sqlite` | `BookmarkStore` | WAL-mode SQLite bookmarks with normalized URL and title fields for local lookup. |
 | `web-apps.json` | `WebAppStore` | Validated installed-app metadata and bounded page icons, atomically written. |
 | `~/Applications/PanBrowser Apps/*.app` | `WebAppShortcutManager` | macOS-only signed launchers; each deletion target is verified by its embedded app ID. |
-| `session.json` | `SessionStore` | Up to 30 restorable HTTP(S) tabs, atomically written. |
+| `session.json` | `SessionStore` | Up to 30 restorable HTTP(S) tabs, atomically written. URL credentials are removed before persistence and again when legacy data is loaded. |
 | `downloads.json` | `DownloadHistoryStore` | Up to 200 download records; paths and source host, not complete source URLs. |
 | native `QSettings` | `BrowserPreferences`, window/download UI | Start page, startup/cookie/history/language choices, window geometry, last download directory, and pending data-reset marker. |
 
@@ -639,6 +647,10 @@ the CryptoAPI validator and links Crypt32. Linux links OpenSSL Crypto 1.1.1 or
 newer for its explicit in-memory and distro-default trust stores. Unsupported
 platforms compile the fail-closed validator.
 
+`project(PanBrowser VERSION ...)` in `CMakeLists.txt` is the single application
+version source. CMake passes it to the executable for runtime diagnostics and
+`--version`, and also uses it for native bundle metadata.
+
 Development verification:
 
 ```sh
@@ -650,7 +662,8 @@ ctest --test-dir build --output-on-failure
 `scripts/build-app.sh` performs a macOS release build, runs tests, executes
 `macdeployqt` twice so the nested `QtWebEngineProcess` helper is fixed up,
 copies the result to `dist/PanBrowser.app`, ad-hoc signs the complete bundle,
-and verifies the signature.
+and verifies the signature. It reads `MACDEPLOYQT_EXECUTABLE` from the CMake
+cache so deployment always uses the same Qt installation as the build.
 
 Windows and Linux use CMake's Qt deployment API during `cmake --install`.
 Qt's deployment hooks collect linked libraries, plugins, translations,

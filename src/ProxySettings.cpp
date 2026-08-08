@@ -158,6 +158,8 @@ ProxySettings ProxySettings::defaults()
 
 bool ProxySettings::load(const QString &path, QString *error)
 {
+    if (!restrictFilePermissions(path, error))
+        return false;
     QFile file(path);
     if (!file.open(QIODevice::ReadOnly)) {
         return fail(

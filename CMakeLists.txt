@@ -13,16 +13,21 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 
-if(APPLE AND EXISTS "/opt/homebrew/opt/qtbase")
-    set(QT_DISABLE_NO_DEFAULT_PATH_IN_QT_PACKAGES ON)
-    list(APPEND CMAKE_PREFIX_PATH
-        "/opt/homebrew/opt/qtbase"
-        "/opt/homebrew/opt/qtdeclarative"
-        "/opt/homebrew/opt/qtpositioning"
-        "/opt/homebrew/opt/qtsvg"
-        "/opt/homebrew/opt/qtwebchannel"
-        "/opt/homebrew/opt/qtwebengine"
-    )
+if(APPLE)
+    foreach(panbrowser_homebrew_prefix IN ITEMS "/opt/homebrew" "/usr/local")
+        if(EXISTS "${panbrowser_homebrew_prefix}/opt/qtbase")
+            set(QT_DISABLE_NO_DEFAULT_PATH_IN_QT_PACKAGES ON)
+            list(APPEND CMAKE_PREFIX_PATH
+                "${panbrowser_homebrew_prefix}/opt/qtbase"
+                "${panbrowser_homebrew_prefix}/opt/qtdeclarative"
+                "${panbrowser_homebrew_prefix}/opt/qtpositioning"
+                "${panbrowser_homebrew_prefix}/opt/qtsvg"
+                "${panbrowser_homebrew_prefix}/opt/qtwebchannel"
+                "${panbrowser_homebrew_prefix}/opt/qtwebengine"
+            )
+            break()
+        endif()
+    endforeach()
 endif()
 
 find_package(Qt6 6.11 REQUIRED COMPONENTS
@@ -94,6 +99,8 @@ set(PANBROWSER_APP_SOURCES
     src/ProxySettings.h
     src/ProxySettingsPage.cpp
     src/ProxySettingsPage.h
+    src/PrivateData.cpp
+    src/PrivateData.h
     src/main.cpp
     src/MainWindow.cpp
     src/MainWindow.h
@@ -111,6 +118,8 @@ set(PANBROWSER_APP_SOURCES
     src/TrustRulesDialog.h
     src/TrustSettings.cpp
     src/TrustSettings.h
+    src/UrlSanitization.cpp
+    src/UrlSanitization.h
     src/WebAppStore.cpp
     src/WebAppStore.h
     src/WebAppsSettingsPage.cpp
@@ -160,6 +169,7 @@ set_target_properties(PanBrowser PROPERTIES
 )
 
 target_include_directories(PanBrowser PRIVATE src)
+target_compile_definitions(PanBrowser PRIVATE PANBROWSER_VERSION="${PROJECT_VERSION}")
 target_link_libraries(PanBrowser PRIVATE
     Qt6::Core
     Qt6::Network
@@ -284,6 +294,8 @@ qt_add_executable(PanBrowserTests
     src/PermissionPolicy.h
     src/ProxySettings.cpp
     src/ProxySettings.h
+    src/PrivateData.cpp
+    src/PrivateData.h
     src/SessionStore.cpp
     src/SessionStore.h
     src/SearchSettings.cpp
@@ -292,6 +304,8 @@ qt_add_executable(PanBrowserTests
     src/TrustConfiguration.h
     src/TrustSettings.cpp
     src/TrustSettings.h
+    src/UrlSanitization.cpp
+    src/UrlSanitization.h
     src/WebAppStore.cpp
     src/WebAppStore.h
     src/WebAppShortcutManager.cpp
