@@ -163,11 +163,12 @@ saved in the restored tab session. Automatic popups remain blocked.
 On macOS, normal browser and popup windows place the tab strip in the native
 title-bar area while retaining system window controls. Safe-area margins keep
 tabs clear of those controls, and the unused part of the strip can drag or
-maximize the window without interfering with tab reordering. The equivalent
-Windows path is implemented but remains experimental until it has been tested
-against Windows 10/11 caption controls, Snap, and mixed-DPI displays. Installed
-web apps and platforms without reliable expanded-title-bar support retain a
-normal native title bar.
+maximize the window without interfering with tab reordering. Windows uses a
+frameless Qt window with client-side minimize, maximize/restore, and close
+buttons in the tab strip; Qt retains resize borders, shadows, and system-move
+Snap behavior. That path remains experimental until it has been tested across
+Windows 10/11 and mixed-DPI displays. Installed web apps and platforms without
+reliable expanded-title-bar support retain a normal native title bar.
 
 ### Installed web apps
 

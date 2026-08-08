@@ -178,14 +178,20 @@ separate explicit privacy action.
 
 ### 3.2 Window chrome
 
-Normal browser and popup windows use `WindowChromeController` on macOS. The
-same Qt path is enabled experimentally on Windows pending native testing. Before
-the native window is created it requests
-`Qt::ExpandedClientAreaHint` and `Qt::NoTitleBarBackgroundHint`, allowing the
-existing tab toolbar to occupy the native title-bar area without replacing the
-system frame or window controls. `Qt::WA_LayoutOnEntireRect` is required as
-well: without it, `QMainWindow` reserves the safe top margin and leaves the tab
-toolbar in a second row even though the native title bar is transparent.
+Normal browser and popup windows use `WindowChromeController` on macOS and an
+experimental Windows path. Before the native window is created both request
+`Qt::ExpandedClientAreaHint` and `Qt::NoTitleBarBackgroundHint`.
+`Qt::WA_LayoutOnEntireRect` is required as well: without it, `QMainWindow`
+reserves the safe top margin and leaves the tab toolbar in a second row even
+though the native title bar is transparent.
+
+macOS retains its native frame and window controls. Windows additionally uses
+`Qt::FramelessWindowHint`, because the expanded-client hints alone can leave a
+separate system caption above a QWidget toolbar. The tab layout then supplies
+client-side minimize, maximize/restore, and close buttons. Qt 6.11 retains the
+invisible resize border, shadow, window animations, and system-move Snap
+behavior for the frameless window. Windows caption behavior and mixed-DPI
+geometry remain explicit native-test targets before release.
 
 After the platform window exists, the controller observes
 `QWindow::safeAreaMarginsChanged`. The macOS adapter also hides the native
@@ -727,7 +733,7 @@ Before merging a change, verify the relevant invariants:
 - external applications and sensitive permissions require browser-owned,
   active-tab user interaction;
 - popup windows retain visible browser chrome and share the isolated profile;
-- integrated title bars retain native window controls and reserve their
+- integrated title bars retain platform-appropriate window controls and reserve
   reported safe areas without intercepting tab interaction;
 - installed web apps cannot navigate their app window outside their validated
   HTTPS origin and scope;

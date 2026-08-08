@@ -20,6 +20,7 @@ class QWindow;
 class WindowChromeController final : public QObject {
 public:
     [[nodiscard]] static bool platformSupportsIntegratedTitleBar();
+    [[nodiscard]] static bool platformUsesClientCaptionButtons();
     static void applyIntegratedTitleBar(QWidget *window);
 
     WindowChromeController(

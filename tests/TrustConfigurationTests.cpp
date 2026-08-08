@@ -478,6 +478,13 @@ void TrustConfigurationTests::integratedChromePreservesBaseMarginsAndAvoidsSyste
     WindowChromeController::applyIntegratedTitleBar(&window);
     QVERIFY(window.windowFlags().testFlag(Qt::ExpandedClientAreaHint));
     QVERIFY(window.windowFlags().testFlag(Qt::NoTitleBarBackgroundHint));
+#if defined(Q_OS_WIN)
+    QVERIFY(window.windowFlags().testFlag(Qt::FramelessWindowHint));
+    QVERIFY(WindowChromeController::platformUsesClientCaptionButtons());
+#else
+    QVERIFY(!window.windowFlags().testFlag(Qt::FramelessWindowHint));
+    QVERIFY(!WindowChromeController::platformUsesClientCaptionButtons());
+#endif
     QVERIFY(window.testAttribute(Qt::WA_LayoutOnEntireRect));
     QVERIFY(!window.testAttribute(Qt::WA_ContentsMarginsRespectsSafeArea));
 #else

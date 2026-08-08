@@ -43,11 +43,27 @@ bool WindowChromeController::platformSupportsIntegratedTitleBar()
 #endif
 }
 
+bool WindowChromeController::platformUsesClientCaptionButtons()
+{
+#if defined(Q_OS_WIN)
+    return true;
+#else
+    return false;
+#endif
+}
+
 void WindowChromeController::applyIntegratedTitleBar(QWidget *window)
 {
     if (!window || !platformSupportsIntegratedTitleBar())
         return;
 
+#if defined(Q_OS_WIN)
+    // ExpandedClientAreaHint leaves the native caption visible with some
+    // QWidget/Windows combinations. Qt 6.9+ keeps resize borders, shadows,
+    // animations and Snap support for frameless Windows windows, while the
+    // tab strip supplies the caption controls and drag region.
+    window->setWindowFlag(Qt::FramelessWindowHint, true);
+#endif
     window->setWindowFlag(Qt::ExpandedClientAreaHint, true);
     window->setWindowFlag(Qt::NoTitleBarBackgroundHint, true);
     window->setAttribute(Qt::WA_LayoutOnEntireRect, true);
