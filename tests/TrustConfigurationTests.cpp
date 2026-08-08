@@ -1800,17 +1800,6 @@ void TrustConfigurationTests::applicationLaunchRequestsAreForwardedToPrimaryInst
     const QString serverName = QStringLiteral("panbrowser-test-%1").arg(
         QUuid::createUuid().toString(QUuid::WithoutBraces)
     );
-    SingleInstanceCoordinator primary(serverName);
-    QString error;
-    const SingleInstanceCoordinator::StartResult primaryResult =
-        primary.start(ApplicationLaunchRequest::activate(), &error);
-    QVERIFY2(
-        primaryResult == SingleInstanceCoordinator::StartResult::Primary,
-        qPrintable(error)
-    );
-    QVERIFY2(error.isEmpty(), qPrintable(error));
-
-    QSignalSpy requestSpy(&primary, &SingleInstanceCoordinator::launchRequested);
     QString launchClientPath = QDir(QCoreApplication::applicationDirPath()).filePath(
         QStringLiteral("PanBrowserLaunchClient")
     );
@@ -1819,57 +1808,60 @@ void TrustConfigurationTests::applicationLaunchRequestsAreForwardedToPrimaryInst
 #endif
     QVERIFY2(QFileInfo::exists(launchClientPath), qPrintable(launchClientPath));
 
+    QProcess server;
+    server.start(
+        launchClientPath,
+        {QStringLiteral("server"), serverName, QStringLiteral("2")}
+    );
+    QVERIFY2(server.waitForStarted(3000), qPrintable(server.errorString()));
+    QVERIFY2(server.waitForReadyRead(3000), server.readAllStandardError().constData());
+    QCOMPARE(server.readLine().trimmed(), QByteArrayLiteral("READY"));
+
     const QString appId(64, QLatin1Char('c'));
     QProcess webAppClient;
     webAppClient.start(
         launchClientPath,
-        {serverName, QStringLiteral("open-web-app"), appId}
+        {QStringLiteral("client"), serverName, QStringLiteral("open-web-app"), appId}
     );
-    QTRY_VERIFY_WITH_TIMEOUT(webAppClient.state() != QProcess::Starting, 3000);
-    QVERIFY2(
-        webAppClient.error() != QProcess::FailedToStart,
-        qPrintable(webAppClient.errorString())
-    );
-    QTRY_VERIFY_WITH_TIMEOUT(
-        webAppClient.state() == QProcess::NotRunning,
-        5000
-    );
+    QVERIFY2(webAppClient.waitForStarted(3000), qPrintable(webAppClient.errorString()));
+    QVERIFY2(webAppClient.waitForFinished(5000), qPrintable(webAppClient.errorString()));
     const QByteArray webAppClientError = webAppClient.readAllStandardError();
     QVERIFY2(
         webAppClient.exitStatus() == QProcess::NormalExit && webAppClient.exitCode() == 0,
         webAppClientError.constData()
     );
-    QTRY_COMPARE(requestSpy.count(), 1);
-    const ApplicationLaunchRequest request =
-        qvariant_cast<ApplicationLaunchRequest>(requestSpy.takeFirst().at(0));
-    QCOMPARE(request.command, ApplicationLaunchRequest::Command::OpenWebApp);
-    QCOMPARE(request.webAppId, appId);
 
     const QUrl url(QStringLiteral("https://example.com/from-secondary"));
     QProcess urlClient;
     urlClient.start(
         launchClientPath,
-        {serverName, QStringLiteral("open-url"), url.toString(QUrl::FullyEncoded)}
+        {
+            QStringLiteral("client"),
+            serverName,
+            QStringLiteral("open-url"),
+            url.toString(QUrl::FullyEncoded),
+        }
     );
-    QTRY_VERIFY_WITH_TIMEOUT(urlClient.state() != QProcess::Starting, 3000);
-    QVERIFY2(
-        urlClient.error() != QProcess::FailedToStart,
-        qPrintable(urlClient.errorString())
-    );
-    QTRY_VERIFY_WITH_TIMEOUT(
-        urlClient.state() == QProcess::NotRunning,
-        5000
-    );
+    QVERIFY2(urlClient.waitForStarted(3000), qPrintable(urlClient.errorString()));
+    QVERIFY2(urlClient.waitForFinished(5000), qPrintable(urlClient.errorString()));
     const QByteArray urlClientError = urlClient.readAllStandardError();
     QVERIFY2(
         urlClient.exitStatus() == QProcess::NormalExit && urlClient.exitCode() == 0,
         urlClientError.constData()
     );
-    QTRY_COMPARE(requestSpy.count(), 1);
-    const ApplicationLaunchRequest urlRequest =
-        qvariant_cast<ApplicationLaunchRequest>(requestSpy.takeFirst().at(0));
-    QCOMPARE(urlRequest.command, ApplicationLaunchRequest::Command::OpenUrl);
-    QCOMPARE(urlRequest.url, url);
+
+    QVERIFY2(server.waitForFinished(5000), server.readAllStandardError().constData());
+    const QList<QByteArray> receivedPayloads = server.readAllStandardOutput()
+        .split('\n');
+    QVERIFY(receivedPayloads.size() >= 2);
+    QCOMPARE(
+        receivedPayloads.at(0),
+        ApplicationLaunchRequest::openWebApp(appId).toPayload().toBase64()
+    );
+    QCOMPARE(
+        receivedPayloads.at(1),
+        ApplicationLaunchRequest::openUrl(url).toPayload().toBase64()
+    );
 }
 
 void TrustConfigurationTests::webAppManifestIsValidatedAndNormalized()
