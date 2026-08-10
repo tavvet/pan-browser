@@ -19,10 +19,11 @@ features needed for practical daily use while keeping its original security
 boundary visible and auditable.
 
 > [!WARNING]
-> PanBrowser is not yet a security-maintained replacement for a general-purpose
-> browser. It has no automatic update mechanism, and its macOS packages are
-> ad-hoc signed rather than notarized. The current tree targets version `0.1.0`,
-> but no prebuilt public release is available. Build and evaluate it from source.
+> PanBrowser is not a security-maintained replacement for a general-purpose
+> browser and has no automatic update mechanism. Version `0.1.0` is the first
+> source milestone. Its macOS release candidate is Developer ID-signed but not
+> notarized, so Gatekeeper requires an explicit user override. Windows and Linux
+> remain build-from-source platforms.
 
 ## Why PanBrowser?
 
@@ -58,8 +59,8 @@ test environments, and other deliberately scoped trust configurations.
 - Diagnostics for the application, Chromium, graphics, sandbox, profile,
   DNS, and proxy state.
 
-See [ROADMAP.md](ROADMAP.md) for the implemented `0.1.0` scope and planned
-work.
+See [CHANGELOG.md](CHANGELOG.md) for milestone notes and
+[ROADMAP.md](ROADMAP.md) for planned work.
 
 ## Trust model
 

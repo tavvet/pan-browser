@@ -1,9 +1,8 @@
 # PanBrowser roadmap
 
-Current release target: **0.1.0 (unreleased)**. The `main` branch is the
-pre-release development state; PanBrowser has no published stable version or
-release tag yet. Checked items describe what is implemented and verified in the
-current tree, not previously shipped functionality.
+Current source milestone: **0.1.0**. The `v0.1.0` tag records the first public
+project baseline; it is not a promise of general-purpose browser stability.
+Checked items describe what is implemented and verified in that baseline.
 
 ## 0.1.0 scope
 
@@ -66,7 +65,7 @@ current tree, not previously shipped functionality.
   separate third-party and binary-distribution obligations.
 - [ ] Run a final regression pass using the packaged artifact on each tested
   platform.
-- [ ] Prepare source milestone notes and the `v0.1.0` tag. A GitHub Release and
+- [x] Prepare source milestone notes and the `v0.1.0` tag. A GitHub Release and
   public binary archives are not required for this source milestone.
 
 ## Planned after 0.1.0
@@ -110,10 +109,13 @@ current tree, not previously shipped functionality.
 
 ### Distribution
 
-- [ ] Assemble version-matched Qt, Qt WebEngine/Chromium, OpenSSL, and asset
-  notices in every binary package, provide the required Qt source offer, and
-  expose an in-application open-source notice.
-- [ ] Developer ID signing and notarization.
+- [ ] Extend version-matched Qt, Qt WebEngine/Chromium, OpenSSL, and asset
+  notices to every Windows and Linux binary package. The macOS candidate
+  collects its runtime notices, source metadata, and source offer and exposes
+  them through Diagnostics.
+- [x] Developer ID signing workflow for macOS release candidates.
+- [ ] Apple notarization and ticket stapling. The current team is not yet
+  enabled for notarization.
 - [ ] DMG packaging and first-run onboarding.
 - [ ] Publish versioned binary archives and checksums when supported downloads
   are ready.

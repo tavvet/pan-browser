@@ -4,10 +4,10 @@ This document explains how PanBrowser is put together, why the important
 boundaries exist, and which invariants must survive future changes. It is aimed
 at someone returning to the project after a long break.
 
-This document describes the pre-release **0.1.0** development baseline. No
-stable PanBrowser version has been published yet. Update this document together
-with any change to component ownership, startup order, persistence, or a
-security boundary.
+This document describes the **0.1.0** source milestone baseline. PanBrowser does
+not yet claim the compatibility or maintenance guarantees of a stable
+general-purpose browser. Update this document together with any change to
+component ownership, startup order, persistence, or a security boundary.
 
 For user-facing behavior and configuration examples, see
 [README.md](../README.md). For planned work, see [ROADMAP.md](../ROADMAP.md).
