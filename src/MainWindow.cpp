@@ -15,6 +15,7 @@
 #include "FindBar.h"
 #include "AddressCompletionPopup.h"
 #include "HttpAuthenticationController.h"
+#include "PageZoom.h"
 #include "PermissionController.h"
 #include "PermissionPrompt.h"
 #include "PrivateData.h"
@@ -70,7 +71,10 @@
 #include <QWebEnginePage>
 #include <QWebEngineScript>
 #include <QWebEngineView>
+#include <QWheelEvent>
 
+#include <algorithm>
+#include <cmath>
 #include <utility>
 
 namespace {
@@ -93,6 +97,30 @@ bool isSameWebOrigin(const QUrl &left, const QUrl &right)
         && left.scheme().compare(right.scheme(), Qt::CaseInsensitive) == 0
         && left.host().compare(right.host(), Qt::CaseInsensitive) == 0
         && effectivePort(left) == effectivePort(right);
+}
+
+bool triggerShortcutAction(
+    QAction *action,
+    QKeyEvent *event,
+    bool consumeWhenDisabled = false
+)
+{
+    if (!action
+        || (!action->isEnabled() && !consumeWhenDisabled)
+        || !BrowserShortcut::matches(*event, action->shortcuts())) {
+        return false;
+    }
+    event->accept();
+    if (!event->isAutoRepeat() && action->isEnabled())
+        action->trigger();
+    return true;
+}
+
+bool hasPageZoomModifier(Qt::KeyboardModifiers modifiers)
+{
+    return modifiers.testFlag(Qt::ControlModifier)
+        && !modifiers.testFlag(Qt::AltModifier)
+        && !modifiers.testFlag(Qt::MetaModifier);
 }
 
 } // namespace
@@ -305,17 +333,70 @@ void MainWindow::closeEvent(QCloseEvent *event)
 
 bool MainWindow::eventFilter(QObject *watched, QEvent *event)
 {
-    if (event->type() == QEvent::KeyPress
-        && isActiveWindow()
-        && m_preferences.developerToolsEnabled()
-        && m_developerToolsAction) {
+    Q_UNUSED(watched);
+    if (!isActiveWindow())
+        return QMainWindow::eventFilter(watched, event);
+
+    if (event->type() == QEvent::KeyPress) {
         auto *keyEvent = static_cast<QKeyEvent *>(event);
-        if (BrowserShortcut::matches(*keyEvent, m_developerToolsAction->shortcuts())) {
-            event->accept();
-            if (!keyEvent->isAutoRepeat())
-                m_developerToolsAction->trigger();
+        if (triggerShortcutAction(m_zoomInAction, keyEvent, true)
+            || triggerShortcutAction(m_zoomOutAction, keyEvent, true)
+            || triggerShortcutAction(m_resetZoomAction, keyEvent, true)) {
             return true;
         }
+        if (m_preferences.developerToolsEnabled()
+            && triggerShortcutAction(m_developerToolsAction, keyEvent)) {
+            return true;
+        }
+    }
+
+    if (event->type() == QEvent::Wheel) {
+        auto *wheelEvent = static_cast<QWheelEvent *>(event);
+        QWebEngineView *webView = currentWebView();
+        if (!hasPageZoomModifier(wheelEvent->modifiers())) {
+            m_zoomAngleRemainder = 0;
+            m_zoomPixelRemainder = 0;
+            return QMainWindow::eventFilter(watched, event);
+        }
+        if (!webView || !webView->isVisible())
+            return QMainWindow::eventFilter(watched, event);
+
+        const QPoint localPosition = webView->mapFromGlobal(
+            wheelEvent->globalPosition().toPoint()
+        );
+        if (!webView->rect().contains(localPosition))
+            return QMainWindow::eventFilter(watched, event);
+
+        if (wheelEvent->phase() == Qt::ScrollBegin) {
+            m_zoomAngleRemainder = 0;
+            m_zoomPixelRemainder = 0;
+        }
+
+        int steps = 0;
+        if (!wheelEvent->pixelDelta().isNull()) {
+            m_zoomAngleRemainder = 0;
+            steps = takePageZoomSteps(
+                wheelEvent->pixelDelta().y(),
+                40,
+                m_zoomPixelRemainder
+            );
+        } else if (!wheelEvent->angleDelta().isNull()) {
+            m_zoomPixelRemainder = 0;
+            steps = takePageZoomSteps(
+                wheelEvent->angleDelta().y(),
+                120,
+                m_zoomAngleRemainder
+            );
+        }
+
+        if (steps != 0)
+            changeCurrentPageZoomBySteps(std::clamp(steps, -4, 4));
+        if (wheelEvent->phase() == Qt::ScrollEnd) {
+            m_zoomAngleRemainder = 0;
+            m_zoomPixelRemainder = 0;
+        }
+        wheelEvent->accept();
+        return true;
     }
     return QMainWindow::eventFilter(watched, event);
 }
@@ -495,6 +576,8 @@ void MainWindow::createInterface()
         createTab(m_preferences.startPage());
     });
     connect(m_tabBar, &QTabBar::currentChanged, this, [this](int index) {
+        m_zoomAngleRemainder = 0;
+        m_zoomPixelRemainder = 0;
         if (index >= 0) {
             m_tabStack->setCurrentIndex(index);
             if (!m_restoringSession)
@@ -634,6 +717,31 @@ void MainWindow::createInterface()
     });
 
     fileMenu->addSeparator();
+    m_zoomMenu = fileMenu->addMenu(tr("Zoom"));
+    m_zoomLevelAction = m_zoomMenu->addAction(QStringLiteral("100%"));
+    m_zoomLevelAction->setEnabled(false);
+    m_zoomMenu->addSeparator();
+    m_zoomInAction = m_zoomMenu->addAction(tr("Zoom In"));
+    m_zoomInAction->setShortcuts(pageZoomInShortcuts());
+    m_zoomInAction->setShortcutContext(Qt::WindowShortcut);
+    m_zoomInAction->setAutoRepeat(false);
+    connect(m_zoomInAction, &QAction::triggered, this, [this] {
+        changeCurrentPageZoomBySteps(1);
+    });
+    m_zoomOutAction = m_zoomMenu->addAction(tr("Zoom Out"));
+    m_zoomOutAction->setShortcuts(pageZoomOutShortcuts());
+    m_zoomOutAction->setShortcutContext(Qt::WindowShortcut);
+    m_zoomOutAction->setAutoRepeat(false);
+    connect(m_zoomOutAction, &QAction::triggered, this, [this] {
+        changeCurrentPageZoomBySteps(-1);
+    });
+    m_resetZoomAction = m_zoomMenu->addAction(tr("Actual Size"));
+    m_resetZoomAction->setShortcuts(pageZoomResetShortcuts());
+    m_resetZoomAction->setShortcutContext(Qt::WindowShortcut);
+    m_resetZoomAction->setAutoRepeat(false);
+    connect(m_resetZoomAction, &QAction::triggered, this, &MainWindow::resetCurrentPageZoom);
+
+    fileMenu->addSeparator();
     m_developerToolsAction = fileMenu->addAction(tr("Developer Tools"));
 #if defined(Q_OS_MACOS)
     m_developerToolsAction->setShortcuts({
@@ -737,6 +845,7 @@ void MainWindow::createInterface()
         m_ruleCount->hide();
     }
 
+    updateZoomActions();
     applyDeveloperToolsPreference();
     qApp->installEventFilter(this);
 }
@@ -1077,6 +1186,7 @@ void MainWindow::connectBrowserSignals(QWebEngineView *webView)
         BrowserTabState &state = m_tabStates[webView];
         state.pendingUrl.clear();
         state.topLevelUrl = url;
+        applyStoredPageZoom(webView);
         const int index = m_tabStack->indexOf(webView);
         if (index >= 0 && webView->title().isEmpty()) {
             const QString label = url.host().isEmpty() ? tr("New Tab") : url.host();
@@ -1095,6 +1205,10 @@ void MainWindow::connectBrowserSignals(QWebEngineView *webView)
         if (webView == currentWebView())
             updateInstallWebAppAction();
         scheduleSessionSave();
+    });
+    connect(webView->page(), &QWebEnginePage::zoomFactorChanged, this, [this, webView](double) {
+        if (webView == currentWebView())
+            updateZoomActions();
     });
     connect(webView, &QWebEngineView::titleChanged, this, [this, webView](const QString &title) {
         const int index = m_tabStack->indexOf(webView);
@@ -1435,6 +1549,7 @@ void MainWindow::updateCurrentTabUi()
         updateNavigationActions();
         updateBookmarkAction();
         updateInstallWebAppAction();
+        updateZoomActions();
         return;
     }
 
@@ -1454,6 +1569,7 @@ void MainWindow::updateCurrentTabUi()
     updateNavigationActions();
     updateBookmarkAction();
     updateInstallWebAppAction();
+    updateZoomActions();
 }
 
 void MainWindow::updateNavigationActions()
@@ -1658,6 +1774,104 @@ void MainWindow::findInPage(bool backward)
         }
         window->m_findBar->setResults(result.activeMatch(), result.numberOfMatches());
     });
+}
+
+void MainWindow::applyStoredPageZoom(QWebEngineView *webView)
+{
+    if (!webView)
+        return;
+    QSettings settings(QStringLiteral("PanBrowser"), QStringLiteral("PanBrowser"));
+    webView->setZoomFactor(storedPageZoomFactor(settings, webView->url()));
+    if (webView == currentWebView())
+        updateZoomActions();
+}
+
+void MainWindow::changeCurrentPageZoomBySteps(int steps)
+{
+    QWebEngineView *webView = currentWebView();
+    if (!webView || steps == 0)
+        return;
+
+    const int boundedSteps = std::clamp(steps, -32, 32);
+    const bool zoomIn = boundedSteps > 0;
+    double factor = webView->zoomFactor();
+    for (int remaining = std::abs(boundedSteps); remaining > 0; --remaining)
+        factor = nextPageZoomFactor(factor, zoomIn);
+    setCurrentPageZoom(factor);
+}
+
+void MainWindow::resetCurrentPageZoom()
+{
+    setCurrentPageZoom(defaultPageZoomFactor);
+}
+
+void MainWindow::setCurrentPageZoom(double factor)
+{
+    QWebEngineView *webView = currentWebView();
+    if (!webView)
+        return;
+
+    const double normalized = normalizedPageZoomFactor(factor);
+    const QString siteKey = pageZoomSiteKey(webView->url());
+    bool persisted = true;
+    if (!siteKey.isEmpty()) {
+        QSettings settings(QStringLiteral("PanBrowser"), QStringLiteral("PanBrowser"));
+        persisted = persistPageZoomFactor(settings, webView->url(), normalized);
+    }
+
+    if (siteKey.isEmpty()) {
+        webView->setZoomFactor(normalized);
+        updateZoomActions();
+    } else {
+        MainWindow *primary = m_primaryWindow ? m_primaryWindow : this;
+        const auto applyToWindow = [&siteKey, normalized](MainWindow *window) {
+            for (QWebEngineView *candidate : window->m_tabStates.keys()) {
+                if (candidate && pageZoomSiteKey(candidate->url()) == siteKey)
+                    candidate->setZoomFactor(normalized);
+            }
+            window->updateZoomActions();
+        };
+        applyToWindow(primary);
+        for (MainWindow *popup : std::as_const(primary->m_popupWindows)) {
+            if (popup)
+                applyToWindow(popup);
+        }
+    }
+
+    const int percentage = pageZoomPercentage(normalized);
+    QString message = tr("Zoom: %1%").arg(percentage);
+    if (!siteKey.isEmpty()) {
+        message += persisted ? tr(" · saved for this site")
+                             : tr(" · could not save this site setting");
+    }
+    statusBar()->showMessage(message, 3500);
+}
+
+void MainWindow::updateZoomActions()
+{
+    if (!m_zoomMenu
+        || !m_zoomLevelAction
+        || !m_zoomInAction
+        || !m_zoomOutAction
+        || !m_resetZoomAction) {
+        return;
+    }
+
+    QWebEngineView *webView = currentWebView();
+    const int percentage = pageZoomPercentage(
+        webView ? webView->zoomFactor() : defaultPageZoomFactor
+    );
+    m_zoomMenu->setEnabled(webView != nullptr);
+    m_zoomLevelAction->setText(QStringLiteral("%1%").arg(percentage));
+    m_zoomInAction->setEnabled(
+        webView && percentage < pageZoomPercentage(maximumPageZoomFactor)
+    );
+    m_zoomOutAction->setEnabled(
+        webView && percentage > pageZoomPercentage(minimumPageZoomFactor)
+    );
+    m_resetZoomAction->setEnabled(
+        webView && percentage != pageZoomPercentage(defaultPageZoomFactor)
+    );
 }
 
 void MainWindow::editCurrentBookmark()

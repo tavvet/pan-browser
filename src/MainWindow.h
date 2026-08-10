@@ -136,6 +136,11 @@ private:
     void openFindBar();
     void closeFindBar();
     void findInPage(bool backward = false);
+    void applyStoredPageZoom(QWebEngineView *webView);
+    void changeCurrentPageZoomBySteps(int steps);
+    void resetCurrentPageZoom();
+    void setCurrentPageZoom(double factor);
+    void updateZoomActions();
     void showWebContextMenu(QWebEngineView *webView, const QPoint &position);
     void openDeveloperTools(QWebEngineView *webView, bool inspectElement = false);
     void closeDeveloperTools(QWebEngineView *webView);
@@ -206,7 +211,12 @@ private:
     QAction *m_closeFindAction = nullptr;
     QAction *m_installWebAppAction = nullptr;
     QAction *m_developerToolsAction = nullptr;
+    QAction *m_zoomLevelAction = nullptr;
+    QAction *m_zoomInAction = nullptr;
+    QAction *m_zoomOutAction = nullptr;
+    QAction *m_resetZoomAction = nullptr;
     QMenu *m_webAppsMenu = nullptr;
+    QMenu *m_zoomMenu = nullptr;
     QLabel *m_trustStatus = nullptr;
     QLabel *m_ruleCount = nullptr;
     QProgressBar *m_progress = nullptr;
@@ -240,5 +250,7 @@ private:
     bool m_discardSessionOnClose = false;
     bool m_networkBlockedByProxyError = false;
     bool m_integratedWindowChrome = false;
+    int m_zoomAngleRemainder = 0;
+    int m_zoomPixelRemainder = 0;
     quint64 m_findRequestSerial = 0;
 };

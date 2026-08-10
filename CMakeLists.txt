@@ -65,6 +65,8 @@ set(PANBROWSER_APP_SOURCES
     src/BrowserShortcut.h
     src/BrowserPage.cpp
     src/BrowserPage.h
+    src/PageZoom.cpp
+    src/PageZoom.h
     src/CredentialPromptDialog.cpp
     src/CredentialPromptDialog.h
     src/DownloadHistoryStore.cpp
@@ -302,6 +304,8 @@ qt_add_executable(PanBrowserTests
     src/BrowserPreferences.h
     src/BrowserShortcut.cpp
     src/BrowserShortcut.h
+    src/PageZoom.cpp
+    src/PageZoom.h
     src/CredentialPromptDialog.cpp
     src/CredentialPromptDialog.h
     src/DownloadHistoryStore.cpp

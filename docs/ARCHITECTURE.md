@@ -542,7 +542,7 @@ directory.
 | `~/Applications/PanBrowser Apps/*.app` | `WebAppShortcutManager` | macOS-only signed launchers; each deletion target is verified by its embedded app ID. |
 | `session.json` | `SessionStore` | Up to 30 restorable HTTP(S) tabs, atomically written. URL credentials are removed before persistence and again when legacy data is loaded. |
 | `downloads.json` | `DownloadHistoryStore` | Up to 200 download records; paths and source host, not complete source URLs. |
-| native `QSettings` | `BrowserPreferences`, window/download UI | Start page, startup/cookie/history/language/developer-tools choices, window geometry, last download directory, and pending data-reset marker. |
+| native `QSettings` | `BrowserPreferences`, `PageZoom`, window/download UI | Start page, startup/cookie/history/language/developer-tools choices, per-origin page zoom, window geometry, last download directory, and pending data-reset marker. |
 
 Session cookies are discarded by default. Enabling “keep sign-ins” changes the
 profile to `ForcePersistentCookies`; otherwise only cookies explicitly marked
@@ -657,6 +657,27 @@ tab, or completed navigation cannot overwrite the current match count.
 Closing the bar sends an empty query to WebEngine to clear highlights. While
 the bar remains visible, tab changes and completed navigations rerun its query
 against the new current page. Find state is window-local and is not persisted.
+
+### 9.2 Page zoom
+
+`PageZoom` owns the discrete 25–500% scale, canonical HTTP(S) origin keys,
+native-preference persistence, and shortcut/delta helpers. Default ports are
+removed from origin keys, while non-default ports remain distinct. Resetting a
+site to 100% removes its saved value instead of storing a redundant override.
+Non-web pages may be zoomed for the current view but are never persisted.
+
+`MainWindow` applies a saved factor on every top-level URL change and propagates
+an explicit change to every open tab, popup, and web-app window with the same
+origin. Keyboard input uses ordinary `QAction` shortcuts plus the same
+application event-filter fallback used by Developer Tools, because an active
+WebEngine renderer may consume browser shortcuts before a window action sees
+them. `Command` on macOS and `Ctrl` elsewhere share Qt's `ControlModifier`
+mapping.
+
+Modified wheel events are accepted only while the pointer is inside the active
+page. Pixel deltas from trackpads and angle deltas from mouse wheels use
+separate accumulators and thresholds, so small high-resolution scroll events
+produce predictable discrete zoom steps without also scrolling the document.
 
 ## 10. Downloads
 
@@ -801,7 +822,8 @@ policy and persistence layers: domains and rule validation, settings backups,
 window placement, sessions, cleanup boundaries, downloads, permissions,
 external navigation, popup geometry, search parsing, history ranking/deletion,
 bookmark CRUD and normalization, combined suggestion ranking,
-proxy persistence, validation, and application modes; corrupt-database
+proxy persistence, validation, and application modes; page-zoom origin
+normalization, persistence, shortcut matching, and scroll accumulation; corrupt-database
 behavior; ghost completion; find-bar keyboard behavior; web-app manifest
 validation, scope enforcement, and registry persistence; DNS settings
 validation, persistence, and mode application; and native custom-anchor,

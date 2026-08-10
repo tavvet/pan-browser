@@ -12,7 +12,7 @@ may be unstable.
   Inspect Element and keyboard shortcuts only while enabled.
 - [ ] Complete favicon support: persist icons received from WebEngine and show
   them in restored tabs, bookmarks, history, and address-bar suggestions.
-- [ ] Page zoom controls with keyboard shortcuts, per-site persistence, and
+- [x] Page zoom controls with keyboard shortcuts, per-site persistence, and
   reset to 100%.
 - [ ] Allow user-initiated `chrome://` navigation from the address bar behind a
   safety warning. Keep redirects, page scripts, and popups blocked; offer a

@@ -48,8 +48,8 @@ test environments, and other deliberately scoped trust configurations.
   on Windows, and OpenSSL on Linux.
 - A dedicated WebEngine profile for cookies, storage, cache, history,
   bookmarks, downloads, and installed web apps.
-- Tabs, session restoration, popup handling, find in page, local address
-  completion, configurable search engines, and a download manager.
+- Tabs, session restoration, popup handling, find in page, per-site page zoom,
+  local address completion, configurable search engines, and a download manager.
 - Browser-owned prompts for camera, microphone, location, external schemes,
   HTTP Basic authentication, and HTTP proxy authentication.
 - Browser-wide System/Direct/HTTP/SOCKS5 proxy modes and configurable
@@ -64,6 +64,11 @@ test environments, and other deliberately scoped trust configurations.
 
 See [CHANGELOG.md](CHANGELOG.md) for milestone notes and
 [ROADMAP.md](ROADMAP.md) for planned work.
+
+Page zoom is available from the application menu and through `Command + Plus`,
+`Command + Minus`, and `Command + 0` on macOS (`Ctrl` on Windows and Linux).
+Holding the same modifier while scrolling over the page also changes zoom.
+PanBrowser remembers the selected level separately for each HTTP(S) origin.
 
 ## Trust model
 

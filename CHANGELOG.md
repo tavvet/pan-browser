@@ -11,6 +11,8 @@ portable web-app integration, and safe transfer of trust configuration.
 
 - Added opt-in developer tools with a profile preference that defaults to off,
   an Inspect Element context action, and platform-appropriate shortcuts.
+- Added page zoom from the application menu, keyboard, mouse wheel, and
+  trackpad, with discrete levels and per-origin persistence.
 
 ## 0.1.0 — 2026-08-10
 

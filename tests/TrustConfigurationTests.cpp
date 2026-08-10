@@ -15,6 +15,7 @@
 #include "HistoryStore.h"
 #include "HttpAuthenticationController.h"
 #include "Localization.h"
+#include "PageZoom.h"
 #include "PermissionPolicy.h"
 #include "ProxySettings.h"
 #include "ProxyAuthenticationController.h"
@@ -74,6 +75,9 @@ private slots:
     void browserPreferencesValidateStartPage();
     void developerToolsPreferenceDefaultsToDisabled();
     void browserShortcutFallbackMatchesRegisteredKeys();
+    void pageZoomUsesCanonicalOriginsAndDiscreteLevels();
+    void pageZoomPersistsAndRemovesDefaults();
+    void pageZoomShortcutsAndWheelDeltas();
     void privateDataFilesUseOwnerOnlyPermissions();
     void interfaceLanguagePreferenceRoundTrips();
     void interfaceLanguageSettingsParsing();
@@ -655,6 +659,83 @@ void TrustConfigurationTests::browserShortcutFallbackMatchesRegisteredKeys()
         Qt::ControlModifier | Qt::AltModifier
     );
     QVERIFY(!BrowserShortcut::matches(released, shortcuts));
+}
+
+void TrustConfigurationTests::pageZoomUsesCanonicalOriginsAndDiscreteLevels()
+{
+    const QString canonical = pageZoomSiteKey(QUrl(QStringLiteral(
+        "https://Example.COM:443/path?query=1#fragment"
+    )));
+    QVERIFY(!canonical.isEmpty());
+    QCOMPARE(
+        canonical,
+        pageZoomSiteKey(QUrl(QStringLiteral("https://example.com/other")))
+    );
+    QVERIFY(canonical != pageZoomSiteKey(QUrl(QStringLiteral("https://example.com:8443"))));
+    QVERIFY(pageZoomSiteKey(QUrl(QStringLiteral("file:///tmp/page.html"))).isEmpty());
+
+    QCOMPARE(normalizedPageZoomFactor(1.09), 1.10);
+    QCOMPARE(normalizedPageZoomFactor(42.0), defaultPageZoomFactor);
+    QCOMPARE(nextPageZoomFactor(1.0, true), 1.10);
+    QCOMPARE(nextPageZoomFactor(1.0, false), 0.90);
+    QCOMPARE(nextPageZoomFactor(maximumPageZoomFactor, true), maximumPageZoomFactor);
+    QCOMPARE(nextPageZoomFactor(minimumPageZoomFactor, false), minimumPageZoomFactor);
+    QCOMPARE(pageZoomPercentage(1.25), 125);
+}
+
+void TrustConfigurationTests::pageZoomPersistsAndRemovesDefaults()
+{
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+    QSettings settings(directory.filePath(QStringLiteral("settings.ini")), QSettings::IniFormat);
+    const QUrl url(QStringLiteral("https://example.com/a"));
+
+    QCOMPARE(storedPageZoomFactor(settings, url), defaultPageZoomFactor);
+    QVERIFY(persistPageZoomFactor(settings, url, 1.25));
+    QCOMPARE(storedPageZoomFactor(settings, QUrl(QStringLiteral("https://example.com/b"))), 1.25);
+    QCOMPARE(storedPageZoomFactor(settings, QUrl(QStringLiteral("https://other.example"))), 1.0);
+
+    QVERIFY(persistPageZoomFactor(settings, url, defaultPageZoomFactor));
+    QCOMPARE(storedPageZoomFactor(settings, url), defaultPageZoomFactor);
+}
+
+void TrustConfigurationTests::pageZoomShortcutsAndWheelDeltas()
+{
+    const QKeyEvent equal(
+        QEvent::KeyPress,
+        Qt::Key_Equal,
+        Qt::ControlModifier
+    );
+    QVERIFY(BrowserShortcut::matches(equal, pageZoomInShortcuts()));
+
+    const QKeyEvent shiftedPlus(
+        QEvent::KeyPress,
+        Qt::Key_Plus,
+        Qt::ControlModifier | Qt::ShiftModifier
+    );
+    QVERIFY(BrowserShortcut::matches(shiftedPlus, pageZoomInShortcuts()));
+
+    const QKeyEvent minus(
+        QEvent::KeyPress,
+        Qt::Key_Minus,
+        Qt::ControlModifier
+    );
+    QVERIFY(BrowserShortcut::matches(minus, pageZoomOutShortcuts()));
+
+    const QKeyEvent zero(QEvent::KeyPress, Qt::Key_0, Qt::ControlModifier);
+    QVERIFY(BrowserShortcut::matches(zero, pageZoomResetShortcuts()));
+
+    int remainder = 0;
+    QCOMPARE(takePageZoomSteps(15, 40, remainder), 0);
+    QCOMPARE(remainder, 15);
+    QCOMPARE(takePageZoomSteps(25, 40, remainder), 1);
+    QCOMPARE(remainder, 0);
+    QCOMPARE(takePageZoomSteps(85, 40, remainder), 2);
+    QCOMPARE(remainder, 5);
+    QCOMPARE(takePageZoomSteps(-20, 40, remainder), 0);
+    QCOMPARE(remainder, -20);
+    QCOMPARE(takePageZoomSteps(-25, 40, remainder), -1);
+    QCOMPARE(remainder, -5);
 }
 
 void TrustConfigurationTests::privateDataFilesUseOwnerOnlyPermissions()
