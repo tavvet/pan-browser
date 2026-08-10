@@ -152,8 +152,10 @@ adequate long-term archive. This repository does not claim that the generated
 package is legally complete merely because the collector succeeds.
 
 These limitations do not block publication of a properly licensed source
-repository and source-only `v0.1.0` tag. A person distributing a binary remains
-responsible for completing and verifying the checklist for that exact package.
+repository and `v0.1.0` source tag. That milestone may be accompanied by the
+separately audited macOS ARM64 candidate described above. A person distributing
+a binary remains responsible for completing and verifying the checklist for
+that exact package.
 
 ## 6. Maintenance rule
 

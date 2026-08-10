@@ -117,6 +117,9 @@ Checked items describe what is implemented and verified in that baseline.
 - [ ] Apple notarization and ticket stapling. The current team is not yet
   enabled for notarization.
 - [ ] DMG packaging and first-run onboarding.
+- [ ] Evaluate an official or source-built Qt distribution for a macOS
+  deployment target older than 26.0; the current Homebrew Qt 6.11.1 frameworks
+  require macOS 26.
 - [ ] Publish versioned binary archives and checksums when supported downloads
   are ready.
 - [ ] Importable and exportable trust profiles.

@@ -135,13 +135,16 @@ This Chromium notice alone is not the complete license inventory for Qt
 WebEngine. Binary distributions must also carry the version-specific Chromium
 third-party notices described in [docs/LICENSING.md](docs/LICENSING.md).
 
-### OpenSSL on Linux
+### OpenSSL
 
 The Linux certificate validator dynamically links to the OpenSSL Crypto
-library selected by CMake. OpenSSL is not vendored in this repository. OpenSSL
-3.0 and later use the Apache License 2.0; OpenSSL 1.1.1 and earlier use the
-dual OpenSSL and SSLeay license. A binary distributor must use the terms and
-notices matching the exact linked or bundled OpenSSL version.
+library selected by CMake. The macOS deployment may also contain OpenSSL shared
+libraries used by the deployed Qt TLS backend; the `0.1.0` macOS candidate
+contains OpenSSL 3 and packages its exact notice through the runtime-license
+collector. OpenSSL is not vendored in this source repository. OpenSSL 3.0 and
+later use the Apache License 2.0; OpenSSL 1.1.1 and earlier use the dual OpenSSL
+and SSLeay license. A binary distributor must use the terms and notices matching
+the exact linked or bundled OpenSSL version.
 
 Official reference: [OpenSSL licensing](https://openssl-library.org/source/license/index.html).
 

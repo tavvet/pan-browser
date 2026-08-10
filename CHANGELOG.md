@@ -41,9 +41,9 @@ viewer experiment into a compact, usable Qt WebEngine browser.
 
 - PanBrowser has no automatic update mechanism and should not be treated as a
   security-maintained general-purpose browser.
-- The macOS candidate is signed but not notarized because the Apple Developer
-  team is not yet enabled for notarization; Gatekeeper therefore requires an
-  explicit user-approved launch.
+- The macOS 26+ ARM64 candidate is signed but not notarized because the Apple
+  Developer team is not yet enabled for notarization; Gatekeeper therefore
+  requires an explicit user-approved launch.
 - Windows and Linux remain build-from-source platforms for this milestone.
 - Native Windows x64 and broader Linux x86-64/X11/Wayland coverage remain future
   work.

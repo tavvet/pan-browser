@@ -8,7 +8,9 @@ publication gate.
 
 ## 1. Prerequisites
 
-- macOS with Xcode command-line tools and `notarytool`.
+- macOS 26 or newer with Xcode command-line tools and `notarytool`. The current
+  Homebrew Qt 6.11.1 frameworks require release builds to pin
+  `CMAKE_OSX_DEPLOYMENT_TARGET` to `26.0`.
 - The same Qt installation used by the normal macOS build.
 - Cached source archives used to extract version-matched license texts. Fetch
   them once with `brew fetch --build-from-source qtbase freetype`.
@@ -88,7 +90,8 @@ The script:
 7. verifies Developer ID authority, Team ID, and secure timestamps for every
    Mach-O file as well as the nested and outer bundle signatures;
 8. records whether the source tree was clean or dirty;
-9. produces a versioned ZIP, SHA-256 checksum, build provenance, and bundle
+9. records the configured macOS deployment target in build provenance;
+10. produces a versioned ZIP, SHA-256 checksum, build provenance, and bundle
    audit. Without `--notarize`, the archive name ends in
    `-signed-unnotarized.zip` so its Gatekeeper status cannot be mistaken for a
    notarized release.
@@ -109,10 +112,10 @@ output can be used as an explicitly unnotarized Developer ID-signed build:
 ./scripts/release-macos.sh
 ```
 
-This is a temporary distribution mode, not equivalent to notarization. It is
-still gated by the binary-distribution checklist in `LICENSING.md`. Release
-notes and direct-download instructions must clearly say that the build is
-signed but not notarized.
+The `v0.1.0` macOS ARM64 candidate uses this temporary distribution mode. It is
+not equivalent to notarization and remains gated by the binary-distribution
+checklist in `LICENSING.md`. Release notes and direct-download instructions
+must clearly say that the build is signed but not notarized.
 
 After downloading it, a user may need to attempt the first launch once and
 then open **System Settings > Privacy & Security** and choose **Open Anyway**.

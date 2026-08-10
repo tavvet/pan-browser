@@ -21,9 +21,9 @@ boundary visible and auditable.
 > [!WARNING]
 > PanBrowser is not a security-maintained replacement for a general-purpose
 > browser and has no automatic update mechanism. Version `0.1.0` is the first
-> source milestone. Its macOS release candidate is Developer ID-signed but not
-> notarized, so Gatekeeper requires an explicit user override. Windows and Linux
-> remain build-from-source platforms.
+> source milestone. Its macOS 26+ ARM64 release candidate is Developer
+> ID-signed but not notarized, so Gatekeeper requires an explicit user override.
+> Windows and Linux remain build-from-source platforms.
 
 ## Why PanBrowser?
 
@@ -92,7 +92,7 @@ PanBrowser requires Qt 6.11 or newer and a C++20 compiler.
 
 | Platform | Validation backend | Current verification |
 | --- | --- | --- |
-| macOS | Security.framework | Build, tests, packaged application, and GUI smoke test |
+| macOS 26+ | Security.framework | ARM64 build, tests, packaged application, and GUI smoke test |
 | Windows 10+ | CryptoAPI | Windows x64 build, tests, package, and GUI smoke test on Windows 11 ARM64 under x64 emulation |
 | Linux | OpenSSL 1.1.1+ | Linux ARM64 build, tests, package, and GUI smoke test on Ubuntu ARM64 |
 
@@ -107,8 +107,8 @@ create a self-contained package under `dist/`.
 
 ### macOS
 
-Requirements: Xcode command-line tools, Homebrew, CMake, Ninja, and Qt
-WebEngine 6.11 or newer.
+Requirements: macOS 26 or newer, Xcode command-line tools, Homebrew, CMake,
+Ninja, and Qt WebEngine 6.11 or newer.
 
 ```sh
 brew install qtwebengine cmake ninja
@@ -212,10 +212,12 @@ Rules are stored in `rules.json`. Imported DER (`.cer`, `.der`) and PEM
 }
 ```
 
-`*.example.com` matches subdomains such as `www.example.com`, but not the base
-domain `example.com`; list the base separately when both are required. Broad
-public-suffix wildcards such as `*.com` are rejected. API, CDN, and other
-subresource hosts need their own matching entries.
+`*.example-service.test` matches subdomains such as
+`www.example-service.test`, but not the base domain `example-service.test`;
+list the base separately when both are required. Single-label wildcard bases
+such as `*.com` are rejected. PanBrowser does not implement Public Suffix List
+validation. API, CDN, and other subresource hosts need their own matching
+entries.
 
 Version 1 files retain the legacy `startPage` field for compatibility. After
 its first import, the start page selected in Settings is authoritative.
@@ -265,6 +267,7 @@ to the current user.
 
 - [Architecture and security boundaries](docs/ARCHITECTURE.md)
 - [Bundle auditing and size policy](docs/BUNDLE_POLICY.md)
+- [Changelog](CHANGELOG.md)
 - [Licensing and binary-distribution checklist](docs/LICENSING.md)
 - [macOS release-candidate workflow](docs/RELEASING.md)
 - [Roadmap](ROADMAP.md)
@@ -287,5 +290,5 @@ PanBrowser's original source code, documentation, translations, and build
 scripts are licensed under the [Apache License 2.0](LICENSE), copyright 2026
 Anton Rudakov. Third-party assets and runtime components remain under their
 respective licenses; see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
-Qt, Chromium, and OpenSSL obligations for future binary packages are tracked
+Qt, Chromium, and OpenSSL obligations for binary packages are tracked
 separately in [docs/LICENSING.md](docs/LICENSING.md).

@@ -676,11 +676,14 @@ only then destroys shared browser resources.
 
 ## 12. Build, packaging, and diagnostics
 
-The project requires CMake, Ninja, Qt 6.11 or newer, and C++20. macOS adds the
-Objective-C++ validator and links Security.framework. Windows 10 or newer adds
-the CryptoAPI validator and links Crypt32. Linux links OpenSSL Crypto 1.1.1 or
-newer for its explicit in-memory and distro-default trust stores. Unsupported
-platforms compile the fail-closed validator.
+The project requires CMake, Ninja, Qt 6.11 or newer, and C++20. The current
+Homebrew Qt 6.11.1 deployment contains frameworks built for macOS 26.0, so the
+macOS release build pins `CMAKE_OSX_DEPLOYMENT_TARGET` to `26.0` and links the
+Objective-C++ validator against Security.framework. Lowering the application
+target alone is invalid while those frameworks remain in the bundle. Windows
+10 or newer adds the CryptoAPI validator and links Crypt32. Linux links OpenSSL
+Crypto 1.1.1 or newer for its explicit in-memory and distro-default trust
+stores. Unsupported platforms compile the fail-closed validator.
 
 `project(PanBrowser VERSION ...)` in `CMakeLists.txt` is the single application
 version source. CMake passes it to the executable for runtime diagnostics and
@@ -742,12 +745,13 @@ separate Qt WebEngine 6.11 repository layout. The extracted SDK is cached using
 the installer manifest hash. The locale allowlist and the files that must remain
 in every bundle are documented in `docs/BUNDLE_POLICY.md`.
 
-These outputs are suitable for local and cross-machine testing. Public binary
-distribution still requires platform signing, a supported oldest Linux build
-host, the version-specific work in [LICENSING.md](LICENSING.md), and the
-distribution work tracked in the roadmap. Publishing a source-only tag is a
-separate milestone and does not imply that these binaries are ready for public
-distribution.
+The generic Windows and Linux outputs are suitable for local and cross-machine
+testing. Public distribution still requires platform signing, a supported
+oldest Linux build host, the version-specific work in
+[LICENSING.md](LICENSING.md), and the distribution work tracked in the roadmap.
+The `v0.1.0` source milestone may be accompanied by the separately audited,
+Developer ID-signed but unnotarized macOS ARM64 candidate; it does not imply
+that the generic Windows and Linux packages are public releases.
 
 The x64 Windows path was locally validated in August 2026 inside a Windows 11
 ARM64 VMware Fusion guest using Windows' x64 emulation. The MSVC 2022 build,

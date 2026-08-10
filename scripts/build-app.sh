@@ -12,6 +12,7 @@ cmake_arguments=(
     -B "$build_dir"
     -G Ninja
     -DCMAKE_BUILD_TYPE=Release
+    -DCMAKE_OSX_DEPLOYMENT_TARGET=26.0
 )
 if [[ -n "$qt_root" ]]; then
     cmake_arguments+=("-DCMAKE_PREFIX_PATH=$qt_root")

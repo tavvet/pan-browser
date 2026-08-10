@@ -174,6 +174,10 @@ qtpaths_path="$(dirname "$macdeployqt_path")/qtpaths"
 
 qt_version="$("$qtpaths_path" --qt-version)"
 qt_archdata="$("$qtpaths_path" --query QT_INSTALL_ARCHDATA)"
+deployment_target="$(cache_value CMAKE_OSX_DEPLOYMENT_TARGET)" \
+    || fail "CMAKE_OSX_DEPLOYMENT_TARGET is missing from the CMake cache"
+[[ -n "$deployment_target" ]] \
+    || fail "CMAKE_OSX_DEPLOYMENT_TARGET must not be empty for a release"
 qt_sbom_dir="$qt_archdata/sbom"
 qt_notice_dir="$staged_bundle/Contents/Resources/Documentation/ThirdParty/Qt"
 qt_sbom_target="$qt_notice_dir/SBOM"
@@ -262,6 +266,7 @@ Git commit: $commit
 Git tree state: $git_tree_state
 Qt version: $qt_version
 macOS architecture: $(uname -m)
+macOS deployment target: $deployment_target
 Xcode: $(xcodebuild -version | tr '\n' ' ' | sed 's/[[:space:]]*$//')
 Built at UTC: $build_utc
 Signing identity: $codesign_identity
