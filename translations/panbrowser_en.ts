@@ -5,11 +5,11 @@
     <name>BookmarksDialog</name>
     <message numerus="yes">
         <location filename="../src/BookmarksDialog.cpp" line="154"/>
-        <location filename="../tests/TrustConfigurationTests.cpp" line="774"/>
-        <location filename="../tests/TrustConfigurationTests.cpp" line="778"/>
-        <location filename="../tests/TrustConfigurationTests.cpp" line="782"/>
-        <location filename="../tests/TrustConfigurationTests.cpp" line="791"/>
-        <location filename="../tests/TrustConfigurationTests.cpp" line="795"/>
+        <location filename="../tests/TrustConfigurationTests.cpp" line="776"/>
+        <location filename="../tests/TrustConfigurationTests.cpp" line="780"/>
+        <location filename="../tests/TrustConfigurationTests.cpp" line="784"/>
+        <location filename="../tests/TrustConfigurationTests.cpp" line="793"/>
+        <location filename="../tests/TrustConfigurationTests.cpp" line="797"/>
         <source>%n bookmark(s)</source>
         <translation>
             <numerusform>%n bookmark</numerusform>
@@ -31,11 +31,22 @@
 <context>
     <name>MainWindow</name>
     <message numerus="yes">
-        <location filename="../src/MainWindow.cpp" line="2073"/>
+        <location filename="../src/MainWindow.cpp" line="2081"/>
         <source>%n custom rule(s)</source>
         <translation>
             <numerusform>%n custom rule</numerusform>
             <numerusform>%n custom rules</numerusform>
+        </translation>
+    </message>
+</context>
+<context>
+    <name>OpenSourceNoticesDialog</name>
+    <message numerus="yes">
+        <location filename="../src/OpenSourceNoticesDialog.cpp" line="168"/>
+        <source>%n notice file(s)</source>
+        <translation>
+            <numerusform>%n notice file</numerusform>
+            <numerusform>%n notice files</numerusform>
         </translation>
     </message>
 </context>

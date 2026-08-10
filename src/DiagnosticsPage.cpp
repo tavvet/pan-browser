@@ -1,6 +1,7 @@
 #include "DiagnosticsPage.h"
 
 #include "BrowserProfile.h"
+#include "OpenSourceNoticesDialog.h"
 
 #include <QApplication>
 #include <QClipboard>
@@ -240,6 +241,15 @@ DiagnosticsPage::DiagnosticsPage(
         valueLabel(m_profile->persistentStoragePath(), this)
     );
     paths->addRow(tr("HTTP cache"), valueLabel(m_profile->cachePath(), this));
+
+    addSectionLabel(layout, tr("LEGAL"), this);
+    QFormLayout *legal = addCard(layout, this);
+    auto *openSourceNotices = new QPushButton(tr("Open-source notices"), this);
+    legal->addRow(tr("Licenses and attributions"), openSourceNotices);
+    connect(openSourceNotices, &QPushButton::clicked, this, [this] {
+        OpenSourceNoticesDialog dialog(m_profile, this);
+        dialog.exec();
+    });
 
     auto *actions = new QHBoxLayout();
     auto *copy = new QPushButton(tr("Copy diagnostic report"), this);

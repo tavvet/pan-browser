@@ -128,22 +128,32 @@ The Qt Company summarizes its open-source distribution expectations in
 [Obligations of the GPL and LGPL](https://www.qt.io/development/open-source-lgpl-obligations).
 The exact license texts, rather than this checklist, control.
 
-## 5. Current package gap
+## 5. Current package status
 
-The existing scripts create local testing packages. They include the PanBrowser
-README, Apache license, third-party notice, and this licensing guide in the
-platform package. None of the scripts currently assembles the full Qt/Chromium
-license set, Qt source offer, or in-application open-source notice.
+The generic platform build scripts create local testing packages. They include
+the PanBrowser README, Apache license, third-party notice, and this licensing
+guide, but they do not yet implement the complete binary-distribution checklist
+above. Windows CI artifacts and Linux packages should therefore remain
+development/test artifacts.
 
-The macOS release-candidate script additionally collects the installed Qt SPDX
-documents, Chromium's top-level license, build provenance, and the final bundle
-audit. Those improve traceability but do not replace the missing full
-Qt/Chromium notices, corresponding-source handling, or in-application notice.
+The macOS release-candidate script goes further. It collects the installed Qt
+SPDX documents, Chromium's top-level license, exact notices for loose Homebrew
+runtime libraries, the common LGPL/GPL texts, raw Homebrew source metadata,
+build provenance, an LGPL corresponding-source offer, and the final bundle
+audit. The settings UI exposes the packaged files under **Diagnostics >
+Open-source notices** and exposes Chromium's embedded component notices through
+the runtime `chrome://credits` page.
 
-Therefore, the current `dist/` outputs and Windows CI artifacts should remain
-development/test artifacts until the binary-distribution checklist above is
-implemented and verified. This limitation does not block publication of a
-properly licensed source repository and source-only `v0.1.0` tag.
+For the macOS candidate, the remaining distributor task is operational rather
+than a missing UI or packaging feature: retain the exact corresponding source,
+patches, build information, and checksums for the full offer period and be able
+to fulfil the packaged written offer. Homebrew cache entries are not an
+adequate long-term archive. This repository does not claim that the generated
+package is legally complete merely because the collector succeeds.
+
+These limitations do not block publication of a properly licensed source
+repository and source-only `v0.1.0` tag. A person distributing a binary remains
+responsible for completing and verifying the checklist for that exact package.
 
 ## 6. Maintenance rule
 

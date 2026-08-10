@@ -8,6 +8,7 @@ release_dir="$project_dir/dist/release-macos"
 staged_bundle="$release_dir/PanBrowser.app"
 main_entitlements="$project_dir/packaging/macos/PanBrowser.entitlements"
 helper_entitlements="$project_dir/packaging/macos/QtWebEngineProcess.entitlements"
+runtime_license_collector="$project_dir/scripts/collect-macos-runtime-licenses.sh"
 
 codesign_identity="${PANBROWSER_CODESIGN_IDENTITY:-}"
 notary_profile="${PANBROWSER_NOTARY_PROFILE:-}"
@@ -82,9 +83,10 @@ done
 [[ "$(uname -s)" == "Darwin" ]] || fail "this script must run on macOS"
 [[ -f "$main_entitlements" ]] || fail "missing $main_entitlements"
 [[ -f "$helper_entitlements" ]] || fail "missing $helper_entitlements"
+[[ -x "$runtime_license_collector" ]] || fail "missing executable $runtime_license_collector"
 
 for required_command in \
-    cmake codesign ditto file git lipo otool plutil security shasum spctl \
+    brew cmake codesign ditto file git lipo otool plutil security shasum spctl \
     xcodebuild xcrun; do
     command -v "$required_command" >/dev/null 2>&1 \
         || fail "required command is unavailable: $required_command"
@@ -193,8 +195,41 @@ chromium_license="$qt_webengine_prefix/LICENSE.Chromium"
 [[ -f "$chromium_license" ]] || fail "Qt Chromium license is missing: $chromium_license"
 ditto "$chromium_license" "$qt_notice_dir/LICENSE.Chromium"
 
+runtime_notice_dir="$staged_bundle/Contents/Resources/Documentation/ThirdParty/Runtime"
+"$runtime_license_collector" "$staged_bundle" "$runtime_notice_dir"
+
 version="$(plutil -extract CFBundleShortVersionString raw -o - \
     "$staged_bundle/Contents/Info.plist")"
+cat > "$staged_bundle/Contents/Resources/Documentation/QT-LICENSE-SELECTION.txt" <<EOF
+PanBrowser $version uses the dynamically linked open-source Qt libraries in
+this package under the GNU Lesser General Public License version 3. Chromium
+and other third-party components embedded by Qt WebEngine retain their own
+licenses, including components under the GNU Lesser General Public License
+version 2.1. See ThirdParty/Qt/SBOM, ThirdParty/Qt/LICENSE.Chromium, and
+ThirdParty/Runtime for the version-matched inventory and notices.
+
+PanBrowser itself is licensed under the Apache License 2.0. Recipients may
+replace the dynamically linked Qt frameworks with ABI-compatible modified
+versions, subject to macOS code-signing and Gatekeeper requirements.
+EOF
+cat > "$staged_bundle/Contents/Resources/Documentation/SOURCE-OFFER.txt" <<EOF
+PanBrowser $version — LGPL Corresponding Source Offer
+
+For at least three years after the last distribution of this release, the
+PanBrowser distributor offers any recipient of this binary the complete
+machine-readable corresponding source code required by the LGPL for the exact
+Qt, Qt WebEngine/Chromium, and other LGPL-covered libraries included here,
+including distributor modifications and the information needed to rebuild and
+replace those libraries. The source will be provided by download or, on
+request, on a physical medium for no more than the reasonable cost of delivery.
+
+Request the source by opening an issue at:
+https://github.com/tavvet/pan-browser/issues
+
+The exact versions, upstream source URLs, checksums, Homebrew formula metadata,
+Qt SPDX documents, and included license texts are packaged under
+Contents/Resources/Documentation/ThirdParty.
+EOF
 main_binary="$staged_bundle/Contents/MacOS/PanBrowser"
 helper_app="$staged_bundle/Contents/Frameworks/QtWebEngineCore.framework/Versions/A/Helpers/QtWebEngineProcess.app"
 helper_binary="$helper_app/Contents/MacOS/QtWebEngineProcess"

@@ -87,6 +87,8 @@ set(PANBROWSER_APP_SOURCES
     src/HttpAuthenticationController.h
     src/Localization.cpp
     src/Localization.h
+    src/OpenSourceNoticesDialog.cpp
+    src/OpenSourceNoticesDialog.h
     src/AddressCompletionPopup.cpp
     src/AddressCompletionPopup.h
     src/HistorySettingsPage.cpp

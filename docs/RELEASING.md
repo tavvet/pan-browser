@@ -10,6 +10,8 @@ publication gate.
 
 - macOS with Xcode command-line tools and `notarytool`.
 - The same Qt installation used by the normal macOS build.
+- Cached source archives used to extract version-matched license texts. Fetch
+  them once with `brew fetch --build-from-source qtbase freetype`.
 - A valid `Developer ID Application` certificate and its private key in a
   local Keychain.
 - An Apple Developer team allowed to submit Developer ID software for
@@ -73,7 +75,11 @@ The script:
 
 1. runs the normal release build and tests;
 2. stages a separate bundle under `dist/release-macos/`;
-3. copies the installed Qt SPDX manifests and Chromium top-level license;
+3. copies the installed Qt SPDX manifests, Chromium top-level license, exact
+   notices for loose Homebrew runtime libraries, common LGPL/GPL texts from the
+   exact QtBase source archive, the FreeType License from its exact source
+   archive, raw Homebrew source metadata, and an LGPL corresponding-source
+   offer; the build fails if a deployed loose library has no inventory mapping;
 4. signs Mach-O files, the Qt WebEngine helper, Qt frameworks, and the outer
    application in inside-out order;
 5. applies Hardened Runtime, secure timestamps, and the required WebEngine,

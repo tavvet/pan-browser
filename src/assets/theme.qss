@@ -790,6 +790,40 @@ QDialog#certificateDetailsDialog QLabel#dialogTitle {
     font-weight: 700;
 }
 
+QDialog#openSourceNoticesDialog,
+QDialog#chromiumCreditsDialog {
+    background: #15181e;
+}
+
+QDialog#openSourceNoticesDialog QLabel#dialogTitle {
+    color: #f5f7fb;
+    font-size: 22px;
+    font-weight: 700;
+}
+
+QDialog#openSourceNoticesDialog QLabel#dialogSubtitle,
+QDialog#openSourceNoticesDialog QLabel#fieldHint,
+QDialog#chromiumCreditsDialog QLabel#dialogSubtitle {
+    color: #929baa;
+}
+
+QDialog#openSourceNoticesDialog QListWidget#noticeFiles,
+QDialog#openSourceNoticesDialog QPlainTextEdit#noticeText {
+    background: #1b1f26;
+    color: #dce1e9;
+    border: 1px solid #303641;
+    border-radius: 8px;
+}
+
+QDialog#openSourceNoticesDialog QListWidget#noticeFiles::item {
+    padding: 6px 8px;
+}
+
+QDialog#openSourceNoticesDialog QListWidget#noticeFiles::item:selected {
+    color: #ffffff;
+    background: #315ea8;
+}
+
 QDialog#certificateDetailsDialog QLabel#dialogSubtitle {
     color: #929baa;
 }
