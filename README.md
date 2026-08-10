@@ -265,6 +265,7 @@ to the current user.
 - [Architecture and security boundaries](docs/ARCHITECTURE.md)
 - [Bundle auditing and size policy](docs/BUNDLE_POLICY.md)
 - [Licensing and binary-distribution checklist](docs/LICENSING.md)
+- [macOS release-candidate workflow](docs/RELEASING.md)
 - [Roadmap](ROADMAP.md)
 - [Third-party notices](THIRD_PARTY_NOTICES.md)
 

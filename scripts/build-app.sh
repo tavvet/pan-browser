@@ -55,16 +55,11 @@ helper_binary="$helper_contents/MacOS/QtWebEngineProcess"
     -codesign=- \
     -executable="$helper_binary"
 
-# Some Qt framework dependencies are resolved relative to the nested helper.
-if [[ ! -e "$helper_contents/Frameworks" ]]; then
-    ln -s ../../../../../.. "$helper_contents/Frameworks"
-fi
-
 mkdir -p "$project_dir/dist"
 cmake -E remove_directory "$destination"
 /usr/bin/ditto "$build_dir/PanBrowser.app" "$destination"
 
-# Sign the final copied bundle so ditto cannot invalidate a sealed helper link.
+# Sign the final copied bundle after deployment has finished mutating it.
 /usr/bin/codesign --force --deep --sign - "$destination"
 # A second pass seals dylibs signed during the first deep traversal inside
 # their containing Qt frameworks.

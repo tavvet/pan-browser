@@ -699,6 +699,20 @@ ctest --test-dir build --output-on-failure
 copies the result to `dist/PanBrowser.app`, ad-hoc signs the complete bundle,
 and verifies the signature. It reads `MACDEPLOYQT_EXECUTABLE` from the CMake
 cache so deployment always uses the same Qt installation as the build.
+The second deployment pass rewrites the helper to use direct `@loader_path`
+references to the outer Frameworks directory; no symlink is allowed to escape
+the nested helper bundle because that fails strict code-signature validation.
+
+`scripts/release-macos.sh` is intentionally separate from that developer path.
+It stages a fresh copy, adds Qt build metadata, signs embedded Mach-O code and
+bundles from the inside out with a Developer ID Application identity, preserves
+the Qt WebEngine JIT entitlements, adds camera and microphone entitlements,
+enables Hardened Runtime and secure timestamps, and rejects `get-task-allow`.
+An explicit notarization mode submits a temporary ZIP, waits for Apple, staples
+the accepted ticket to the staged app, performs Gatekeeper assessment, and only
+then creates the final ZIP. Credentials are referenced solely by a non-secret
+`notarytool` Keychain profile; the script accepts no Apple password or API key.
+See [RELEASING.md](RELEASING.md).
 
 Windows and Linux use CMake's Qt deployment API during `cmake --install`.
 Qt's deployment hooks collect linked libraries, plugins, translations,

@@ -135,6 +135,11 @@ README, Apache license, third-party notice, and this licensing guide in the
 platform package. None of the scripts currently assembles the full Qt/Chromium
 license set, Qt source offer, or in-application open-source notice.
 
+The macOS release-candidate script additionally collects the installed Qt SPDX
+documents, Chromium's top-level license, build provenance, and the final bundle
+audit. Those improve traceability but do not replace the missing full
+Qt/Chromium notices, corresponding-source handling, or in-application notice.
+
 Therefore, the current `dist/` outputs and Windows CI artifacts should remain
 development/test artifacts until the binary-distribution checklist above is
 implemented and verified. This limitation does not block publication of a

@@ -191,6 +191,7 @@ if(APPLE)
         LICENSE
         THIRD_PARTY_NOTICES.md
         docs/LICENSING.md
+        docs/RELEASING.md
     )
     set_source_files_properties(${PANBROWSER_LICENSE_DOCUMENTS} PROPERTIES
         MACOSX_PACKAGE_LOCATION "Resources/Documentation"
@@ -251,7 +252,8 @@ if(WIN32 OR CMAKE_SYSTEM_NAME STREQUAL "Linux")
     install(TARGETS PanBrowser
         RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
     )
-    install(FILES README.md LICENSE THIRD_PARTY_NOTICES.md docs/LICENSING.md
+    install(FILES README.md LICENSE THIRD_PARTY_NOTICES.md
+        docs/LICENSING.md docs/RELEASING.md
         DESTINATION ${CMAKE_INSTALL_DATADIR}/doc/PanBrowser
     )
     qt_generate_deploy_app_script(
