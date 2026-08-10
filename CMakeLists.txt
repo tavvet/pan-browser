@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.24)
 
-project(PanBrowser VERSION 0.1.0 LANGUAGES CXX)
+project(PanBrowser VERSION 0.2.0 LANGUAGES CXX)
 
 include(GNUInstallDirs)
 
@@ -61,6 +61,8 @@ set(PANBROWSER_APP_SOURCES
     src/BrowserProfile.h
     src/BrowserPreferences.cpp
     src/BrowserPreferences.h
+    src/BrowserShortcut.cpp
+    src/BrowserShortcut.h
     src/BrowserPage.cpp
     src/BrowserPage.h
     src/CredentialPromptDialog.cpp
@@ -298,6 +300,8 @@ qt_add_executable(PanBrowserTests
     src/BrowserProfile.h
     src/BrowserPreferences.cpp
     src/BrowserPreferences.h
+    src/BrowserShortcut.cpp
+    src/BrowserShortcut.h
     src/CredentialPromptDialog.cpp
     src/CredentialPromptDialog.h
     src/DownloadHistoryStore.cpp

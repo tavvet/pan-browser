@@ -87,7 +87,8 @@ independent browser profiles.
 Each tab owns one `QWebEngineView` and one `BrowserPage`. `BrowserTabState` in
 `MainWindow` contains UI state that Qt WebEngine does not provide as a single
 unit: loading progress, pending restored URL, history transition, TLS status,
-and the custom rule accepted for the top-level origin.
+the custom rule accepted for the top-level origin, and an optional developer
+tools window.
 
 `MainWindow.cpp` is intentionally the orchestration layer. Parsing, policy,
 storage, and geometry calculations live in smaller classes so they can be unit
@@ -376,7 +377,25 @@ the prompt queue.
 When adding a WebEngine capability, decide explicitly whether it belongs in
 `PermissionPolicy`; never rely only on Chromium's default prompt behavior.
 
-### 6.1 Localization
+### 6.1 Developer tools
+
+Developer tools are an explicit profile preference and default to disabled.
+`MainWindow` removes Qt's `InspectElement` action from every tab's standard
+context menu, then adds a PanBrowser-owned replacement only while the
+preference is enabled. The same preference controls the menu action and its
+keyboard shortcuts. Qt's ordinary shortcut dispatch remains the primary path;
+an application event filter handles the same registered key sequences when a
+focused WebEngine surface consumes `ShortcutOverride`. The filter is limited
+to the active PanBrowser window and enabled actions, and suppresses auto-repeat.
+
+Opening the tools creates a separate `QWebEngineView` on the shared
+`BrowserProfile` and binds it with `QWebEnginePage::setDevToolsPage()`. Each tab
+may own at most one such window. Closing the tab, disabling the preference, or
+destroying its browser window detaches and deletes the developer tools view
+before the shared profile is destroyed. The Chromium credits view and other
+service views never receive these actions.
+
+### 6.2 Localization
 
 English source strings are the fallback. `LocalizationManager` resolves the
 saved `InterfaceLanguage` before `MainWindow` is constructed: an explicit
@@ -391,7 +410,7 @@ distributed Qt translation package. The first implementation applies language
 changes after restart; rebuilding every manually constructed widget in live
 WebEngine windows would add avoidable state and lifecycle risk.
 
-### 6.2 Secure DNS
+### 6.3 Secure DNS
 
 `DnsSettings` owns the versioned resolver configuration and validates both the
 built-in and user-defined providers. The safe default is `System`: Chromium
@@ -414,7 +433,7 @@ account-specific identifiers. Serialized settings are capped at 256 KiB on
 both read and write, so the editor cannot create a file that the next launch
 would reject.
 
-### 6.3 Proxy
+### 6.4 Proxy
 
 `ProxySettings` owns a versioned browser-wide configuration with three modes:
 operating-system proxy, no proxy, and one manual proxy. Manual configuration is
@@ -523,7 +542,7 @@ directory.
 | `~/Applications/PanBrowser Apps/*.app` | `WebAppShortcutManager` | macOS-only signed launchers; each deletion target is verified by its embedded app ID. |
 | `session.json` | `SessionStore` | Up to 30 restorable HTTP(S) tabs, atomically written. URL credentials are removed before persistence and again when legacy data is loaded. |
 | `downloads.json` | `DownloadHistoryStore` | Up to 200 download records; paths and source host, not complete source URLs. |
-| native `QSettings` | `BrowserPreferences`, window/download UI | Start page, startup/cookie/history/language choices, window geometry, last download directory, and pending data-reset marker. |
+| native `QSettings` | `BrowserPreferences`, window/download UI | Start page, startup/cookie/history/language/developer-tools choices, window geometry, last download directory, and pending data-reset marker. |
 
 Session cookies are discarded by default. Enabling “keep sign-ins” changes the
 profile to `ForcePersistentCookies`; otherwise only cookies explicitly marked
@@ -697,10 +716,12 @@ cmake --build build --parallel
 ctest --test-dir build --output-on-failure
 ```
 
-`scripts/build-app.sh` performs a macOS release build, runs tests, executes
-`macdeployqt` twice so the nested `QtWebEngineProcess` helper is fixed up,
-copies the result to `dist/PanBrowser.app`, ad-hoc signs the complete bundle,
-and verifies the signature. It reads `MACDEPLOYQT_EXECUTABLE` from the CMake
+`scripts/build-app.sh` performs a macOS release build in the dedicated
+`build-macos-release/` directory, runs tests, executes `macdeployqt` twice so
+the nested `QtWebEngineProcess` helper is fixed up, copies the result to
+`dist/PanBrowser.app`, ad-hoc signs the complete bundle, and verifies the
+signature. The separate directory prevents deployment from mutating the normal
+development build. The script reads `MACDEPLOYQT_EXECUTABLE` from the CMake
 cache so deployment always uses the same Qt installation as the build.
 The second deployment pass rewrites the helper to use direct `@loader_path`
 references to the outer Frameworks directory; no symlink is allowed to escape

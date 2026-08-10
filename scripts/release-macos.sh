@@ -150,7 +150,7 @@ ditto "$source_bundle" "$staged_bundle"
 ditto "$project_dir/docs/RELEASING.md" \
     "$staged_bundle/Contents/Resources/Documentation/RELEASING.md"
 
-build_cache="$project_dir/build/CMakeCache.txt"
+build_cache="$project_dir/build-macos-release/CMakeCache.txt"
 [[ -f "$build_cache" ]] || fail "CMake cache is missing: $build_cache"
 
 cache_value() {

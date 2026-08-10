@@ -1,7 +1,7 @@
 # Releasing PanBrowser
 
 This document describes the macOS release-candidate workflow for PanBrowser
-0.1.x. Windows and Linux currently remain build-from-source platforms. A signed
+0.x. Windows and Linux currently remain build-from-source platforms. A signed
 or notarized artifact is not automatically ready for public distribution: the
 binary-distribution checklist in [LICENSING.md](LICENSING.md) remains the
 publication gate.
@@ -166,7 +166,7 @@ Before publishing a candidate:
 5. smoke-test navigation, trust rules, downloads, HTTP authentication,
    camera/microphone/location permissions, and an installed web app;
 6. compare the ZIP checksum with the committed or published checksum;
-7. create and push the annotated `v0.1.0` tag only after verification.
+7. create and push the annotated `v<version>` tag only after verification.
 
 The release script deliberately keeps the ordinary `build-app.sh` workflow
 ad-hoc signed. Developer ID signing and notarization are explicit release

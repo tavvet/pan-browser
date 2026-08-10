@@ -3,7 +3,7 @@
 set -euo pipefail
 
 project_dir="$(cd "$(dirname "$0")/.." && pwd)"
-build_dir="$project_dir/build"
+build_dir="$project_dir/build-macos-release"
 destination="$project_dir/dist/PanBrowser.app"
 qt_root="${QT_ROOT:-}"
 

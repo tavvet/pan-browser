@@ -7,6 +7,7 @@
 #include "BookmarksDialog.h"
 #include "BrowserPage.h"
 #include "BrowserProfile.h"
+#include "BrowserShortcut.h"
 #include "CertificateTrustValidator.h"
 #include "DownloadManager.h"
 #include "DownloadsPanel.h"
@@ -38,6 +39,7 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QKeyEvent>
 #include <QBuffer>
 #include <QLabel>
 #include <QLineEdit>
@@ -245,12 +247,17 @@ MainWindow::MainWindow(
 
 MainWindow::~MainWindow()
 {
+    if (qApp)
+        qApp->removeEventFilter(this);
     if (m_ownsBrowserResources) {
         while (!m_popupWindows.isEmpty()) {
             if (MainWindow *popup = m_popupWindows.takeLast())
                 delete popup;
         }
     }
+    const QList<QWebEngineView *> webViews = m_tabStates.keys();
+    for (QWebEngineView *webView : webViews)
+        closeDeveloperTools(webView);
     delete m_permissionController;
     m_permissionController = nullptr;
     delete takeCentralWidget();
@@ -294,6 +301,23 @@ void MainWindow::closeEvent(QCloseEvent *event)
         }
     }
     QMainWindow::closeEvent(event);
+}
+
+bool MainWindow::eventFilter(QObject *watched, QEvent *event)
+{
+    if (event->type() == QEvent::KeyPress
+        && isActiveWindow()
+        && m_preferences.developerToolsEnabled()
+        && m_developerToolsAction) {
+        auto *keyEvent = static_cast<QKeyEvent *>(event);
+        if (BrowserShortcut::matches(*keyEvent, m_developerToolsAction->shortcuts())) {
+            event->accept();
+            if (!keyEvent->isAutoRepeat())
+                m_developerToolsAction->trigger();
+            return true;
+        }
+    }
+    return QMainWindow::eventFilter(watched, event);
 }
 
 void MainWindow::createInterface()
@@ -610,6 +634,24 @@ void MainWindow::createInterface()
     });
 
     fileMenu->addSeparator();
+    m_developerToolsAction = fileMenu->addAction(tr("Developer Tools"));
+#if defined(Q_OS_MACOS)
+    m_developerToolsAction->setShortcuts({
+        QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_I),
+        QKeySequence(Qt::Key_F12),
+    });
+#else
+    m_developerToolsAction->setShortcuts({
+        QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_I),
+        QKeySequence(Qt::Key_F12),
+    });
+#endif
+    m_developerToolsAction->setShortcutContext(Qt::WindowShortcut);
+    connect(m_developerToolsAction, &QAction::triggered, this, [this] {
+        openDeveloperTools(currentWebView());
+    });
+
+    fileMenu->addSeparator();
     QAction *settingsAction = fileMenu->addAction(
         QIcon(QStringLiteral(":/assets/icons/settings.svg")),
         tr("Settings…")
@@ -695,6 +737,8 @@ void MainWindow::createInterface()
         m_ruleCount->hide();
     }
 
+    applyDeveloperToolsPreference();
+    qApp->installEventFilter(this);
 }
 
 MainWindow *MainWindow::createPopupWindow(
@@ -795,6 +839,15 @@ QWebEngineView *MainWindow::createTab(
     }
     m_tabStates.insert(webView, state);
     connectBrowserSignals(webView);
+    webView->setContextMenuPolicy(Qt::CustomContextMenu);
+    connect(
+        webView,
+        &QWidget::customContextMenuRequested,
+        this,
+        [this, webView](const QPoint &position) {
+            showWebContextMenu(webView, position);
+        }
+    );
 
     const int stackIndex = m_tabStack->addWidget(webView);
     const QString initialTitle = restoredTitle.isEmpty()
@@ -825,6 +878,7 @@ void MainWindow::closeTab(int index)
 
     m_permissionController->cancelForView(webView);
     cancelExternalUrlPrompt(webView);
+    closeDeveloperTools(webView);
     if (m_findView == webView) {
         ++m_findRequestSerial;
         m_findView.clear();
@@ -856,6 +910,110 @@ void MainWindow::closeTab(int index)
 QWebEngineView *MainWindow::currentWebView() const
 {
     return qobject_cast<QWebEngineView *>(m_tabStack->currentWidget());
+}
+
+QString MainWindow::developerToolsWindowTitle(QWebEngineView *webView) const
+{
+    QString pageTitle;
+    if (webView)
+        pageTitle = webView->title().trimmed();
+    if (pageTitle.isEmpty())
+        pageTitle = tr("Untitled page");
+    return tr("Developer Tools — %1").arg(pageTitle);
+}
+
+void MainWindow::showWebContextMenu(QWebEngineView *webView, const QPoint &position)
+{
+    if (!webView || !m_tabStates.contains(webView))
+        return;
+
+    QMenu *menu = webView->createStandardContextMenu();
+    if (!menu)
+        return;
+    menu->setAttribute(Qt::WA_DeleteOnClose);
+
+    if (QAction *defaultInspect = webView->pageAction(QWebEnginePage::InspectElement))
+        menu->removeAction(defaultInspect);
+    while (!menu->actions().isEmpty() && menu->actions().constLast()->isSeparator())
+        menu->removeAction(menu->actions().constLast());
+
+    if (m_preferences.developerToolsEnabled()) {
+        if (!menu->actions().isEmpty())
+            menu->addSeparator();
+        QAction *inspect = menu->addAction(tr("Inspect Element"));
+        connect(inspect, &QAction::triggered, this, [this, webView] {
+            openDeveloperTools(webView, true);
+        });
+    }
+
+    menu->popup(webView->mapToGlobal(position));
+}
+
+void MainWindow::openDeveloperTools(QWebEngineView *webView, bool inspectElement)
+{
+    if (!m_preferences.developerToolsEnabled()
+        || !webView
+        || !m_tabStates.contains(webView)) {
+        return;
+    }
+
+    BrowserTabState &state = m_tabStates[webView];
+    QWebEngineView *developerToolsView = state.developerToolsView;
+    if (!developerToolsView) {
+        developerToolsView = new QWebEngineView(m_profile, this);
+        developerToolsView->setWindowFlag(Qt::Window, true);
+        developerToolsView->setAttribute(Qt::WA_DeleteOnClose);
+        developerToolsView->setWindowIcon(windowIcon());
+        developerToolsView->resize(1100, 760);
+        developerToolsView->setWindowTitle(developerToolsWindowTitle(webView));
+        state.developerToolsView = developerToolsView;
+        webView->page()->setDevToolsPage(developerToolsView->page());
+
+        const QPointer<QWebEngineView> inspectedView(webView);
+        connect(developerToolsView, &QObject::destroyed, this, [this, inspectedView] {
+            if (!inspectedView)
+                return;
+            const auto stateIt = m_tabStates.find(inspectedView);
+            if (stateIt != m_tabStates.end())
+                stateIt->developerToolsView.clear();
+        });
+    }
+
+    developerToolsView->setWindowTitle(developerToolsWindowTitle(webView));
+    developerToolsView->show();
+    developerToolsView->raise();
+    developerToolsView->activateWindow();
+    if (inspectElement)
+        webView->page()->triggerAction(QWebEnginePage::InspectElement);
+}
+
+void MainWindow::closeDeveloperTools(QWebEngineView *webView)
+{
+    const auto stateIt = m_tabStates.find(webView);
+    if (stateIt == m_tabStates.end() || !stateIt->developerToolsView)
+        return;
+
+    QWebEngineView *developerToolsView = stateIt->developerToolsView;
+    stateIt->developerToolsView.clear();
+    if (webView && webView->page()->devToolsPage() == developerToolsView->page())
+        webView->page()->setDevToolsPage(nullptr);
+    developerToolsView->setAttribute(Qt::WA_DeleteOnClose, false);
+    delete developerToolsView;
+}
+
+void MainWindow::applyDeveloperToolsPreference()
+{
+    const bool enabled = m_preferences.developerToolsEnabled();
+    if (m_developerToolsAction) {
+        m_developerToolsAction->setEnabled(enabled);
+        m_developerToolsAction->setVisible(enabled);
+    }
+    if (enabled)
+        return;
+
+    const QList<QWebEngineView *> webViews = m_tabStates.keys();
+    for (QWebEngineView *webView : webViews)
+        closeDeveloperTools(webView);
 }
 
 void MainWindow::activatePendingTab(QWebEngineView *webView)
@@ -953,6 +1111,9 @@ void MainWindow::connectBrowserSignals(QWebEngineView *webView)
             else
                 setWindowTitle(title.isEmpty() ? QStringLiteral("PanBrowser") : title + QStringLiteral(" — PanBrowser"));
         }
+        const auto stateIt = m_tabStates.constFind(webView);
+        if (stateIt != m_tabStates.cend() && stateIt->developerToolsView)
+            stateIt->developerToolsView->setWindowTitle(developerToolsWindowTitle(webView));
         if (m_preferences.saveBrowsingHistory() && m_historyStore && m_historyStore->isOpen()) {
             QString error;
             if (!m_historyStore->updateTitle(webView->url(), title, &error))
@@ -1936,6 +2097,7 @@ void MainWindow::openSettingsPage(int page)
         m_searchSettings = dialog.searchSettings();
         m_dnsSettings = dialog.dnsSettings();
         m_proxySettings = dialog.proxySettings();
+        applyDeveloperToolsPreference();
         if (!m_preferences.saveBrowsingHistory() && m_addressCompletionPopup)
             m_addressCompletionPopup->hide();
         updateAddressPlaceholder();
@@ -1950,6 +2112,7 @@ void MainWindow::openSettingsPage(int page)
                 popup->m_searchSettings = m_searchSettings;
                 popup->m_dnsSettings = m_dnsSettings;
                 popup->m_proxySettings = m_proxySettings;
+                popup->applyDeveloperToolsPreference();
                 popup->updateAddressPlaceholder();
                 if (!m_preferences.saveBrowsingHistory()
                     && popup->m_addressCompletionPopup) {

@@ -1,8 +1,29 @@
 # PanBrowser roadmap
 
-Current source milestone: **0.1.0**. The `v0.1.0` tag records the first public
-project baseline; it is not a promise of general-purpose browser stability.
-Checked items describe what is implemented and verified in that baseline.
+Current development target: **0.2.0 (unreleased)**. The `v0.1.0` tag records the
+first public project baseline; `main` now contains post-release development and
+may be unstable.
+
+## 0.2.0 scope
+
+### Browser polish
+
+- [x] Add opt-in developer tools that default to disabled and expose both
+  Inspect Element and keyboard shortcuts only while enabled.
+- [ ] Complete favicon support: persist icons received from WebEngine and show
+  them in restored tabs, bookmarks, history, and address-bar suggestions.
+- [ ] Page zoom controls with keyboard shortcuts, per-site persistence, and
+  reset to 100%.
+- [ ] Allow user-initiated `chrome://` navigation from the address bar behind a
+  safety warning. Keep redirects, page scripts, and popups blocked; offer a
+  per-profile "Don't show again" preference that can be reset in settings.
+
+### Portable app and trust workflows
+
+- [ ] Add Windows Start Menu and Linux `.desktop` launchers for installed web
+  apps.
+- [ ] Add import and export for versioned trust profiles without silently
+  installing certificates into the operating-system trust store.
 
 ## 0.1.0 scope
 
@@ -65,32 +86,23 @@ Checked items describe what is implemented and verified in that baseline.
   separate third-party and binary-distribution obligations.
 - [ ] Run a final regression pass using the packaged artifact on each tested
   platform.
-- [x] Prepare source milestone notes and the `v0.1.0` tag. A GitHub Release and
-  public binary archives are not required for this source milestone.
+- [x] Publish the `v0.1.0` tag and GitHub prerelease with the signed,
+  explicitly unnotarized macOS ARM64 archive and checksum.
 
-## Planned after 0.1.0
+## Backlog after 0.2.0
 
 ### Browser improvements
 
-- [ ] Complete favicon support: persist icons received from WebEngine and show
-  them in restored tabs, bookmarks, history, and address-bar suggestions.
-- [ ] Page zoom controls with keyboard shortcuts, per-site persistence, and
-  reset to 100%.
-- [ ] Allow user-initiated `chrome://` navigation from the address bar behind a
-  safety warning. Keep redirects, page scripts, and popups blocked; offer a
-  per-profile "Don't show again" preference that can be reset in settings.
+- [ ] Add a controlled update mechanism.
 
 ### Trust, platform, and maintenance
 
 - [ ] Add a freshness-checked revocation cache for custom trust anchors.
-- [ ] Add Windows Start Menu and Linux `.desktop` launchers for installed web
-  apps.
 - [ ] Run native Windows 11 x64 and Windows 10 smoke tests outside emulation.
 - [ ] Run Linux package and GUI smoke tests on representative x86-64, X11, and
   Wayland environments.
 - [ ] Evaluate further Qt plugin or resource removal with cross-platform smoke
   tests before changing the retained-runtime policy.
-- [ ] Add a controlled update mechanism.
 
 ### Web app profiles
 
@@ -122,7 +134,6 @@ Checked items describe what is implemented and verified in that baseline.
   require macOS 26.
 - [ ] Publish versioned binary archives and checksums when supported downloads
   are ready.
-- [ ] Importable and exportable trust profiles.
 
 ### Proxy extensions
 

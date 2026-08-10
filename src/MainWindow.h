@@ -25,6 +25,7 @@ class QTimer;
 class QToolBar;
 class QMenu;
 class QAction;
+class QPoint;
 class BookmarkStore;
 class BrowserProfile;
 class DownloadButton;
@@ -64,6 +65,7 @@ public:
 
 protected:
     void closeEvent(QCloseEvent *event) override;
+    bool eventFilter(QObject *watched, QEvent *event) override;
 
 private:
     enum class WindowRole {
@@ -88,6 +90,7 @@ private:
         HistoryTransition pendingHistoryTransition = HistoryTransition::Other;
         QUrl manifestUrl;
         QString manifestTitle;
+        QPointer<QWebEngineView> developerToolsView;
     };
 
     struct PendingManifestRequest {
@@ -133,6 +136,11 @@ private:
     void openFindBar();
     void closeFindBar();
     void findInPage(bool backward = false);
+    void showWebContextMenu(QWebEngineView *webView, const QPoint &position);
+    void openDeveloperTools(QWebEngineView *webView, bool inspectElement = false);
+    void closeDeveloperTools(QWebEngineView *webView);
+    void applyDeveloperToolsPreference();
+    [[nodiscard]] QString developerToolsWindowTitle(QWebEngineView *webView) const;
     void openSettings();
     void openWebAppsSettings();
     void openSettingsPage(int page);
@@ -197,6 +205,7 @@ private:
     QAction *m_bookmarkAction = nullptr;
     QAction *m_closeFindAction = nullptr;
     QAction *m_installWebAppAction = nullptr;
+    QAction *m_developerToolsAction = nullptr;
     QMenu *m_webAppsMenu = nullptr;
     QLabel *m_trustStatus = nullptr;
     QLabel *m_ruleCount = nullptr;

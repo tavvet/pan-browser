@@ -20,10 +20,11 @@ boundary visible and auditable.
 
 > [!WARNING]
 > PanBrowser is not a security-maintained replacement for a general-purpose
-> browser and has no automatic update mechanism. Version `0.1.0` is the first
-> source milestone. Its macOS 26+ ARM64 release candidate is Developer
-> ID-signed but not notarized, so Gatekeeper requires an explicit user override.
-> Windows and Linux remain build-from-source platforms.
+> browser and has no automatic update mechanism. The latest published milestone
+> is `v0.1.0`; its macOS 26+ ARM64 binary is Developer ID-signed but not
+> notarized, so Gatekeeper requires an explicit user override. The `main` branch
+> targets `0.2.0` and may contain unfinished changes. Windows and Linux remain
+> build-from-source platforms.
 
 ## Why PanBrowser?
 
@@ -56,6 +57,8 @@ test environments, and other deliberately scoped trust configurations.
 - Manifest-based web app installation, including lightweight application
   shortcuts on macOS.
 - English and Russian interfaces with system-language detection.
+- Opt-in developer tools with Inspect Element and familiar keyboard shortcuts;
+  disabled by default.
 - Diagnostics for the application, Chromium, graphics, sandbox, profile,
   DNS, and proxy state.
 

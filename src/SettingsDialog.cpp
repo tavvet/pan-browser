@@ -430,6 +430,30 @@ void SettingsDialog::createInterface(const QUrl &currentUrl, Page initialPage)
     privacyHint->setWordWrap(true);
     privacyLayout->addWidget(privacyHint);
     generalLayout->addWidget(privacyCard);
+
+    auto *developerLabel = new QLabel(tr("DEVELOPER TOOLS"), generalPage);
+    developerLabel->setObjectName(QStringLiteral("sectionLabel"));
+    generalLayout->addWidget(developerLabel);
+
+    auto *developerCard = new QFrame(generalPage);
+    developerCard->setObjectName(QStringLiteral("settingsCard"));
+    auto *developerLayout = new QVBoxLayout(developerCard);
+    developerLayout->setContentsMargins(18, 16, 18, 16);
+    developerLayout->setSpacing(8);
+    m_developerToolsEnabled = new QCheckBox(
+        tr("Enable developer tools"),
+        developerCard
+    );
+    m_developerToolsEnabled->setChecked(m_preferences.developerToolsEnabled());
+    developerLayout->addWidget(m_developerToolsEnabled);
+    auto *developerHint = new QLabel(
+        tr("Developer tools can read and modify page content and browser data for the inspected site."),
+        developerCard
+    );
+    developerHint->setObjectName(QStringLiteral("fieldHint"));
+    developerHint->setWordWrap(true);
+    developerLayout->addWidget(developerHint);
+    generalLayout->addWidget(developerCard);
     generalLayout->addStretch();
     m_pages->addWidget(generalPage);
 
@@ -673,6 +697,7 @@ BrowserPreferences SettingsDialog::preferencesFromControls() const
     );
     preferences.setPersistSessionCookies(m_persistSessionCookies->isChecked());
     preferences.setSaveBrowsingHistory(m_historyPage->saveHistoryEnabled());
+    preferences.setDeveloperToolsEnabled(m_developerToolsEnabled->isChecked());
     preferences.setInterfaceLanguage(
         static_cast<InterfaceLanguage>(m_interfaceLanguage->currentData().toInt())
     );

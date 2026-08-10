@@ -80,6 +80,10 @@ BrowserPreferences BrowserPreferences::load(const QUrl &legacyStartPage, QString
         QStringLiteral("Browser/saveBrowsingHistory"),
         true
     ).toBool();
+    preferences.m_developerToolsEnabled = settings.value(
+        QStringLiteral("Browser/developerToolsEnabled"),
+        false
+    ).toBool();
     preferences.m_interfaceLanguage = loadInterfaceLanguage(settings);
     settings.sync();
     if (settings.status() != QSettings::NoError) {
@@ -140,6 +144,7 @@ bool BrowserPreferences::save(QString *error) const
     );
     settings.setValue(QStringLiteral("Browser/persistSessionCookies"), m_persistSessionCookies);
     settings.setValue(QStringLiteral("Browser/saveBrowsingHistory"), m_saveBrowsingHistory);
+    settings.setValue(QStringLiteral("Browser/developerToolsEnabled"), m_developerToolsEnabled);
     settings.setValue(QStringLiteral("Browser/language"), languageSetting(m_interfaceLanguage));
     settings.sync();
     if (settings.status() != QSettings::NoError)
@@ -198,6 +203,16 @@ bool BrowserPreferences::saveBrowsingHistory() const
 void BrowserPreferences::setSaveBrowsingHistory(bool save)
 {
     m_saveBrowsingHistory = save;
+}
+
+bool BrowserPreferences::developerToolsEnabled() const
+{
+    return m_developerToolsEnabled;
+}
+
+void BrowserPreferences::setDeveloperToolsEnabled(bool enabled)
+{
+    m_developerToolsEnabled = enabled;
 }
 
 InterfaceLanguage BrowserPreferences::interfaceLanguage() const

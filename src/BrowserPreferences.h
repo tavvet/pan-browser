@@ -39,6 +39,9 @@ public:
     [[nodiscard]] bool saveBrowsingHistory() const;
     void setSaveBrowsingHistory(bool save);
 
+    [[nodiscard]] bool developerToolsEnabled() const;
+    void setDeveloperToolsEnabled(bool enabled);
+
     [[nodiscard]] InterfaceLanguage interfaceLanguage() const;
     void setInterfaceLanguage(InterfaceLanguage language);
 
@@ -47,5 +50,6 @@ private:
     StartupMode m_startupMode = StartupMode::StartPage;
     bool m_persistSessionCookies = false;
     bool m_saveBrowsingHistory = true;
+    bool m_developerToolsEnabled = false;
     InterfaceLanguage m_interfaceLanguage = InterfaceLanguage::System;
 };

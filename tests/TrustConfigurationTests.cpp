@@ -4,6 +4,7 @@
 #include "ApplicationLaunch.h"
 #include "BookmarkStore.h"
 #include "BrowserPreferences.h"
+#include "BrowserShortcut.h"
 #include "BrowserDataCleanup.h"
 #include "BrowserProfile.h"
 #include "CertificateTrustValidator.h"
@@ -34,6 +35,7 @@
 #include <QFileInfo>
 #include <QHBoxLayout>
 #include <QLabel>
+#include <QKeyEvent>
 #include <QLineEdit>
 #include <QListWidget>
 #include <QMouseEvent>
@@ -70,6 +72,8 @@ private slots:
     void integratedChromePreservesBaseMarginsAndAvoidsSystemControls();
     void integratedChromeSurvivesSurfaceAndLayoutTeardown();
     void browserPreferencesValidateStartPage();
+    void developerToolsPreferenceDefaultsToDisabled();
+    void browserShortcutFallbackMatchesRegisteredKeys();
     void privateDataFilesUseOwnerOnlyPermissions();
     void interfaceLanguagePreferenceRoundTrips();
     void interfaceLanguageSettingsParsing();
@@ -611,6 +615,46 @@ void TrustConfigurationTests::browserPreferencesValidateStartPage()
         preferences.startPage(),
         QUrl(QStringLiteral("https://example.com/private#section"))
     );
+}
+
+void TrustConfigurationTests::developerToolsPreferenceDefaultsToDisabled()
+{
+    BrowserPreferences preferences;
+    QVERIFY(!preferences.developerToolsEnabled());
+
+    preferences.setDeveloperToolsEnabled(true);
+    QVERIFY(preferences.developerToolsEnabled());
+}
+
+void TrustConfigurationTests::browserShortcutFallbackMatchesRegisteredKeys()
+{
+    const QList<QKeySequence> shortcuts{
+        QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_I),
+        QKeySequence(Qt::Key_F12),
+    };
+    const QKeyEvent developerTools(
+        QEvent::KeyPress,
+        Qt::Key_I,
+        Qt::ControlModifier | Qt::AltModifier
+    );
+    QVERIFY(BrowserShortcut::matches(developerTools, shortcuts));
+
+    const QKeyEvent functionKey(QEvent::KeyPress, Qt::Key_F12, Qt::NoModifier);
+    QVERIFY(BrowserShortcut::matches(functionKey, shortcuts));
+
+    const QKeyEvent extraModifier(
+        QEvent::KeyPress,
+        Qt::Key_I,
+        Qt::ControlModifier | Qt::AltModifier | Qt::ShiftModifier
+    );
+    QVERIFY(!BrowserShortcut::matches(extraModifier, shortcuts));
+
+    const QKeyEvent released(
+        QEvent::KeyRelease,
+        Qt::Key_I,
+        Qt::ControlModifier | Qt::AltModifier
+    );
+    QVERIFY(!BrowserShortcut::matches(released, shortcuts));
 }
 
 void TrustConfigurationTests::privateDataFilesUseOwnerOnlyPermissions()

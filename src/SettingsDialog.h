@@ -90,6 +90,7 @@ private:
     QComboBox *m_startupMode = nullptr;
     QComboBox *m_interfaceLanguage = nullptr;
     QCheckBox *m_persistSessionCookies = nullptr;
+    QCheckBox *m_developerToolsEnabled = nullptr;
     SearchSettingsPage *m_searchPage = nullptr;
     DnsSettingsPage *m_dnsPage = nullptr;
     ProxySettingsPage *m_proxyPage = nullptr;

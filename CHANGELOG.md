@@ -4,6 +4,14 @@ This file records PanBrowser source milestones. The project does not yet make
 the compatibility or security-maintenance guarantees of a stable
 general-purpose browser.
 
+## 0.2.0 — Unreleased
+
+Development continues on `main`. The initial scope focuses on browser polish,
+portable web-app integration, and safe transfer of trust configuration.
+
+- Added opt-in developer tools with a profile preference that defaults to off,
+  an Inspect Element context action, and platform-appropriate shortcuts.
+
 ## 0.1.0 — 2026-08-10
 
 The first public source milestone turns the original domain-scoped certificate
