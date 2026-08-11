@@ -5,6 +5,7 @@ class PersistenceAndPolicyTests final : public QObject {
 
 private slots:
     void privateDataFilesUseOwnerOnlyPermissions();
+    void settingsSaveTransactionRestoresFiles();
     void interfaceLanguagePreferenceRoundTrips();
     void interfaceLanguageSettingsParsing();
     void systemInterfaceLanguageUsesFirstSupportedLanguage();
@@ -84,6 +85,38 @@ void PersistenceAndPolicyTests::privateDataFilesUseOwnerOnlyPermissions()
     if (QFileInfo::exists(bookmarksPath + QStringLiteral("-shm")))
         QVERIFY(isOwnerOnly(bookmarksPath + QStringLiteral("-shm")));
 #endif
+}
+
+void PersistenceAndPolicyTests::settingsSaveTransactionRestoresFiles()
+{
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+    const QString existingPath = directory.filePath(QStringLiteral("existing.json"));
+    const QString newPath = directory.filePath(QStringLiteral("new.json"));
+
+    QFile existing(existingPath);
+    QVERIFY(existing.open(QIODevice::WriteOnly));
+    QCOMPARE(existing.write("before"), qint64(6));
+    existing.close();
+
+    QString error;
+    SettingsSaveTransaction transaction;
+    QVERIFY2(transaction.capture({existingPath, newPath}, &error), qPrintable(error));
+
+    QVERIFY(existing.open(QIODevice::WriteOnly | QIODevice::Truncate));
+    QCOMPARE(existing.write("after"), qint64(5));
+    existing.close();
+    QFile created(newPath);
+    QVERIFY(created.open(QIODevice::WriteOnly));
+    QCOMPARE(created.write("temporary"), qint64(9));
+    created.close();
+
+    const QString rollbackError = transaction.rollback();
+    QVERIFY2(rollbackError.isEmpty(), qPrintable(rollbackError));
+    QVERIFY(existing.open(QIODevice::ReadOnly));
+    QCOMPARE(existing.readAll(), QByteArray("before"));
+    existing.close();
+    QVERIFY(!QFile::exists(newPath));
 }
 
 void PersistenceAndPolicyTests::interfaceLanguagePreferenceRoundTrips()

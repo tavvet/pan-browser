@@ -22,6 +22,8 @@ private slots:
     void detachedVideoWindowMovesAndRestoresPage();
     void detachedVideoWindowCloseRequestsReturn();
     void popupGeometryIsVisibleAndUsable();
+    void settingsDialogRegistersEveryPageAndSelectsInitialPage();
+    void generalSettingsPageRoundTripsPreferences();
 };
 
 void WindowInteractionTests::visibleWindowPlacementIsPreserved()
@@ -163,6 +165,99 @@ void WindowInteractionTests::browserPreferencesValidateStartPage()
         preferences.startPage(),
         QUrl(QStringLiteral("https://example.com/private#section"))
     );
+}
+
+void WindowInteractionTests::settingsDialogRegistersEveryPageAndSelectsInitialPage()
+{
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+
+    BrowserProfile profile(false);
+    HistoryStore historyStore(directory.filePath(QStringLiteral("history.sqlite")));
+    WebAppStore webAppStore(directory.filePath(QStringLiteral("web-apps.json")));
+    SettingsDialogContext context;
+    context.trustConfigurationPath = directory.filePath(QStringLiteral("trust.json"));
+    context.searchConfigurationPath = directory.filePath(QStringLiteral("search.json"));
+    context.dnsConfigurationPath = directory.filePath(QStringLiteral("dns.json"));
+    context.proxyConfigurationPath = directory.filePath(QStringLiteral("proxy.json"));
+    context.profile = &profile;
+    context.historyStore = &historyStore;
+    context.webAppStore = &webAppStore;
+    SettingsDialog dialog(
+        context,
+        QUrl(QStringLiteral("https://current.example/")),
+        SettingsDialog::Page::WebApps
+    );
+
+    auto *sidebar = dialog.findChild<QListWidget *>(QStringLiteral("settingsSidebar"));
+    auto *pages = dialog.findChild<QStackedWidget *>(QStringLiteral("settingsPages"));
+    QVERIFY(sidebar);
+    QVERIFY(pages);
+    QCOMPARE(sidebar->count(), 9);
+    QCOMPARE(pages->count(), 9);
+    QCOMPARE(
+        sidebar->currentItem()->data(Qt::UserRole).toInt(),
+        static_cast<int>(SettingsDialog::Page::WebApps)
+    );
+    QCOMPARE(pages->currentWidget()->objectName(), QStringLiteral("webAppsSettingsPage"));
+
+    const QList<SettingsDialog::Page> expectedPages{
+        SettingsDialog::Page::General,
+        SettingsDialog::Page::Search,
+        SettingsDialog::Page::History,
+        SettingsDialog::Page::WebApps,
+        SettingsDialog::Page::PrivacyData,
+        SettingsDialog::Page::Dns,
+        SettingsDialog::Page::Proxy,
+        SettingsDialog::Page::TrustRules,
+        SettingsDialog::Page::Diagnostics,
+    };
+    const QStringList expectedObjectNames{
+        QStringLiteral("generalSettingsPage"),
+        QStringLiteral("searchSettingsPage"),
+        QStringLiteral("historySettingsPage"),
+        QStringLiteral("webAppsSettingsPage"),
+        QStringLiteral("privacyDataSettingsPage"),
+        QStringLiteral("dnsSettingsPage"),
+        QStringLiteral("proxySettingsPage"),
+        QStringLiteral("trustRulesDialog"),
+        QStringLiteral("diagnosticsSettingsPage"),
+    };
+    for (int row = 0; row < expectedPages.size(); ++row) {
+        QCOMPARE(
+            sidebar->item(row)->data(Qt::UserRole).toInt(),
+            static_cast<int>(expectedPages.at(row))
+        );
+        sidebar->setCurrentRow(row);
+        QCOMPARE(pages->currentWidget()->objectName(), expectedObjectNames.at(row));
+    }
+
+}
+
+void WindowInteractionTests::generalSettingsPageRoundTripsPreferences()
+{
+    BrowserPreferences initial;
+    initial.setStartPage(QUrl(QStringLiteral("https://start.example/path")));
+    initial.setStartupMode(StartupMode::RestoreTabs);
+    initial.setPersistSessionCookies(true);
+    initial.setSaveBrowsingHistory(true);
+    initial.setDeveloperToolsEnabled(true);
+    initial.setInterfaceLanguage(InterfaceLanguage::Russian);
+
+    GeneralSettingsPage page(
+        initial,
+        QUrl(QStringLiteral("https://current.example/"))
+    );
+    BrowserPreferences baseline;
+    baseline.setSaveBrowsingHistory(false);
+    const BrowserPreferences result = page.applyTo(baseline);
+
+    QCOMPARE(result.startPage(), initial.startPage());
+    QCOMPARE(result.startupMode(), initial.startupMode());
+    QCOMPARE(result.persistSessionCookies(), initial.persistSessionCookies());
+    QCOMPARE(result.developerToolsEnabled(), initial.developerToolsEnabled());
+    QCOMPARE(result.interfaceLanguage(), initial.interfaceLanguage());
+    QVERIFY(!result.saveBrowsingHistory());
 }
 
 void WindowInteractionTests::developerToolsPreferenceDefaultsToDisabled()

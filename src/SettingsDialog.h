@@ -6,22 +6,39 @@
 #include "SearchSettings.h"
 
 #include <QDialog>
+#include <QHash>
 
-class QCheckBox;
-class QComboBox;
-class QLineEdit;
+class QIcon;
 class QListWidget;
 class QStackedWidget;
 class BrowserProfile;
 class DiagnosticsPage;
 class DnsSettingsPage;
+class GeneralSettingsPage;
 class HistorySettingsPage;
 class HistoryStore;
 class ProxySettingsPage;
+class PrivacyDataSettingsPage;
 class SearchSettingsPage;
 class TrustRulesDialog;
 class WebAppsSettingsPage;
 class WebAppStore;
+
+struct SettingsDialogContext {
+    QString trustConfigurationPath;
+    QString searchConfigurationPath;
+    QString dnsConfigurationPath;
+    QString proxyConfigurationPath;
+    BrowserPreferences preferences;
+    SearchSettings searchSettings;
+    DnsSettings dnsSettings;
+    ProxySettings proxySettings;
+    ProxySettings activeProxySettings;
+    bool networkBlockedByProxyError = false;
+    BrowserProfile *profile = nullptr;
+    HistoryStore *historyStore = nullptr;
+    WebAppStore *webAppStore = nullptr;
+};
 
 class SettingsDialog final : public QDialog {
     Q_OBJECT
@@ -40,19 +57,7 @@ public:
     };
 
     SettingsDialog(
-        const QString &configurationPath,
-        const QString &searchConfigurationPath,
-        const QString &dnsConfigurationPath,
-        const QString &proxyConfigurationPath,
-        const BrowserPreferences &preferences,
-        const SearchSettings &searchSettings,
-        const DnsSettings &dnsSettings,
-        const ProxySettings &proxySettings,
-        const ProxySettings &activeProxySettings,
-        bool networkBlockedByProxyError,
-        BrowserProfile *profile,
-        HistoryStore *historyStore,
-        WebAppStore *webAppStore,
+        const SettingsDialogContext &context,
         const QUrl &currentUrl,
         Page initialPage,
         QWidget *parent = nullptr
@@ -68,7 +73,13 @@ signals:
     void webAppOpenRequested(const QString &id);
 
 private:
-    void createInterface(const QUrl &currentUrl, Page initialPage);
+    void createInterface(
+        const QUrl &currentUrl,
+        Page initialPage,
+        HistoryStore *historyStore,
+        WebAppStore *webAppStore
+    );
+    void registerPage(Page page, const QIcon &icon, const QString &title, QWidget *widget);
     void selectPage(Page page);
     BrowserPreferences preferencesFromControls() const;
     void saveAndClose();
@@ -86,11 +97,9 @@ private:
     BrowserProfile *m_profile = nullptr;
     QListWidget *m_sidebar = nullptr;
     QStackedWidget *m_pages = nullptr;
-    QLineEdit *m_startPage = nullptr;
-    QComboBox *m_startupMode = nullptr;
-    QComboBox *m_interfaceLanguage = nullptr;
-    QCheckBox *m_persistSessionCookies = nullptr;
-    QCheckBox *m_developerToolsEnabled = nullptr;
+    QHash<int, QWidget *> m_pageWidgets;
+    GeneralSettingsPage *m_generalPage = nullptr;
+    PrivacyDataSettingsPage *m_privacyDataPage = nullptr;
     SearchSettingsPage *m_searchPage = nullptr;
     DnsSettingsPage *m_dnsPage = nullptr;
     ProxySettingsPage *m_proxyPage = nullptr;

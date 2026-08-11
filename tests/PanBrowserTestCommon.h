@@ -16,6 +16,7 @@
 #include "DnsSettings.h"
 #include "ExternalNavigationPolicy.h"
 #include "FindBar.h"
+#include "GeneralSettingsPage.h"
 #include "HistoryStore.h"
 #include "HttpAuthenticationController.h"
 #include "Localization.h"
@@ -25,6 +26,8 @@
 #include "ProxyAuthenticationController.h"
 #include "SessionStore.h"
 #include "SearchSettings.h"
+#include "SettingsDialog.h"
+#include "SettingsSaveTransaction.h"
 #include "TrustConfiguration.h"
 #include "TrustSettings.h"
 #include "WebAppStore.h"
@@ -50,6 +53,7 @@
 #include <QPlatformSurfaceEvent>
 #include <QProcess>
 #include <QSignalSpy>
+#include <QStackedWidget>
 #include <QSettings>
 #include <QTemporaryDir>
 #include <QTest>

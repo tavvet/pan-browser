@@ -2639,20 +2639,22 @@ void MainWindow::openSettingsPage(int page)
         return;
     }
 
+    SettingsDialogContext settingsContext;
+    settingsContext.trustConfigurationPath = m_configurationPath;
+    settingsContext.searchConfigurationPath = m_searchConfigurationPath;
+    settingsContext.dnsConfigurationPath = m_dnsConfigurationPath;
+    settingsContext.proxyConfigurationPath = m_proxyConfigurationPath;
+    settingsContext.preferences = m_preferences;
+    settingsContext.searchSettings = m_searchSettings;
+    settingsContext.dnsSettings = m_dnsSettings;
+    settingsContext.proxySettings = m_proxySettings;
+    settingsContext.activeProxySettings = m_activeProxySettings;
+    settingsContext.networkBlockedByProxyError = m_networkBlockedByProxyError;
+    settingsContext.profile = m_profile;
+    settingsContext.historyStore = m_historyStore;
+    settingsContext.webAppStore = m_webAppStore;
     SettingsDialog dialog(
-        m_configurationPath,
-        m_searchConfigurationPath,
-        m_dnsConfigurationPath,
-        m_proxyConfigurationPath,
-        m_preferences,
-        m_searchSettings,
-        m_dnsSettings,
-        m_proxySettings,
-        m_activeProxySettings,
-        m_networkBlockedByProxyError,
-        m_profile,
-        m_historyStore,
-        m_webAppStore,
+        settingsContext,
         urlForTab(currentWebView()),
         static_cast<SettingsDialog::Page>(page),
         this

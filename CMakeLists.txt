@@ -89,6 +89,8 @@ set(PANBROWSER_APP_SOURCES
     src/ExternalNavigationPolicy.h
     src/FindBar.cpp
     src/FindBar.h
+    src/GeneralSettingsPage.cpp
+    src/GeneralSettingsPage.h
     src/HistoryStore.cpp
     src/HistoryStore.h
     src/HttpAuthenticationController.cpp
@@ -113,6 +115,8 @@ set(PANBROWSER_APP_SOURCES
     src/ProxySettings.h
     src/ProxySettingsPage.cpp
     src/ProxySettingsPage.h
+    src/PrivacyDataSettingsPage.cpp
+    src/PrivacyDataSettingsPage.h
     src/PrivateData.cpp
     src/PrivateData.h
     src/main.cpp
@@ -126,6 +130,8 @@ set(PANBROWSER_APP_SOURCES
     src/SearchSettingsPage.h
     src/SettingsDialog.cpp
     src/SettingsDialog.h
+    src/SettingsSaveTransaction.cpp
+    src/SettingsSaveTransaction.h
     src/TrustConfiguration.cpp
     src/TrustConfiguration.h
     src/TrustRulesDialog.cpp
@@ -323,40 +329,64 @@ qt_add_executable(PanBrowserTests
     src/CredentialPromptDialog.h
     src/DownloadHistoryStore.cpp
     src/DownloadHistoryStore.h
+    src/DiagnosticsPage.cpp
+    src/DiagnosticsPage.h
     src/DetachedVideoWindow.cpp
     src/DetachedVideoWindow.h
     src/DnsSettings.cpp
     src/DnsSettings.h
+    src/DnsSettingsPage.cpp
+    src/DnsSettingsPage.h
     src/ExternalNavigationPolicy.cpp
     src/ExternalNavigationPolicy.h
     src/FindBar.cpp
     src/FindBar.h
+    src/GeneralSettingsPage.cpp
+    src/GeneralSettingsPage.h
     src/HistoryStore.cpp
     src/HistoryStore.h
+    src/HistorySettingsPage.cpp
+    src/HistorySettingsPage.h
     src/HttpAuthenticationController.cpp
     src/HttpAuthenticationController.h
     src/Localization.cpp
     src/Localization.h
     src/PermissionPolicy.cpp
     src/PermissionPolicy.h
+    src/OpenSourceNoticesDialog.cpp
+    src/OpenSourceNoticesDialog.h
     src/ProxyAuthenticationController.cpp
     src/ProxyAuthenticationController.h
     src/ProxySettings.cpp
     src/ProxySettings.h
+    src/ProxySettingsPage.cpp
+    src/ProxySettingsPage.h
+    src/PrivacyDataSettingsPage.cpp
+    src/PrivacyDataSettingsPage.h
     src/PrivateData.cpp
     src/PrivateData.h
     src/SessionStore.cpp
     src/SessionStore.h
     src/SearchSettings.cpp
     src/SearchSettings.h
+    src/SearchSettingsPage.cpp
+    src/SearchSettingsPage.h
+    src/SettingsDialog.cpp
+    src/SettingsDialog.h
+    src/SettingsSaveTransaction.cpp
+    src/SettingsSaveTransaction.h
     src/TrustConfiguration.cpp
     src/TrustConfiguration.h
     src/TrustSettings.cpp
     src/TrustSettings.h
+    src/TrustRulesDialog.cpp
+    src/TrustRulesDialog.h
     src/UrlSanitization.cpp
     src/UrlSanitization.h
     src/WebAppStore.cpp
     src/WebAppStore.h
+    src/WebAppsSettingsPage.cpp
+    src/WebAppsSettingsPage.h
     src/WebAppShortcutManager.cpp
     src/WebAppShortcutManager.h
     src/WindowPlacement.cpp
