@@ -1,7 +1,12 @@
 #include <QDebug>
 #include <QString>
+#include <QtGlobal>
 
-int runTrustAndCertificateTests(int argc, char **argv);
+int runTrustConfigurationTests(int argc, char **argv);
+int runTrustRulesSettingsTests(int argc, char **argv);
+#if defined(Q_OS_WIN) || defined(Q_OS_LINUX)
+int runCertificateTrustValidatorTests(int argc, char **argv);
+#endif
 int runWindowInteractionTests(int argc, char **argv);
 int runPersistenceAndPolicyTests(int argc, char **argv);
 int runNetworkSettingsAndAuthTests(int argc, char **argv);
@@ -21,8 +26,14 @@ int main(int argc, char *argv[])
     --argc;
     argv[argc] = nullptr;
 
-    if (suite == QStringLiteral("trust"))
-        return runTrustAndCertificateTests(argc, argv);
+    if (suite == QStringLiteral("trust-configuration"))
+        return runTrustConfigurationTests(argc, argv);
+    if (suite == QStringLiteral("trust-rules"))
+        return runTrustRulesSettingsTests(argc, argv);
+#if defined(Q_OS_WIN) || defined(Q_OS_LINUX)
+    if (suite == QStringLiteral("certificate-validator"))
+        return runCertificateTrustValidatorTests(argc, argv);
+#endif
     if (suite == QStringLiteral("window"))
         return runWindowInteractionTests(argc, argv);
     if (suite == QStringLiteral("persistence"))

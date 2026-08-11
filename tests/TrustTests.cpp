@@ -1,6 +1,6 @@
 #include "PanBrowserTestCommon.h"
 
-class TrustAndCertificateTests final : public QObject {
+class TrustConfigurationTests final : public QObject {
     Q_OBJECT
 
 private slots:
@@ -12,6 +12,12 @@ private slots:
     void runtimeRejectsOverlappingEnabledDomains();
     void customModeRequiresCertificate();
     void disabledDraftMayBeIncomplete();
+};
+
+class TrustRulesSettingsTests final : public QObject {
+    Q_OBJECT
+
+private slots:
     void trustRulesPageLoadsRulesAndSelectsFirst();
     void certificateRepositoryRollsBackPendingImport();
     void certificateRepositoryFinalizesOnlyReferencedImports();
@@ -19,11 +25,16 @@ private slots:
 #if defined(Q_OS_UNIX)
     void certificateRepositoryRetainsFailedCleanupForRetry();
 #endif
+};
+
 #if defined(Q_OS_WIN) || defined(Q_OS_LINUX)
+class CertificateTrustValidatorTests final : public QObject {
+    Q_OBJECT
+
+private slots:
     void nativeCertificateValidatorTrustsConfiguredAnchor();
     void nativeCertificateValidatorRejectsWrongHostname();
     void nativeCertificateValidatorRejectsWeakKey();
-#endif
 #if defined(Q_OS_LINUX)
     void linuxCertificateValidatorSupportsSystemPlusCustom();
     void linuxCertificateValidatorBuildsIntermediateChain();
@@ -31,6 +42,7 @@ private slots:
     void linuxCertificateValidatorMatchesIpSan();
 #endif
 };
+#endif
 
 namespace {
 
@@ -180,7 +192,7 @@ QList<QSslCertificate> testCertificates(const QByteArray &pem)
 
 } // namespace
 
-void TrustAndCertificateTests::exactDomainIsCaseInsensitive()
+void TrustConfigurationTests::exactDomainIsCaseInsensitive()
 {
     const DomainPattern pattern = DomainPattern::parse(QStringLiteral("Example.COM."));
     QVERIFY(pattern.isValid());
@@ -189,7 +201,7 @@ void TrustAndCertificateTests::exactDomainIsCaseInsensitive()
     QVERIFY(!pattern.matches(QStringLiteral("www.example.com")));
 }
 
-void TrustAndCertificateTests::wildcardMatchesSubdomainsOnly()
+void TrustConfigurationTests::wildcardMatchesSubdomainsOnly()
 {
     const DomainPattern pattern = DomainPattern::parse(QStringLiteral("*.example.com"));
     QVERIFY(pattern.isValid());
@@ -199,14 +211,14 @@ void TrustAndCertificateTests::wildcardMatchesSubdomainsOnly()
     QVERIFY(!pattern.matches(QStringLiteral("notexample.com")));
 }
 
-void TrustAndCertificateTests::malformedWildcardsAreRejected()
+void TrustConfigurationTests::malformedWildcardsAreRejected()
 {
     QVERIFY(!DomainPattern::parse(QStringLiteral("*.com")).isValid());
     QVERIFY(!DomainPattern::parse(QStringLiteral("exam*ple.com")).isValid());
     QVERIFY(!DomainPattern::parse(QString()).isValid());
 }
 
-void TrustAndCertificateTests::settingsRoundTripAndCreateBackup()
+void TrustConfigurationTests::settingsRoundTripAndCreateBackup()
 {
     QTemporaryDir directory;
     QVERIFY(directory.isValid());
@@ -267,7 +279,7 @@ void TrustAndCertificateTests::settingsRoundTripAndCreateBackup()
     QCOMPARE(loaded.rules().at(0).mode, TrustMode::SystemOnly);
 }
 
-void TrustAndCertificateTests::overlappingEnabledDomainsAreRejected()
+void TrustConfigurationTests::overlappingEnabledDomainsAreRejected()
 {
     QTemporaryDir directory;
     QVERIFY(directory.isValid());
@@ -290,7 +302,7 @@ void TrustAndCertificateTests::overlappingEnabledDomainsAreRejected()
     QVERIFY(error.contains(QStringLiteral("overlaps rule First")));
 }
 
-void TrustAndCertificateTests::runtimeRejectsOverlappingEnabledDomains()
+void TrustConfigurationTests::runtimeRejectsOverlappingEnabledDomains()
 {
     QTemporaryDir directory;
     QVERIFY(directory.isValid());
@@ -324,7 +336,7 @@ void TrustAndCertificateTests::runtimeRejectsOverlappingEnabledDomains()
     QCOMPARE(policy.ruleCount(), 0);
 }
 
-void TrustAndCertificateTests::customModeRequiresCertificate()
+void TrustConfigurationTests::customModeRequiresCertificate()
 {
     QTemporaryDir directory;
     QVERIFY(directory.isValid());
@@ -341,7 +353,7 @@ void TrustAndCertificateTests::customModeRequiresCertificate()
     QVERIFY(error.contains(QStringLiteral("requires at least one certificate")));
 }
 
-void TrustAndCertificateTests::disabledDraftMayBeIncomplete()
+void TrustConfigurationTests::disabledDraftMayBeIncomplete()
 {
     QTemporaryDir directory;
     QVERIFY(directory.isValid());
@@ -360,7 +372,7 @@ void TrustAndCertificateTests::disabledDraftMayBeIncomplete()
     );
 }
 
-void TrustAndCertificateTests::trustRulesPageLoadsRulesAndSelectsFirst()
+void TrustRulesSettingsTests::trustRulesPageLoadsRulesAndSelectsFirst()
 {
     QTemporaryDir directory;
     QVERIFY(directory.isValid());
@@ -393,7 +405,7 @@ void TrustAndCertificateTests::trustRulesPageLoadsRulesAndSelectsFirst()
     QVERIFY2(page.validate(&error), qPrintable(error));
 }
 
-void TrustAndCertificateTests::certificateRepositoryRollsBackPendingImport()
+void TrustRulesSettingsTests::certificateRepositoryRollsBackPendingImport()
 {
     QTemporaryDir directory;
     QVERIFY(directory.isValid());
@@ -422,7 +434,7 @@ void TrustAndCertificateTests::certificateRepositoryRollsBackPendingImport()
     QVERIFY(!QFile::exists(importedPath));
 }
 
-void TrustAndCertificateTests::certificateRepositoryFinalizesOnlyReferencedImports()
+void TrustRulesSettingsTests::certificateRepositoryFinalizesOnlyReferencedImports()
 {
     QTemporaryDir directory;
     QVERIFY(directory.isValid());
@@ -457,7 +469,7 @@ void TrustAndCertificateTests::certificateRepositoryFinalizesOnlyReferencedImpor
     QVERIFY(!QFile::exists(unreferencedPath));
 }
 
-void TrustAndCertificateTests::certificateRepositoryRejectsInvalidFiles()
+void TrustRulesSettingsTests::certificateRepositoryRejectsInvalidFiles()
 {
     QTemporaryDir directory;
     QVERIFY(directory.isValid());
@@ -480,7 +492,7 @@ void TrustAndCertificateTests::certificateRepositoryRejectsInvalidFiles()
 }
 
 #if defined(Q_OS_UNIX)
-void TrustAndCertificateTests::certificateRepositoryRetainsFailedCleanupForRetry()
+void TrustRulesSettingsTests::certificateRepositoryRetainsFailedCleanupForRetry()
 {
     QTemporaryDir directory;
     QVERIFY(directory.isValid());
@@ -528,7 +540,7 @@ void TrustAndCertificateTests::certificateRepositoryRetainsFailedCleanupForRetry
 #endif
 
 #if defined(Q_OS_WIN) || defined(Q_OS_LINUX)
-void TrustAndCertificateTests::nativeCertificateValidatorTrustsConfiguredAnchor()
+void CertificateTrustValidatorTests::nativeCertificateValidatorTrustsConfiguredAnchor()
 {
     const QList<QSslCertificate> chain = testCertificates(validatorLeafCertificate);
     const QList<QSslCertificate> anchors = testCertificates(validatorRootCertificate);
@@ -544,7 +556,7 @@ void TrustAndCertificateTests::nativeCertificateValidatorTrustsConfiguredAnchor(
     QVERIFY2(result.trusted, qPrintable(result.explanation));
 }
 
-void TrustAndCertificateTests::nativeCertificateValidatorRejectsWrongHostname()
+void CertificateTrustValidatorTests::nativeCertificateValidatorRejectsWrongHostname()
 {
     const CertificateValidationResult result = CertificateTrustValidator::evaluate(
         testCertificates(validatorLeafCertificate),
@@ -556,7 +568,7 @@ void TrustAndCertificateTests::nativeCertificateValidatorRejectsWrongHostname()
     QVERIFY(!result.explanation.isEmpty());
 }
 
-void TrustAndCertificateTests::nativeCertificateValidatorRejectsWeakKey()
+void CertificateTrustValidatorTests::nativeCertificateValidatorRejectsWeakKey()
 {
     const CertificateValidationResult result = CertificateTrustValidator::evaluate(
         testCertificates(validatorWeakLeafCertificate),
@@ -570,7 +582,7 @@ void TrustAndCertificateTests::nativeCertificateValidatorRejectsWeakKey()
 #endif
 
 #if defined(Q_OS_LINUX)
-void TrustAndCertificateTests::linuxCertificateValidatorSupportsSystemPlusCustom()
+void CertificateTrustValidatorTests::linuxCertificateValidatorSupportsSystemPlusCustom()
 {
     QTemporaryDir directory;
     QVERIFY(directory.isValid());
@@ -596,7 +608,7 @@ void TrustAndCertificateTests::linuxCertificateValidatorSupportsSystemPlusCustom
     QVERIFY2(result.trusted, qPrintable(result.explanation));
 }
 
-void TrustAndCertificateTests::linuxCertificateValidatorBuildsIntermediateChain()
+void CertificateTrustValidatorTests::linuxCertificateValidatorBuildsIntermediateChain()
 {
     QList<QSslCertificate> chain = testCertificates(linuxValidatorLeafCertificate);
     chain.append(testCertificates(linuxValidatorIntermediateCertificate));
@@ -611,7 +623,7 @@ void TrustAndCertificateTests::linuxCertificateValidatorBuildsIntermediateChain(
     QVERIFY2(result.trusted, qPrintable(result.explanation));
 }
 
-void TrustAndCertificateTests::linuxCertificateValidatorTrustsIntermediateAnchor()
+void CertificateTrustValidatorTests::linuxCertificateValidatorTrustsIntermediateAnchor()
 {
     const CertificateValidationResult result = CertificateTrustValidator::evaluate(
         testCertificates(linuxValidatorLeafCertificate),
@@ -622,7 +634,7 @@ void TrustAndCertificateTests::linuxCertificateValidatorTrustsIntermediateAnchor
     QVERIFY2(result.trusted, qPrintable(result.explanation));
 }
 
-void TrustAndCertificateTests::linuxCertificateValidatorMatchesIpSan()
+void CertificateTrustValidatorTests::linuxCertificateValidatorMatchesIpSan()
 {
     QList<QSslCertificate> chain = testCertificates(linuxValidatorLeafCertificate);
     chain.append(testCertificates(linuxValidatorIntermediateCertificate));
@@ -637,12 +649,30 @@ void TrustAndCertificateTests::linuxCertificateValidatorMatchesIpSan()
 }
 #endif
 
-int runTrustAndCertificateTests(int argc, char **argv)
+int runTrustConfigurationTests(int argc, char **argv)
 {
     QApplication application(argc, argv);
     application.setAttribute(Qt::AA_Use96Dpi, true);
-    TrustAndCertificateTests tests;
-    return QTest::qExec(&tests, argc, argv);
+    TrustConfigurationTests configurationTests;
+    return QTest::qExec(&configurationTests, argc, argv);
 }
 
-#include "TrustAndCertificateTests.moc"
+int runTrustRulesSettingsTests(int argc, char **argv)
+{
+    QApplication application(argc, argv);
+    application.setAttribute(Qt::AA_Use96Dpi, true);
+    TrustRulesSettingsTests settingsTests;
+    return QTest::qExec(&settingsTests, argc, argv);
+}
+
+#if defined(Q_OS_WIN) || defined(Q_OS_LINUX)
+int runCertificateTrustValidatorTests(int argc, char **argv)
+{
+    QApplication application(argc, argv);
+    application.setAttribute(Qt::AA_Use96Dpi, true);
+    CertificateTrustValidatorTests validatorTests;
+    return QTest::qExec(&validatorTests, argc, argv);
+}
+#endif
+
+#include "TrustTests.moc"

@@ -311,7 +311,7 @@ qt_add_executable(PanBrowserTests
     tests/PanBrowserTestCommon.h
     tests/PanBrowserTestsMain.cpp
     tests/PersistenceAndPolicyTests.cpp
-    tests/TrustAndCertificateTests.cpp
+    tests/TrustTests.cpp
     tests/WindowInteractionTests.cpp
     src/AddressLineEdit.cpp
     src/AddressLineEdit.h
@@ -458,7 +458,17 @@ qt_add_translations(
     RESOURCE_PREFIX "/i18n"
 )
 
-add_test(NAME PanBrowserTrustTests COMMAND PanBrowserTests trust)
+add_test(
+    NAME PanBrowserTrustConfigurationTests
+    COMMAND PanBrowserTests trust-configuration
+)
+add_test(NAME PanBrowserTrustRulesTests COMMAND PanBrowserTests trust-rules)
+if(WIN32 OR CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    add_test(
+        NAME PanBrowserCertificateValidatorTests
+        COMMAND PanBrowserTests certificate-validator
+    )
+endif()
 add_test(NAME PanBrowserWindowTests COMMAND PanBrowserTests window)
 add_test(NAME PanBrowserPersistenceTests COMMAND PanBrowserTests persistence)
 add_test(NAME PanBrowserNetworkTests COMMAND PanBrowserTests network)

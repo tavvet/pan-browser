@@ -78,7 +78,16 @@ if ($LASTEXITCODE -ne 0) {
     if ($UsesVisualStudioGenerator) {
         $TestExecutable = Join-Path $BuildDir "Release\PanBrowserTests.exe"
         if (Test-Path -LiteralPath $TestExecutable -PathType Leaf) {
-            foreach ($TestSuite in @("trust", "window", "persistence", "network", "browsing", "webapps")) {
+            foreach ($TestSuite in @(
+                "trust-configuration",
+                "trust-rules",
+                "certificate-validator",
+                "window",
+                "persistence",
+                "network",
+                "browsing",
+                "webapps"
+            )) {
                 $DiagnosticPrefix = Join-Path $BuildDir "PanBrowserTests.$TestSuite"
                 $DiagnosticOutput = "$DiagnosticPrefix.stdout.txt"
                 $DiagnosticError = "$DiagnosticPrefix.stderr.txt"

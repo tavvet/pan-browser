@@ -829,19 +829,27 @@ intentionally omitted.
 
 ## 13. Tests and change discipline
 
-`tests/TrustConfigurationTests.cpp` is a Qt Test executable covering the pure
-policy and persistence layers: domains and rule validation, settings backups,
+`PanBrowserTests` is a single Qt Test executable with named suites dispatched by
+`tests/PanBrowserTestsMain.cpp`. The source is split by feature boundary instead
+of collecting the entire browser test surface in one QObject:
+
+- `TrustTests.cpp` contains focused `trust-configuration`, `trust-rules`, and
+  platform-only `certificate-validator` suites;
+- `WindowInteractionTests.cpp` covers browser-window interaction and chrome;
+- `PersistenceAndPolicyTests.cpp` covers stored state and navigation policy;
+- `NetworkSettingsAndAuthTests.cpp` covers DNS, proxy, permissions, and auth;
+- `BrowsingFeaturesTests.cpp` covers address suggestions, history, bookmarks,
+  find-in-page, and zoom;
+- `ApplicationAndWebAppTests.cpp` covers launch coordination and web apps.
+
+Together these suites cover domains and rule validation, settings backups,
 window placement, sessions, cleanup boundaries, downloads, permissions,
 external navigation, popup geometry, search parsing, history ranking/deletion,
-bookmark CRUD and normalization, combined suggestion ranking,
-proxy persistence, validation, and application modes; page-zoom origin
-normalization, persistence, shortcut matching, and scroll accumulation; corrupt-database
-behavior; ghost completion; find-bar keyboard behavior; web-app manifest
-validation, scope enforcement, and registry persistence; DNS settings
-validation, persistence, and mode application; and native custom-anchor,
-hostname, and weak-key validation on Windows and Linux. Window-chrome tests
-verify the macOS safe-area calculations and verify that unsupported platforms
-do not receive expanded-client-area flags.
+bookmark CRUD and normalization, combined suggestion ranking, proxy and DNS
+settings, page zoom, corrupt-database behavior, web-app persistence, and native
+custom-anchor, hostname, and weak-key validation on Windows and Linux.
+Window-chrome tests verify the macOS safe-area calculations and verify that
+unsupported platforms do not receive expanded-client-area flags.
 
 The test target deliberately excludes `MainWindow` and a live WebEngine process,
 so signal wiring and visual state still need a short manual smoke test after
