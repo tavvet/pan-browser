@@ -53,7 +53,7 @@
 <context>
     <name>TrustRulesDialog</name>
     <message numerus="yes">
-        <location filename="../src/TrustRulesDialog.cpp" line="531"/>
+        <location filename="../src/TrustRuleEditor.cpp" line="269"/>
         <source> · %n certificates</source>
         <translation>
             <numerusform> · %n certificate</numerusform>

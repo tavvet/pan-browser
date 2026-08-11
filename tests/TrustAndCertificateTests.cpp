@@ -12,6 +12,13 @@ private slots:
     void runtimeRejectsOverlappingEnabledDomains();
     void customModeRequiresCertificate();
     void disabledDraftMayBeIncomplete();
+    void trustRulesPageLoadsRulesAndSelectsFirst();
+    void certificateRepositoryRollsBackPendingImport();
+    void certificateRepositoryFinalizesOnlyReferencedImports();
+    void certificateRepositoryRejectsInvalidFiles();
+#if defined(Q_OS_UNIX)
+    void certificateRepositoryRetainsFailedCleanupForRetry();
+#endif
 #if defined(Q_OS_WIN) || defined(Q_OS_LINUX)
     void nativeCertificateValidatorTrustsConfiguredAnchor();
     void nativeCertificateValidatorRejectsWrongHostname();
@@ -25,7 +32,6 @@ private slots:
 #endif
 };
 
-#if defined(Q_OS_WIN) || defined(Q_OS_LINUX)
 namespace {
 
 const QByteArray validatorRootCertificate = QByteArrayLiteral(R"CERT(
@@ -165,13 +171,14 @@ GU12WV1Rbhb9H/DfDaogjSmDDeNg6M65/piB4MdCK9IFJEckMcxWBeY8bRVv/vkI
 )CERT");
 #endif
 
+#if defined(Q_OS_WIN) || defined(Q_OS_LINUX)
 QList<QSslCertificate> testCertificates(const QByteArray &pem)
 {
     return QSslCertificate::fromData(pem, QSsl::Pem);
 }
+#endif
 
 } // namespace
-#endif
 
 void TrustAndCertificateTests::exactDomainIsCaseInsensitive()
 {
@@ -352,6 +359,173 @@ void TrustAndCertificateTests::disabledDraftMayBeIncomplete()
         qPrintable(error)
     );
 }
+
+void TrustAndCertificateTests::trustRulesPageLoadsRulesAndSelectsFirst()
+{
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+    const QString path = directory.filePath(QStringLiteral("rules.json"));
+
+    TrustSettings settings;
+    TrustRuleSettings firstRule;
+    firstRule.name = QStringLiteral("First bank");
+    firstRule.enabled = false;
+    firstRule.mode = TrustMode::SystemPlusCustom;
+    settings.rules().append(firstRule);
+
+    TrustRuleSettings secondRule;
+    secondRule.name = QStringLiteral("Second bank");
+    secondRule.enabled = false;
+    secondRule.mode = TrustMode::SystemOnly;
+    settings.rules().append(secondRule);
+
+    QString error;
+    QVERIFY2(settings.save(path, &error), qPrintable(error));
+
+    TrustRulesSettingsPage page(path);
+    QVERIFY2(page.load(&error), qPrintable(error));
+
+    auto *ruleList = page.findChild<QListWidget *>(QStringLiteral("ruleList"));
+    QVERIFY(ruleList);
+    QCOMPARE(ruleList->count(), 2);
+    QCOMPARE(ruleList->currentRow(), 0);
+    QVERIFY(ruleList->item(0)->text().startsWith(QStringLiteral("First bank")));
+    QVERIFY2(page.validate(&error), qPrintable(error));
+}
+
+void TrustAndCertificateTests::certificateRepositoryRollsBackPendingImport()
+{
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+    const QString sourcePath = directory.filePath(QStringLiteral("root.pem"));
+    QFile source(sourcePath);
+    QVERIFY(source.open(QIODevice::WriteOnly));
+    QCOMPARE(source.write(validatorRootCertificate), validatorRootCertificate.size());
+    source.close();
+
+    QString importedPath;
+    {
+        TrustCertificateRepository repository(
+            directory.filePath(QStringLiteral("rules.json"))
+        );
+        const TrustCertificateImportResult result = repository.importFiles({sourcePath});
+        QVERIFY(result.certificateDirectoryError.isEmpty());
+        QVERIFY(result.failures.isEmpty());
+        QCOMPARE(result.anchors.size(), 1);
+
+        const TrustCertificateInfo info = repository.inspect(result.anchors.first());
+        QVERIFY(info.isReadable());
+        importedPath = info.absolutePath;
+        QVERIFY(QFile::exists(importedPath));
+    }
+
+    QVERIFY(!QFile::exists(importedPath));
+}
+
+void TrustAndCertificateTests::certificateRepositoryFinalizesOnlyReferencedImports()
+{
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+    const QString firstSourcePath = directory.filePath(QStringLiteral("first.pem"));
+    const QString secondSourcePath = directory.filePath(QStringLiteral("second.pem"));
+    for (const QString &path : {firstSourcePath, secondSourcePath}) {
+        QFile source(path);
+        QVERIFY(source.open(QIODevice::WriteOnly));
+        QCOMPARE(source.write(validatorRootCertificate), validatorRootCertificate.size());
+    }
+
+    QString referencedPath;
+    QString unreferencedPath;
+    {
+        TrustCertificateRepository repository(
+            directory.filePath(QStringLiteral("rules.json"))
+        );
+        const TrustCertificateImportResult result = repository.importFiles(
+            {firstSourcePath, secondSourcePath}
+        );
+        QVERIFY(result.failures.isEmpty());
+        QCOMPARE(result.anchors.size(), 2);
+        referencedPath = repository.inspect(result.anchors.first()).absolutePath;
+        unreferencedPath = repository.inspect(result.anchors.last()).absolutePath;
+
+        TrustRuleSettings rule;
+        rule.anchors.append(result.anchors.first());
+        QVERIFY(repository.finalize({rule}).isEmpty());
+    }
+
+    QVERIFY(QFile::exists(referencedPath));
+    QVERIFY(!QFile::exists(unreferencedPath));
+}
+
+void TrustAndCertificateTests::certificateRepositoryRejectsInvalidFiles()
+{
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+    const QString sourcePath = directory.filePath(QStringLiteral("not-a-certificate.pem"));
+    QFile source(sourcePath);
+    QVERIFY(source.open(QIODevice::WriteOnly));
+    QVERIFY(source.write("not a certificate") > 0);
+    source.close();
+
+    TrustCertificateRepository repository(
+        directory.filePath(QStringLiteral("rules.json"))
+    );
+    const TrustCertificateImportResult result = repository.importFiles({sourcePath});
+    QVERIFY(result.anchors.isEmpty());
+    QCOMPARE(result.failures.size(), 1);
+    QCOMPARE(
+        result.failures.first().reason,
+        TrustCertificateImportFailureReason::InvalidCertificate
+    );
+}
+
+#if defined(Q_OS_UNIX)
+void TrustAndCertificateTests::certificateRepositoryRetainsFailedCleanupForRetry()
+{
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+    const QString firstSourcePath = directory.filePath(QStringLiteral("first.pem"));
+    const QString secondSourcePath = directory.filePath(QStringLiteral("second.pem"));
+    for (const QString &path : {firstSourcePath, secondSourcePath}) {
+        QFile source(path);
+        QVERIFY(source.open(QIODevice::WriteOnly));
+        QCOMPARE(source.write(validatorRootCertificate), validatorRootCertificate.size());
+    }
+
+    TrustCertificateRepository repository(
+        directory.filePath(QStringLiteral("rules.json"))
+    );
+    const TrustCertificateImportResult result = repository.importFiles(
+        {firstSourcePath, secondSourcePath}
+    );
+    QVERIFY(result.failures.isEmpty());
+    QCOMPARE(result.anchors.size(), 2);
+
+    const QString referencedPath = repository.inspect(result.anchors.first()).absolutePath;
+    const QString unreferencedPath = repository.inspect(result.anchors.last()).absolutePath;
+    const QString certificateDirectory = QFileInfo(unreferencedPath).absolutePath();
+    const QFileDevice::Permissions originalPermissions = QFile::permissions(
+        certificateDirectory
+    );
+    QVERIFY(QFile::setPermissions(
+        certificateDirectory,
+        QFileDevice::ReadOwner | QFileDevice::ExeOwner
+    ));
+
+    TrustRuleSettings rule;
+    rule.anchors.append(result.anchors.first());
+    const QStringList failures = repository.finalize({rule});
+
+    QVERIFY(QFile::setPermissions(certificateDirectory, originalPermissions));
+    QCOMPARE(failures, QStringList{unreferencedPath});
+    QVERIFY(QFile::exists(referencedPath));
+    QVERIFY(QFile::exists(unreferencedPath));
+
+    QVERIFY(repository.rollback().isEmpty());
+    QVERIFY(QFile::exists(referencedPath));
+    QVERIFY(!QFile::exists(unreferencedPath));
+}
+#endif
 
 #if defined(Q_OS_WIN) || defined(Q_OS_LINUX)
 void TrustAndCertificateTests::nativeCertificateValidatorTrustsConfiguredAnchor()

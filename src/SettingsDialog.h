@@ -20,7 +20,7 @@ class HistoryStore;
 class ProxySettingsPage;
 class PrivacyDataSettingsPage;
 class SearchSettingsPage;
-class TrustRulesDialog;
+class TrustRulesSettingsPage;
 class WebAppsSettingsPage;
 class WebAppStore;
 
@@ -69,6 +69,9 @@ public:
     [[nodiscard]] DnsSettings dnsSettings() const;
     [[nodiscard]] ProxySettings proxySettings() const;
 
+public slots:
+    void reject() override;
+
 signals:
     void webAppOpenRequested(const QString &id);
 
@@ -106,5 +109,5 @@ private:
     HistorySettingsPage *m_historyPage = nullptr;
     WebAppsSettingsPage *m_webAppsPage = nullptr;
     DiagnosticsPage *m_diagnosticsPage = nullptr;
-    TrustRulesDialog *m_trustRules = nullptr;
+    TrustRulesSettingsPage *m_trustRules = nullptr;
 };

@@ -69,7 +69,10 @@ flowchart TD
     MW --> AppWindow
 
     Settings["SettingsDialog"] --> Preferences["BrowserPreferences / QSettings"]
-    Settings --> TrustEditor["TrustRulesDialog"]
+    Settings --> TrustEditor["TrustRulesSettingsPage"]
+    TrustEditor --> RuleEditor["TrustRuleEditor"]
+    TrustEditor --> CertRepo["TrustCertificateRepository"]
+    TrustEditor --> CertDetails["CertificateDetailsDialog"]
     Settings --> Search["SearchSettings"]
     Settings --> DNS["DnsSettings / QWebEngineGlobalSettings"]
     Settings --> Proxy["ProxySettings / QNetworkProxy"]
@@ -93,6 +96,15 @@ tools window.
 `MainWindow.cpp` is intentionally the orchestration layer. Parsing, policy,
 storage, and geometry calculations live in smaller classes so they can be unit
 tested without starting Chromium.
+
+Trust-rule settings follow the same boundary. `TrustRulesSettingsPage` owns the
+rule collection and coordinates Settings save/rollback. `TrustRuleEditor` owns
+the controls for one selected rule, while `CertificateDetailsDialog` is a
+read-only certificate view. `TrustCertificateRepository` is the only component
+that copies imported CA files: it keeps new files pending until the complete
+Settings transaction succeeds, removes unreferenced imports on commit, and
+rolls all pending files back when Settings is cancelled. Failed deletions are
+reported to the user and remain pending for a retry during final destruction.
 
 ## 3. Ownership and lifetime
 
@@ -532,7 +544,7 @@ directory.
 | `WebEngine/Profile/` | `BrowserProfile` | Cookies, local storage, IndexedDB, service workers, and other Chromium profile data. |
 | cache `WebEngine/` | `BrowserProfile` | Disk HTTP cache, isolated from other browsers. |
 | `rules.json` | `TrustSettings` / `TrustPolicy` | Versioned trust configuration; atomic write with `.backup`. |
-| `Certificates/` | `TrustRulesDialog` | Imported CA files referenced by paths relative to `rules.json`. |
+| `Certificates/` | `TrustCertificateRepository` | Imported CA files referenced by paths relative to `rules.json`. |
 | `search-engines.json` | `SearchSettings` | Versioned engines and default selection; atomic write with `.backup`. |
 | `dns-settings.json` | `DnsSettings` | Versioned DNS mode, selected provider, and custom HTTPS templates; atomic write with `.backup`. Files use owner-only mode bits on Unix-like systems and inherit the per-user application-data ACL on Windows. |
 | `proxy-settings.json` | `ProxySettings` | Versioned system/direct/manual mode plus proxy type, host, port, and optional HTTP username; no password; atomic write with `.backup` and owner-only mode bits on Unix-like systems. |

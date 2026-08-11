@@ -9,7 +9,7 @@
 #include "ProxySettingsPage.h"
 #include "SearchSettingsPage.h"
 #include "SettingsSaveTransaction.h"
-#include "TrustRulesDialog.h"
+#include "TrustRulesSettingsPage.h"
 #include "WebAppsSettingsPage.h"
 
 #include <QDialogButtonBox>
@@ -108,6 +108,21 @@ DnsSettings SettingsDialog::dnsSettings() const
 ProxySettings SettingsDialog::proxySettings() const
 {
     return m_proxySettings;
+}
+
+void SettingsDialog::reject()
+{
+    const QStringList failures = m_trustRules->rollbackPendingCertificates();
+    if (!failures.isEmpty()) {
+        QMessageBox::warning(
+            this,
+            tr("Certificate cleanup incomplete"),
+            tr(
+                "Some imported certificate files could not be removed:\n%1"
+            ).arg(failures.join(QLatin1Char('\n')))
+        );
+    }
+    QDialog::reject();
 }
 
 void SettingsDialog::createInterface(
@@ -214,7 +229,7 @@ void SettingsDialog::createInterface(
         m_proxyPage
     );
 
-    m_trustRules = new TrustRulesDialog(m_configurationPath, m_pages, true);
+    m_trustRules = new TrustRulesSettingsPage(m_configurationPath, m_pages);
     registerPage(
         Page::TrustRules,
         QIcon(QStringLiteral(":/assets/icons/shield-check.svg")),
@@ -261,7 +276,7 @@ void SettingsDialog::createInterface(
             m_pages->setCurrentWidget(page);
     });
     connect(buttons, &QDialogButtonBox::accepted, this, &SettingsDialog::saveAndClose);
-    connect(buttons, &QDialogButtonBox::rejected, this, &QDialog::reject);
+    connect(buttons, &QDialogButtonBox::rejected, this, &SettingsDialog::reject);
     selectPage(initialPage);
 }
 
@@ -392,10 +407,20 @@ void SettingsDialog::saveAndClose()
         return;
     }
 
-    m_trustRules->finalizeSave();
+    const QStringList certificateCleanupFailures = m_trustRules->finalizeSave();
     m_preferences = preferences;
     m_searchSettings = searchSettings;
     m_dnsSettings = dnsSettings;
     m_proxySettings = proxySettings;
+    if (!certificateCleanupFailures.isEmpty()) {
+        QMessageBox::warning(
+            this,
+            tr("Settings saved with a warning"),
+            tr(
+                "Settings were saved, but some unused imported certificate "
+                "files could not be removed:\n%1"
+            ).arg(certificateCleanupFailures.join(QLatin1Char('\n')))
+        );
+    }
     accept();
 }

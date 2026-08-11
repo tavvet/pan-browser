@@ -631,42 +631,42 @@ QDialog#searchEngineDialog QPushButton:default {
     color: #ffffff;
 }
 
-QDialog#trustRulesDialog {
+QWidget#trustRulesSettingsPage {
     background: #15181e;
     color: #e6e9ef;
 }
 
-QDialog#trustRulesDialog QLabel#dialogTitle {
+QWidget#trustRulesSettingsPage QLabel#dialogTitle {
     color: #f5f7fb;
     font-size: 22px;
     font-weight: 700;
 }
 
-QDialog#trustRulesDialog QLabel#dialogSubtitle,
-QDialog#trustRulesDialog QLabel#fieldHint {
+QWidget#trustRulesSettingsPage QLabel#dialogSubtitle,
+QWidget#trustRulesSettingsPage QLabel#fieldHint {
     color: #929baa;
 }
 
-QDialog#trustRulesDialog QLabel#sectionLabel {
+QWidget#trustRulesSettingsPage QLabel#sectionLabel {
     color: #778295;
     font-size: 11px;
     font-weight: 700;
     letter-spacing: 1px;
 }
 
-QDialog#trustRulesDialog QSplitter::handle {
+QWidget#trustRulesSettingsPage QSplitter::handle {
     background: #292e37;
     width: 1px;
 }
 
-QDialog#trustRulesDialog QScrollArea#ruleEditorScroll,
-QDialog#trustRulesDialog QWidget#ruleEditor,
-QDialog#trustRulesDialog QScrollArea#ruleEditorScroll > QWidget > QWidget {
+QWidget#trustRulesSettingsPage QScrollArea#ruleEditorScroll,
+QWidget#trustRulesSettingsPage QWidget#ruleEditor,
+QWidget#trustRulesSettingsPage QScrollArea#ruleEditorScroll > QWidget > QWidget {
     background: transparent;
     border: none;
 }
 
-QDialog#trustRulesDialog QListWidget {
+QWidget#trustRulesSettingsPage QListWidget {
     background: #1b1f26;
     color: #e3e7ee;
     border: 1px solid #303641;
@@ -675,23 +675,23 @@ QDialog#trustRulesDialog QListWidget {
     padding: 4px;
 }
 
-QDialog#trustRulesDialog QListWidget::item {
+QWidget#trustRulesSettingsPage QListWidget::item {
     border-radius: 7px;
     padding: 7px 8px;
 }
 
-QDialog#trustRulesDialog QListWidget::item:hover {
+QWidget#trustRulesSettingsPage QListWidget::item:hover {
     background: #262c35;
 }
 
-QDialog#trustRulesDialog QListWidget::item:selected {
+QWidget#trustRulesSettingsPage QListWidget::item:selected {
     background: #315ea8;
     color: #ffffff;
 }
 
-QDialog#trustRulesDialog QLineEdit,
-QDialog#trustRulesDialog QPlainTextEdit,
-QDialog#trustRulesDialog QComboBox {
+QWidget#trustRulesSettingsPage QLineEdit,
+QWidget#trustRulesSettingsPage QPlainTextEdit,
+QWidget#trustRulesSettingsPage QComboBox {
     background: #20242c;
     color: #edf0f6;
     border: 1px solid #373e4a;
@@ -700,30 +700,30 @@ QDialog#trustRulesDialog QComboBox {
     selection-background-color: #3d72d9;
 }
 
-QDialog#trustRulesDialog QLineEdit:focus,
-QDialog#trustRulesDialog QPlainTextEdit:focus,
-QDialog#trustRulesDialog QComboBox:focus {
+QWidget#trustRulesSettingsPage QLineEdit:focus,
+QWidget#trustRulesSettingsPage QPlainTextEdit:focus,
+QWidget#trustRulesSettingsPage QComboBox:focus {
     border-color: #5b8def;
 }
 
-QDialog#trustRulesDialog QComboBox::drop-down {
+QWidget#trustRulesSettingsPage QComboBox::drop-down {
     border: none;
     width: 24px;
 }
 
-QDialog#trustRulesDialog QComboBox QAbstractItemView {
+QWidget#trustRulesSettingsPage QComboBox QAbstractItemView {
     background: #20242c;
     color: #edf0f6;
     border: 1px solid #373e4a;
     selection-background-color: #315ea8;
 }
 
-QDialog#trustRulesDialog QCheckBox {
+QWidget#trustRulesSettingsPage QCheckBox {
     color: #dce1e9;
     spacing: 8px;
 }
 
-QDialog#trustRulesDialog QPushButton {
+QWidget#trustRulesSettingsPage QPushButton {
     min-height: 30px;
     color: #e9edf5;
     background: #2a303a;
@@ -732,49 +732,49 @@ QDialog#trustRulesDialog QPushButton {
     padding: 2px 13px;
 }
 
-QDialog#trustRulesDialog QPushButton:hover {
+QWidget#trustRulesSettingsPage QPushButton:hover {
     background: #343c48;
     border-color: #4a5564;
 }
 
-QDialog#trustRulesDialog QPushButton:pressed {
+QWidget#trustRulesSettingsPage QPushButton:pressed {
     background: #242a33;
 }
 
-QDialog#trustRulesDialog QPushButton:default {
+QWidget#trustRulesSettingsPage QPushButton:default {
     background: #3d72d9;
     border-color: #5689ea;
     color: #ffffff;
 }
 
-QDialog#trustRulesDialog QPushButton:default:hover {
+QWidget#trustRulesSettingsPage QPushButton:default:hover {
     background: #477fe8;
 }
 
-QDialog#trustRulesDialog QPushButton#dangerButton {
+QWidget#trustRulesSettingsPage QPushButton#dangerButton {
     color: #ff9aaa;
 }
 
-QDialog#trustRulesDialog QPushButton:disabled,
-QDialog#trustRulesDialog QLineEdit:disabled,
-QDialog#trustRulesDialog QPlainTextEdit:disabled,
-QDialog#trustRulesDialog QComboBox:disabled {
+QWidget#trustRulesSettingsPage QPushButton:disabled,
+QWidget#trustRulesSettingsPage QLineEdit:disabled,
+QWidget#trustRulesSettingsPage QPlainTextEdit:disabled,
+QWidget#trustRulesSettingsPage QComboBox:disabled {
     color: #626b79;
     background: #1b1e24;
     border-color: #292e37;
 }
 
-QDialog#trustRulesDialog QLabel#testResult {
+QWidget#trustRulesSettingsPage QLabel#testResult {
     border-radius: 7px;
     padding: 7px 9px;
 }
 
-QDialog#trustRulesDialog QLabel#testResult[state="match"] {
+QWidget#trustRulesSettingsPage QLabel#testResult[state="match"] {
     color: #8ce0b4;
     background: rgba(52, 211, 153, 0.10);
 }
 
-QDialog#trustRulesDialog QLabel#testResult[state="none"] {
+QWidget#trustRulesSettingsPage QLabel#testResult[state="none"] {
     color: #f4c783;
     background: rgba(245, 158, 11, 0.10);
 }

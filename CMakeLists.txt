@@ -134,8 +134,12 @@ set(PANBROWSER_APP_SOURCES
     src/SettingsSaveTransaction.h
     src/TrustConfiguration.cpp
     src/TrustConfiguration.h
-    src/TrustRulesDialog.cpp
-    src/TrustRulesDialog.h
+    src/TrustCertificateRepository.cpp
+    src/TrustCertificateRepository.h
+    src/TrustRuleEditor.cpp
+    src/TrustRuleEditor.h
+    src/TrustRulesSettingsPage.cpp
+    src/TrustRulesSettingsPage.h
     src/TrustSettings.cpp
     src/TrustSettings.h
     src/UrlSanitization.cpp
@@ -152,6 +156,8 @@ set(PANBROWSER_APP_SOURCES
     src/WindowChrome.h
     src/WindowChromePlatform.h
     src/CertificateTrustValidator.h
+    src/CertificateDetailsDialog.cpp
+    src/CertificateDetailsDialog.h
     src/resources.qrc
 )
 
@@ -327,6 +333,8 @@ qt_add_executable(PanBrowserTests
     src/PageZoom.h
     src/CredentialPromptDialog.cpp
     src/CredentialPromptDialog.h
+    src/CertificateDetailsDialog.cpp
+    src/CertificateDetailsDialog.h
     src/DownloadHistoryStore.cpp
     src/DownloadHistoryStore.h
     src/DiagnosticsPage.cpp
@@ -377,10 +385,14 @@ qt_add_executable(PanBrowserTests
     src/SettingsSaveTransaction.h
     src/TrustConfiguration.cpp
     src/TrustConfiguration.h
+    src/TrustCertificateRepository.cpp
+    src/TrustCertificateRepository.h
+    src/TrustRuleEditor.cpp
+    src/TrustRuleEditor.h
     src/TrustSettings.cpp
     src/TrustSettings.h
-    src/TrustRulesDialog.cpp
-    src/TrustRulesDialog.h
+    src/TrustRulesSettingsPage.cpp
+    src/TrustRulesSettingsPage.h
     src/UrlSanitization.cpp
     src/UrlSanitization.h
     src/WebAppStore.cpp

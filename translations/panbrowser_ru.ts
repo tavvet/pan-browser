@@ -2944,55 +2944,55 @@ Warning: searches sent through HTTP are not encrypted.</source>
         <translation>Не удалось восстановить %1: %2</translation>
     </message>
     <message>
-        <location filename="../src/SettingsDialog.cpp" line="121"/>
+        <location filename="../src/SettingsDialog.cpp" line="136"/>
         <location filename="../tests/PersistenceAndPolicyTests.cpp" line="205"/>
         <source>Settings</source>
         <translation>Настройки</translation>
     </message>
     <message>
         <location filename="../src/GeneralSettingsPage.cpp" line="26"/>
-        <location filename="../src/SettingsDialog.cpp" line="151"/>
+        <location filename="../src/SettingsDialog.cpp" line="166"/>
         <source>General</source>
         <translation>Основные</translation>
     </message>
     <message>
-        <location filename="../src/SettingsDialog.cpp" line="159"/>
+        <location filename="../src/SettingsDialog.cpp" line="174"/>
         <source>Search</source>
         <translation>Поиск</translation>
     </message>
     <message>
-        <location filename="../src/SettingsDialog.cpp" line="171"/>
+        <location filename="../src/SettingsDialog.cpp" line="186"/>
         <source>History</source>
         <translation>История</translation>
     </message>
     <message>
-        <location filename="../src/SettingsDialog.cpp" line="179"/>
+        <location filename="../src/SettingsDialog.cpp" line="194"/>
         <source>Web Apps</source>
         <translation>Веб-приложения</translation>
     </message>
     <message>
         <location filename="../src/PrivacyDataSettingsPage.cpp" line="24"/>
-        <location filename="../src/SettingsDialog.cpp" line="197"/>
+        <location filename="../src/SettingsDialog.cpp" line="212"/>
         <source>Privacy &amp; Data</source>
         <translation>Конфиденциальность и данные</translation>
     </message>
     <message>
-        <location filename="../src/SettingsDialog.cpp" line="205"/>
+        <location filename="../src/SettingsDialog.cpp" line="220"/>
         <source>DNS</source>
         <translation>DNS</translation>
     </message>
     <message>
-        <location filename="../src/SettingsDialog.cpp" line="213"/>
+        <location filename="../src/SettingsDialog.cpp" line="228"/>
         <source>Proxy</source>
         <translation>Прокси</translation>
     </message>
     <message>
-        <location filename="../src/SettingsDialog.cpp" line="221"/>
+        <location filename="../src/SettingsDialog.cpp" line="236"/>
         <source>Trust Rules</source>
         <translation>Правила доверия</translation>
     </message>
     <message>
-        <location filename="../src/SettingsDialog.cpp" line="236"/>
+        <location filename="../src/SettingsDialog.cpp" line="251"/>
         <source>Diagnostics</source>
         <translation>Диагностика</translation>
     </message>
@@ -3142,7 +3142,7 @@ Warning: searches sent through HTTP are not encrypted.</source>
         <translation>При следующем запуске удалить файлы cookie, локальное хранилище, IndexedDB, сервис-воркеры и кэш. Настройки, история, правила доверия, сертификаты и сохранённые вкладки останутся.</translation>
     </message>
     <message>
-        <location filename="../src/SettingsDialog.cpp" line="253"/>
+        <location filename="../src/SettingsDialog.cpp" line="268"/>
         <source>Save settings</source>
         <translation>Сохранить настройки</translation>
     </message>
@@ -3207,42 +3207,54 @@ Warning: searches sent through HTTP are not encrypted.</source>
         <translation>Не удалось запланировать сброс</translation>
     </message>
     <message>
-        <location filename="../src/SettingsDialog.cpp" line="305"/>
-        <location filename="../src/SettingsDialog.cpp" line="342"/>
-        <location filename="../src/SettingsDialog.cpp" line="351"/>
+        <location filename="../src/SettingsDialog.cpp" line="119"/>
+        <source>Certificate cleanup incomplete</source>
+        <translation>Очистка сертификатов завершена не полностью</translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsDialog.cpp" line="120"/>
+        <source>Some imported certificate files could not be removed:
+%1</source>
+        <translation>Не удалось удалить некоторые импортированные файлы сертификатов:
+%1</translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsDialog.cpp" line="320"/>
+        <location filename="../src/SettingsDialog.cpp" line="357"/>
+        <location filename="../src/SettingsDialog.cpp" line="366"/>
         <source>Cannot save settings</source>
         <translation>Не удалось сохранить настройки</translation>
     </message>
     <message>
-        <location filename="../src/SettingsDialog.cpp" line="310"/>
-        <location filename="../src/SettingsDialog.cpp" line="383"/>
+        <location filename="../src/SettingsDialog.cpp" line="325"/>
+        <location filename="../src/SettingsDialog.cpp" line="398"/>
         <source>Cannot save trust rules</source>
         <translation>Не удалось сохранить правила доверия</translation>
     </message>
     <message>
-        <location filename="../src/SettingsDialog.cpp" line="315"/>
-        <location filename="../src/SettingsDialog.cpp" line="359"/>
+        <location filename="../src/SettingsDialog.cpp" line="330"/>
+        <location filename="../src/SettingsDialog.cpp" line="374"/>
         <source>Cannot save search settings</source>
         <translation>Не удалось сохранить настройки поиска</translation>
     </message>
     <message>
-        <location filename="../src/SettingsDialog.cpp" line="320"/>
-        <location filename="../src/SettingsDialog.cpp" line="367"/>
+        <location filename="../src/SettingsDialog.cpp" line="335"/>
+        <location filename="../src/SettingsDialog.cpp" line="382"/>
         <source>Cannot save DNS settings</source>
         <translation>Не удалось сохранить настройки DNS</translation>
     </message>
     <message>
-        <location filename="../src/SettingsDialog.cpp" line="325"/>
-        <location filename="../src/SettingsDialog.cpp" line="375"/>
+        <location filename="../src/SettingsDialog.cpp" line="340"/>
+        <location filename="../src/SettingsDialog.cpp" line="390"/>
         <source>Cannot save proxy settings</source>
         <translation>Не удалось сохранить настройки прокси</translation>
     </message>
     <message>
-        <location filename="../src/SettingsDialog.cpp" line="358"/>
-        <location filename="../src/SettingsDialog.cpp" line="366"/>
-        <location filename="../src/SettingsDialog.cpp" line="374"/>
-        <location filename="../src/SettingsDialog.cpp" line="382"/>
-        <location filename="../src/SettingsDialog.cpp" line="390"/>
+        <location filename="../src/SettingsDialog.cpp" line="373"/>
+        <location filename="../src/SettingsDialog.cpp" line="381"/>
+        <location filename="../src/SettingsDialog.cpp" line="389"/>
+        <location filename="../src/SettingsDialog.cpp" line="397"/>
+        <location filename="../src/SettingsDialog.cpp" line="405"/>
         <source>
 
 Rollback was incomplete:
@@ -3253,9 +3265,21 @@ Rollback was incomplete:
 </translation>
     </message>
     <message>
-        <location filename="../src/SettingsDialog.cpp" line="391"/>
+        <location filename="../src/SettingsDialog.cpp" line="406"/>
         <source>Cannot apply DNS settings</source>
         <translation>Не удалось применить настройки DNS</translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsDialog.cpp" line="418"/>
+        <source>Settings saved with a warning</source>
+        <translation>Настройки сохранены с предупреждением</translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsDialog.cpp" line="419"/>
+        <source>Settings were saved, but some unused imported certificate files could not be removed:
+%1</source>
+        <translation>Настройки сохранены, но не удалось удалить некоторые неиспользуемые импортированные файлы сертификатов:
+%1</translation>
     </message>
 </context>
 <context>
@@ -3367,168 +3391,166 @@ Rollback was incomplete:
 <context>
     <name>TrustRulesDialog</name>
     <message>
-        <location filename="../src/TrustRulesDialog.cpp" line="76"/>
+        <location filename="../src/TrustCertificateRepository.cpp" line="182"/>
         <source>Unnamed certificate</source>
         <translation>Сертификат без имени</translation>
     </message>
     <message>
-        <location filename="../src/TrustRulesDialog.cpp" line="169"/>
-        <location filename="../src/TrustRulesDialog.cpp" line="178"/>
+        <location filename="../src/TrustRulesSettingsPage.cpp" line="77"/>
         <source>Trust Rules</source>
         <translation>Правила доверия</translation>
     </message>
     <message>
-        <location filename="../src/TrustRulesDialog.cpp" line="183"/>
+        <location filename="../src/TrustRulesSettingsPage.cpp" line="82"/>
         <source>Control which domains may use certificate authorities added to PanBrowser.</source>
         <translation>Укажите, какие домены могут использовать центры сертификации, добавленные в PanBrowser.</translation>
     </message>
     <message>
-        <location filename="../src/TrustRulesDialog.cpp" line="200"/>
+        <location filename="../src/TrustRulesSettingsPage.cpp" line="103"/>
         <source>DOMAIN RULES</source>
         <translation>ПРАВИЛА ДЛЯ ДОМЕНОВ</translation>
     </message>
     <message>
-        <location filename="../src/TrustRulesDialog.cpp" line="210"/>
+        <location filename="../src/TrustRulesSettingsPage.cpp" line="116"/>
         <source>Add rule</source>
         <translation>Добавить правило</translation>
     </message>
     <message>
-        <location filename="../src/TrustRulesDialog.cpp" line="212"/>
+        <location filename="../src/TrustRulesSettingsPage.cpp" line="121"/>
         <source>Remove rule</source>
         <translation>Удалить правило</translation>
     </message>
     <message>
-        <location filename="../src/TrustRulesDialog.cpp" line="230"/>
+        <location filename="../src/TrustRuleEditor.cpp" line="55"/>
         <source>RULE DETAILS</source>
         <translation>ПАРАМЕТРЫ ПРАВИЛА</translation>
     </message>
     <message>
-        <location filename="../src/TrustRulesDialog.cpp" line="241"/>
+        <location filename="../src/TrustRuleEditor.cpp" line="68"/>
         <source>Example Bank</source>
         <translation>Пример банка</translation>
     </message>
     <message>
-        <location filename="../src/TrustRulesDialog.cpp" line="242"/>
+        <location filename="../src/TrustRuleEditor.cpp" line="69"/>
         <source>Name</source>
         <translation>Название</translation>
     </message>
     <message>
-        <location filename="../src/TrustRulesDialog.cpp" line="244"/>
+        <location filename="../src/TrustRuleEditor.cpp" line="72"/>
         <source>Rule is enabled</source>
         <translation>Правило включено</translation>
     </message>
     <message>
-        <location filename="../src/TrustRulesDialog.cpp" line="245"/>
+        <location filename="../src/TrustRuleEditor.cpp" line="75"/>
         <source>Status</source>
         <translation>Состояние</translation>
     </message>
     <message>
-        <location filename="../src/TrustRulesDialog.cpp" line="248"/>
+        <location filename="../src/TrustRuleEditor.cpp" line="79"/>
         <source>System trust only</source>
         <translation>Только системное доверие</translation>
     </message>
     <message>
-        <location filename="../src/TrustRulesDialog.cpp" line="250"/>
+        <location filename="../src/TrustRuleEditor.cpp" line="83"/>
         <source>System trust or added certificates</source>
         <translation>Системное доверие или добавленные сертификаты</translation>
     </message>
     <message>
-        <location filename="../src/TrustRulesDialog.cpp" line="254"/>
+        <location filename="../src/TrustRuleEditor.cpp" line="87"/>
         <source>Added certificates only</source>
         <translation>Только добавленные сертификаты</translation>
     </message>
     <message>
-        <location filename="../src/TrustRulesDialog.cpp" line="257"/>
+        <location filename="../src/TrustRuleEditor.cpp" line="90"/>
         <source>Trust mode</source>
         <translation>Режим доверия</translation>
     </message>
     <message>
-        <location filename="../src/TrustRulesDialog.cpp" line="265"/>
+        <location filename="../src/TrustRuleEditor.cpp" line="99"/>
         <source>DOMAINS</source>
         <translation>ДОМЕНЫ</translation>
     </message>
     <message>
-        <location filename="../src/TrustRulesDialog.cpp" line="276"/>
+        <location filename="../src/TrustRuleEditor.cpp" line="112"/>
         <source>One domain per line. Wildcards match subdomains only; include the base domain separately.</source>
         <translation>Один домен на строку. Маска охватывает только поддомены; основной домен укажите отдельно.</translation>
     </message>
     <message>
-        <location filename="../src/TrustRulesDialog.cpp" line="283"/>
+        <location filename="../src/TrustRuleEditor.cpp" line="123"/>
         <source>ADDED CERTIFICATES</source>
         <translation>ДОБАВЛЕННЫЕ СЕРТИФИКАТЫ</translation>
     </message>
     <message>
-        <location filename="../src/TrustRulesDialog.cpp" line="293"/>
+        <location filename="../src/TrustRuleEditor.cpp" line="136"/>
         <source>Add certificates…</source>
         <translation>Добавить сертификаты…</translation>
     </message>
     <message>
-        <location filename="../src/TrustRulesDialog.cpp" line="295"/>
+        <location filename="../src/TrustRuleEditor.cpp" line="141"/>
         <source>View details…</source>
         <translation>Подробнее…</translation>
     </message>
     <message>
-        <location filename="../src/TrustRulesDialog.cpp" line="297"/>
+        <location filename="../src/TrustRuleEditor.cpp" line="146"/>
         <source>Remove from rule</source>
         <translation>Убрать из правила</translation>
     </message>
     <message>
-        <location filename="../src/TrustRulesDialog.cpp" line="307"/>
+        <location filename="../src/TrustRuleEditor.cpp" line="159"/>
         <source>Enter a domain to see which rule applies</source>
         <translation>Введите домен, чтобы проверить применимое правило</translation>
     </message>
     <message>
-        <location filename="../src/TrustRulesDialog.cpp" line="308"/>
+        <location filename="../src/TrustRuleEditor.cpp" line="162"/>
         <source>Check domain</source>
         <translation>Проверить домен</translation>
     </message>
     <message>
-        <location filename="../src/TrustRulesDialog.cpp" line="334"/>
         <source>Save rules</source>
-        <translation>Сохранить правила</translation>
+        <translation type="vanished">Сохранить правила</translation>
     </message>
     <message>
-        <location filename="../src/TrustRulesDialog.cpp" line="381"/>
-        <location filename="../src/TrustRulesDialog.cpp" line="448"/>
+        <location filename="../src/TrustRulesSettingsPage.cpp" line="188"/>
+        <location filename="../src/TrustRulesSettingsPage.cpp" line="247"/>
         <source>No domains</source>
         <translation>Нет доменов</translation>
     </message>
     <message>
-        <location filename="../src/TrustRulesDialog.cpp" line="382"/>
-        <location filename="../src/TrustRulesDialog.cpp" line="449"/>
+        <location filename="../src/TrustRulesSettingsPage.cpp" line="190"/>
+        <location filename="../src/TrustRulesSettingsPage.cpp" line="249"/>
         <source>Disabled</source>
         <translation>Отключено</translation>
     </message>
     <message>
-        <location filename="../src/TrustRulesDialog.cpp" line="385"/>
-        <location filename="../src/TrustRulesDialog.cpp" line="453"/>
+        <location filename="../src/TrustRulesSettingsPage.cpp" line="194"/>
+        <location filename="../src/TrustRulesSettingsPage.cpp" line="254"/>
         <source>Untitled rule</source>
         <translation>Правило без названия</translation>
     </message>
     <message>
-        <location filename="../src/TrustRulesDialog.cpp" line="481"/>
+        <location filename="../src/TrustRuleEditor.cpp" line="337"/>
         <source>Use Chromium’s normal certificate validation. Certificates added below are ignored.</source>
         <translation>Использовать обычную проверку сертификатов Chromium. Добавленные ниже сертификаты игнорируются.</translation>
     </message>
     <message>
-        <location filename="../src/TrustRulesDialog.cpp" line="486"/>
+        <location filename="../src/TrustRuleEditor.cpp" line="343"/>
         <source>Use normal system trust. If the certificate authority is unknown, also try the certificates added below.</source>
         <translation>Использовать обычное системное доверие. Если центр сертификации неизвестен, также проверять добавленные ниже сертификаты.</translation>
     </message>
     <message>
-        <location filename="../src/TrustRulesDialog.cpp" line="491"/>
+        <location filename="../src/TrustRuleEditor.cpp" line="349"/>
         <source>For an unknown certificate authority, accept only chains ending at a certificate added below. Sites Chromium already trusts are unaffected.</source>
         <translation>Для неизвестного центра сертификации принимать только цепочки, завершающиеся добавленным ниже сертификатом. Это не влияет на сайты, которым Chromium уже доверяет.</translation>
     </message>
     <message>
-        <location filename="../src/TrustRulesDialog.cpp" line="516"/>
+        <location filename="../src/TrustRuleEditor.cpp" line="251"/>
         <source>%1
 Missing or invalid certificate</source>
         <translation>%1
 Сертификат отсутствует или повреждён</translation>
     </message>
     <message numerus="yes">
-        <location filename="../src/TrustRulesDialog.cpp" line="531"/>
+        <location filename="../src/TrustRuleEditor.cpp" line="269"/>
         <source> · %n certificates</source>
         <translation>
             <numerusform> · %n сертификат</numerusform>
@@ -3537,7 +3559,7 @@ Missing or invalid certificate</source>
         </translation>
     </message>
     <message>
-        <location filename="../src/TrustRulesDialog.cpp" line="543"/>
+        <location filename="../src/TrustRuleEditor.cpp" line="286"/>
         <source>Path: %1
 Subject: %2
 Issuer: %3
@@ -3550,147 +3572,146 @@ SHA-256: %5</source>
 SHA-256: %5</translation>
     </message>
     <message>
-        <location filename="../src/TrustRulesDialog.cpp" line="566"/>
+        <location filename="../src/TrustRulesSettingsPage.cpp" line="283"/>
         <source>New rule</source>
         <translation>Новое правило</translation>
     </message>
     <message>
-        <location filename="../src/TrustRulesDialog.cpp" line="568"/>
+        <location filename="../src/TrustRulesSettingsPage.cpp" line="285"/>
         <source>New rule %1</source>
         <translation>Новое правило %1</translation>
     </message>
     <message>
-        <location filename="../src/TrustRulesDialog.cpp" line="589"/>
+        <location filename="../src/TrustRulesSettingsPage.cpp" line="305"/>
         <source>Remove trust rule</source>
         <translation>Удалить правило доверия</translation>
     </message>
     <message>
-        <location filename="../src/TrustRulesDialog.cpp" line="590"/>
+        <location filename="../src/TrustRulesSettingsPage.cpp" line="306"/>
         <source>Remove “%1”? The certificate files will be kept.</source>
         <translation>Удалить «%1»? Файлы сертификатов сохранятся.</translation>
     </message>
     <message>
-        <location filename="../src/TrustRulesDialog.cpp" line="616"/>
+        <location filename="../src/TrustRulesSettingsPage.cpp" line="335"/>
         <source>Import CA certificates</source>
         <translation>Импорт сертификатов центра сертификации</translation>
     </message>
     <message>
-        <location filename="../src/TrustRulesDialog.cpp" line="618"/>
+        <location filename="../src/TrustRulesSettingsPage.cpp" line="337"/>
         <source>Certificates (*.cer *.crt *.der *.pem);;All files (*)</source>
         <translation>Сертификаты (*.cer *.crt *.der *.pem);;Все файлы (*)</translation>
     </message>
     <message>
-        <location filename="../src/TrustRulesDialog.cpp" line="630"/>
+        <location filename="../src/TrustRulesSettingsPage.cpp" line="351"/>
         <source>Import failed</source>
         <translation>Ошибка импорта</translation>
     </message>
     <message>
-        <location filename="../src/TrustRulesDialog.cpp" line="631"/>
+        <location filename="../src/TrustRulesSettingsPage.cpp" line="352"/>
         <source>Cannot create %1</source>
         <translation>Не удалось создать %1</translation>
     </message>
     <message>
-        <location filename="../src/TrustRulesDialog.cpp" line="641"/>
+        <location filename="../src/TrustRulesSettingsPage.cpp" line="367"/>
         <source>%1 is not a readable certificate</source>
         <translation>%1 не является доступным для чтения сертификатом</translation>
     </message>
     <message>
-        <location filename="../src/TrustRulesDialog.cpp" line="653"/>
+        <location filename="../src/TrustRulesSettingsPage.cpp" line="371"/>
         <source>Cannot copy %1</source>
         <translation>Не удалось скопировать %1</translation>
     </message>
     <message>
-        <location filename="../src/TrustRulesDialog.cpp" line="670"/>
+        <location filename="../src/TrustRulesSettingsPage.cpp" line="380"/>
         <source>Some certificates were not imported</source>
         <translation>Некоторые сертификаты не импортированы</translation>
     </message>
     <message>
-        <location filename="../src/TrustRulesDialog.cpp" line="703"/>
+        <location filename="../src/TrustRulesSettingsPage.cpp" line="403"/>
         <source>Certificate unavailable</source>
         <translation>Сертификат недоступен</translation>
     </message>
     <message>
-        <location filename="../src/TrustRulesDialog.cpp" line="704"/>
+        <location filename="../src/TrustRulesSettingsPage.cpp" line="404"/>
         <source>Cannot read certificate file:
 %1</source>
         <translation>Не удалось прочитать файл сертификата:
 %1</translation>
     </message>
     <message>
-        <location filename="../src/TrustRulesDialog.cpp" line="711"/>
-        <location filename="../src/TrustRulesDialog.cpp" line="719"/>
+        <location filename="../src/CertificateDetailsDialog.cpp" line="38"/>
+        <location filename="../src/CertificateDetailsDialog.cpp" line="47"/>
         <source>Certificate Details</source>
         <translation>Сведения о сертификате</translation>
     </message>
     <message>
-        <location filename="../src/TrustRulesDialog.cpp" line="734"/>
+        <location filename="../src/CertificateDetailsDialog.cpp" line="64"/>
         <source>Certificate %1 — %2</source>
         <translation>Сертификат %1 — %2</translation>
     </message>
     <message>
-        <location filename="../src/TrustRulesDialog.cpp" line="767"/>
+        <location filename="../src/CertificateDetailsDialog.cpp" line="99"/>
         <source>Subject</source>
         <translation>Субъект</translation>
     </message>
     <message>
-        <location filename="../src/TrustRulesDialog.cpp" line="768"/>
+        <location filename="../src/CertificateDetailsDialog.cpp" line="100"/>
         <source>Issuer</source>
         <translation>Издатель</translation>
     </message>
     <message>
-        <location filename="../src/TrustRulesDialog.cpp" line="769"/>
+        <location filename="../src/CertificateDetailsDialog.cpp" line="101"/>
         <source>Serial number</source>
         <translation>Серийный номер</translation>
     </message>
     <message>
-        <location filename="../src/TrustRulesDialog.cpp" line="770"/>
+        <location filename="../src/CertificateDetailsDialog.cpp" line="102"/>
         <source>Valid from</source>
         <translation>Действителен с</translation>
     </message>
     <message>
-        <location filename="../src/TrustRulesDialog.cpp" line="771"/>
+        <location filename="../src/CertificateDetailsDialog.cpp" line="103"/>
         <source>Valid until</source>
         <translation>Действителен до</translation>
     </message>
     <message>
-        <location filename="../src/TrustRulesDialog.cpp" line="777"/>
+        <location filename="../src/CertificateDetailsDialog.cpp" line="109"/>
         <source>Copy fingerprint</source>
         <translation>Скопировать отпечаток</translation>
     </message>
     <message>
-        <location filename="../src/TrustRulesDialog.cpp" line="790"/>
+        <location filename="../src/CertificateDetailsDialog.cpp" line="125"/>
         <source>Unknown</source>
         <translation>Неизвестно</translation>
     </message>
     <message>
-        <location filename="../src/TrustRulesDialog.cpp" line="799"/>
+        <location filename="../src/CertificateDetailsDialog.cpp" line="135"/>
         <source>Not valid yet</source>
         <translation>Срок действия ещё не начался</translation>
     </message>
     <message>
-        <location filename="../src/TrustRulesDialog.cpp" line="802"/>
+        <location filename="../src/CertificateDetailsDialog.cpp" line="138"/>
         <source>Expired</source>
         <translation>Срок действия истёк</translation>
     </message>
     <message>
-        <location filename="../src/TrustRulesDialog.cpp" line="805"/>
+        <location filename="../src/CertificateDetailsDialog.cpp" line="141"/>
         <source>Valid</source>
         <translation>Действителен</translation>
     </message>
     <message>
-        <location filename="../src/TrustRulesDialog.cpp" line="852"/>
+        <location filename="../src/TrustRuleEditor.cpp" line="319"/>
         <source>No enabled rule matches %1</source>
         <translation>Для %1 нет подходящего включённого правила</translation>
     </message>
     <message>
-        <location filename="../src/TrustRulesDialog.cpp" line="853"/>
+        <location filename="../src/TrustRuleEditor.cpp" line="323"/>
         <source>%1 matches rule “%2”</source>
         <translation>%1 соответствует правилу «%2»</translation>
     </message>
     <message>
-        <location filename="../src/TrustRulesDialog.cpp" line="863"/>
         <source>Cannot save trust rules</source>
-        <translation>Не удалось сохранить правила доверия</translation>
+        <translation type="vanished">Не удалось сохранить правила доверия</translation>
     </message>
 </context>
 <context>

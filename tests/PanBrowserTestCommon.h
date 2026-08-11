@@ -29,6 +29,8 @@
 #include "SettingsDialog.h"
 #include "SettingsSaveTransaction.h"
 #include "TrustConfiguration.h"
+#include "TrustCertificateRepository.h"
+#include "TrustRulesSettingsPage.h"
 #include "TrustSettings.h"
 #include "WebAppStore.h"
 #include "WebAppShortcutManager.h"

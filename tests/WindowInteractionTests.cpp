@@ -220,7 +220,7 @@ void WindowInteractionTests::settingsDialogRegistersEveryPageAndSelectsInitialPa
         QStringLiteral("privacyDataSettingsPage"),
         QStringLiteral("dnsSettingsPage"),
         QStringLiteral("proxySettingsPage"),
-        QStringLiteral("trustRulesDialog"),
+        QStringLiteral("trustRulesSettingsPage"),
         QStringLiteral("diagnosticsSettingsPage"),
     };
     for (int row = 0; row < expectedPages.size(); ++row) {
