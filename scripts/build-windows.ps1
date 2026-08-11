@@ -78,26 +78,29 @@ if ($LASTEXITCODE -ne 0) {
     if ($UsesVisualStudioGenerator) {
         $TestExecutable = Join-Path $BuildDir "Release\PanBrowserTests.exe"
         if (Test-Path -LiteralPath $TestExecutable -PathType Leaf) {
-            $DiagnosticOutput = Join-Path $BuildDir "PanBrowserTests.stdout.txt"
-            $DiagnosticError = Join-Path $BuildDir "PanBrowserTests.stderr.txt"
-            $DiagnosticReport = Join-Path $BuildDir "PanBrowserTests.report.txt"
-            try {
-                $DiagnosticProcess = Start-Process `
-                    -FilePath $TestExecutable `
-                    -ArgumentList @("-o", "$DiagnosticReport,txt") `
-                    -NoNewWindow `
-                    -Wait `
-                    -PassThru `
-                    -RedirectStandardOutput $DiagnosticOutput `
-                    -RedirectStandardError $DiagnosticError
-                Write-Output "Direct PanBrowserTests exit code: $($DiagnosticProcess.ExitCode)"
-            }
-            catch {
-                Write-Warning "Cannot run PanBrowserTests directly: $($_.Exception.Message)"
-            }
-            foreach ($DiagnosticFile in @($DiagnosticReport, $DiagnosticOutput, $DiagnosticError)) {
-                if (Test-Path -LiteralPath $DiagnosticFile -PathType Leaf) {
-                    Get-Content -LiteralPath $DiagnosticFile | Write-Output
+            foreach ($TestSuite in @("trust", "window", "persistence", "network", "browsing", "webapps")) {
+                $DiagnosticPrefix = Join-Path $BuildDir "PanBrowserTests.$TestSuite"
+                $DiagnosticOutput = "$DiagnosticPrefix.stdout.txt"
+                $DiagnosticError = "$DiagnosticPrefix.stderr.txt"
+                $DiagnosticReport = "$DiagnosticPrefix.report.txt"
+                try {
+                    $DiagnosticProcess = Start-Process `
+                        -FilePath $TestExecutable `
+                        -ArgumentList @($TestSuite, "-o", "$DiagnosticReport,txt") `
+                        -NoNewWindow `
+                        -Wait `
+                        -PassThru `
+                        -RedirectStandardOutput $DiagnosticOutput `
+                        -RedirectStandardError $DiagnosticError
+                    Write-Output "Direct PanBrowserTests ($TestSuite) exit code: $($DiagnosticProcess.ExitCode)"
+                }
+                catch {
+                    Write-Warning "Cannot run PanBrowserTests suite '$TestSuite' directly: $($_.Exception.Message)"
+                }
+                foreach ($DiagnosticFile in @($DiagnosticReport, $DiagnosticOutput, $DiagnosticError)) {
+                    if (Test-Path -LiteralPath $DiagnosticFile -PathType Leaf) {
+                        Get-Content -LiteralPath $DiagnosticFile | Write-Output
+                    }
                 }
             }
         }

@@ -293,7 +293,14 @@ qt_add_executable(PanBrowserTests
     src/ApplicationLaunch.h
     src/AddressCompletionPopup.cpp
     src/AddressCompletionPopup.h
-    tests/TrustConfigurationTests.cpp
+    tests/ApplicationAndWebAppTests.cpp
+    tests/BrowsingFeaturesTests.cpp
+    tests/NetworkSettingsAndAuthTests.cpp
+    tests/PanBrowserTestCommon.h
+    tests/PanBrowserTestsMain.cpp
+    tests/PersistenceAndPolicyTests.cpp
+    tests/TrustAndCertificateTests.cpp
+    tests/WindowInteractionTests.cpp
     src/AddressLineEdit.cpp
     src/AddressLineEdit.h
     src/AddressSuggestion.cpp
@@ -409,4 +416,9 @@ qt_add_translations(
     RESOURCE_PREFIX "/i18n"
 )
 
-add_test(NAME PanBrowserTests COMMAND PanBrowserTests)
+add_test(NAME PanBrowserTrustTests COMMAND PanBrowserTests trust)
+add_test(NAME PanBrowserWindowTests COMMAND PanBrowserTests window)
+add_test(NAME PanBrowserPersistenceTests COMMAND PanBrowserTests persistence)
+add_test(NAME PanBrowserNetworkTests COMMAND PanBrowserTests network)
+add_test(NAME PanBrowserBrowsingTests COMMAND PanBrowserTests browsing)
+add_test(NAME PanBrowserWebAppTests COMMAND PanBrowserTests webapps)
