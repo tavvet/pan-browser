@@ -61,6 +61,8 @@ set(PANBROWSER_APP_SOURCES
     src/BrowserProfile.h
     src/BrowserPreferences.cpp
     src/BrowserPreferences.h
+    src/BrowserInteraction.cpp
+    src/BrowserInteraction.h
     src/BrowserShortcut.cpp
     src/BrowserShortcut.h
     src/BrowserPage.cpp
@@ -77,6 +79,8 @@ set(PANBROWSER_APP_SOURCES
     src/DownloadsPanel.h
     src/DiagnosticsPage.cpp
     src/DiagnosticsPage.h
+    src/DetachedVideoWindow.cpp
+    src/DetachedVideoWindow.h
     src/DnsSettings.cpp
     src/DnsSettings.h
     src/DnsSettingsPage.cpp
@@ -302,6 +306,8 @@ qt_add_executable(PanBrowserTests
     src/BrowserProfile.h
     src/BrowserPreferences.cpp
     src/BrowserPreferences.h
+    src/BrowserInteraction.cpp
+    src/BrowserInteraction.h
     src/BrowserShortcut.cpp
     src/BrowserShortcut.h
     src/PageZoom.cpp
@@ -310,6 +316,8 @@ qt_add_executable(PanBrowserTests
     src/CredentialPromptDialog.h
     src/DownloadHistoryStore.cpp
     src/DownloadHistoryStore.h
+    src/DetachedVideoWindow.cpp
+    src/DetachedVideoWindow.h
     src/DnsSettings.cpp
     src/DnsSettings.h
     src/ExternalNavigationPolicy.cpp
@@ -361,6 +369,7 @@ target_link_libraries(PanBrowserTests PRIVATE
     Qt6::Sql
     Qt6::Test
     Qt6::WebEngineCore
+    Qt6::WebEngineWidgets
     Qt6::Widgets
 )
 add_dependencies(PanBrowserTests PanBrowserLaunchClient)

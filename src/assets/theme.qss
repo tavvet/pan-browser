@@ -1128,3 +1128,44 @@ QDialog#proxyAuthenticationDialog QPushButton:default {
     background: #3d72d9;
     border-color: #5689ea;
 }
+
+QMainWindow#detachedVideoWindow {
+    background: #000000;
+}
+
+QFrame#detachedVideoOriginBar {
+    background: #151a23;
+    border: none;
+    border-bottom: 1px solid #313a49;
+}
+
+QLabel#detachedVideoOriginCaption,
+QLabel#detachedVideoOrigin {
+    color: #b9c3d2;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+QFrame#detachedVideoPlaceholder {
+    background: #111318;
+    border: none;
+}
+
+QLabel#detachedVideoMessage {
+    color: #c5cbd5;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+QPushButton#returnDetachedVideoButton {
+    min-height: 32px;
+    color: #ffffff;
+    background: #3d72d9;
+    border: 1px solid #5689ea;
+    border-radius: 8px;
+    padding: 2px 16px;
+}
+
+QPushButton#returnDetachedVideoButton:hover {
+    background: #487fe6;
+}

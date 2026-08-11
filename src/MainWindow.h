@@ -31,6 +31,9 @@ class BrowserProfile;
 class DownloadButton;
 class DownloadManager;
 class DownloadsPanel;
+class DetachedVideoSession;
+class DetachedVideoPlaceholder;
+class DetachedVideoWindow;
 class FindBar;
 class HttpAuthenticationController;
 class AddressCompletionPopup;
@@ -39,7 +42,9 @@ class PermissionPrompt;
 class ProxyAuthenticationController;
 class QCloseEvent;
 class QWebEngineCertificateError;
+class QWebEngineFullScreenRequest;
 class QWebEngineNewWindowRequest;
+class QWebEnginePage;
 class QWebEngineView;
 class WindowChromeController;
 
@@ -90,7 +95,11 @@ private:
         HistoryTransition pendingHistoryTransition = HistoryTransition::Other;
         QUrl manifestUrl;
         QString manifestTitle;
+        QPointer<QWebEnginePage> page;
         QPointer<QWebEngineView> developerToolsView;
+        QPointer<DetachedVideoSession> detachedVideoSession;
+        QPointer<DetachedVideoWindow> detachedVideoWindow;
+        QPointer<DetachedVideoPlaceholder> detachedVideoPlaceholder;
     };
 
     struct PendingManifestRequest {
@@ -125,8 +134,25 @@ private:
     );
     void closeTab(int index);
     QWebEngineView *currentWebView() const;
+    QWebEnginePage *pageForTab(QWebEngineView *webView) const;
+    QUrl urlForTab(QWebEngineView *webView) const;
+    QString titleForTab(QWebEngineView *webView) const;
+    QWebEngineView *activeInteractionWebView() const;
+    QWebEngineView *commandTargetWebView() const;
+    QWebEngineView *renderingViewForTab(QWebEngineView *webView) const;
+    QWidget *interactionParentForTab(QWebEngineView *webView);
+    bool isTabInteractionActive(QWebEngineView *webView) const;
+    void returnDetachedVideoForPermissionPrompt(QWebEngineView *webView);
     void activatePendingTab(QWebEngineView *webView);
     void connectBrowserSignals(QWebEngineView *webView);
+    void handleFullScreenRequest(
+        QWebEngineView *webView,
+        QWebEngineFullScreenRequest request
+    );
+    void detachVideo(QWebEngineView *webView, const QUrl &origin);
+    void requestDetachedVideoReturn(QWebEngineView *webView);
+    void restoreDetachedVideo(QWebEngineView *webView);
+    void restoreAllDetachedVideos();
     void updateCurrentTabUi();
     void updateNavigationActions();
     void updateBookmarkAction();
@@ -137,11 +163,14 @@ private:
     void closeFindBar();
     void findInPage(bool backward = false);
     void applyStoredPageZoom(QWebEngineView *webView);
-    void changeCurrentPageZoomBySteps(int steps);
-    void resetCurrentPageZoom();
-    void setCurrentPageZoom(double factor);
+    void changePageZoomBySteps(QWebEngineView *webView, int steps);
+    void setPageZoom(QWebEngineView *webView, double factor);
     void updateZoomActions();
-    void showWebContextMenu(QWebEngineView *webView, const QPoint &position);
+    void showWebContextMenu(
+        QWebEngineView *webView,
+        QWebEngineView *renderingView,
+        const QPoint &position
+    );
     void openDeveloperTools(QWebEngineView *webView, bool inspectElement = false);
     void closeDeveloperTools(QWebEngineView *webView);
     void applyDeveloperToolsPreference();
@@ -200,6 +229,7 @@ private:
     QPointer<QMessageBox> m_externalUrlDialog;
     QPointer<QWebEngineView> m_externalUrlSource;
     QPointer<QWebEngineView> m_findView;
+    QPointer<QWebEngineView> m_lastInteractionWebView;
     QTabBar *m_tabBar = nullptr;
     QStackedWidget *m_tabStack = nullptr;
     AddressLineEdit *m_address = nullptr;

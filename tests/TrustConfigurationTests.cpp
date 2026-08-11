@@ -6,8 +6,10 @@
 #include "BrowserPreferences.h"
 #include "BrowserShortcut.h"
 #include "BrowserDataCleanup.h"
+#include "BrowserInteraction.h"
 #include "BrowserProfile.h"
 #include "CertificateTrustValidator.h"
+#include "DetachedVideoWindow.h"
 #include "DownloadHistoryStore.h"
 #include "DnsSettings.h"
 #include "ExternalNavigationPolicy.h"
@@ -30,6 +32,7 @@
 
 #include <QApplication>
 #include <QAuthenticator>
+#include <QCloseEvent>
 #include <QDialog>
 #include <QDir>
 #include <QFile>
@@ -52,6 +55,8 @@
 #include <QTimeZone>
 #include <QTranslator>
 #include <QUuid>
+#include <QWebEnginePage>
+#include <QWebEngineView>
 #include <QWindow>
 
 class TrustConfigurationTests final : public QObject {
@@ -78,6 +83,11 @@ private slots:
     void pageZoomUsesCanonicalOriginsAndDiscreteLevels();
     void pageZoomPersistsAndRemovesDefaults();
     void pageZoomShortcutsAndWheelDeltas();
+    void activeBrowserViewSeparatesDetachedSurfaceFromDialogs();
+    void fullScreenRequestPolicyValidatesOriginAndState();
+    void detachedVideoSessionCoordinatesReturnAndFallback();
+    void detachedVideoWindowMovesAndRestoresPage();
+    void detachedVideoWindowCloseRequestsReturn();
     void privateDataFilesUseOwnerOnlyPermissions();
     void interfaceLanguagePreferenceRoundTrips();
     void interfaceLanguageSettingsParsing();
@@ -736,6 +746,324 @@ void TrustConfigurationTests::pageZoomShortcutsAndWheelDeltas()
     QCOMPARE(remainder, -20);
     QCOMPARE(takePageZoomSteps(-25, 40, remainder), -1);
     QCOMPARE(remainder, -5);
+}
+
+void TrustConfigurationTests::activeBrowserViewSeparatesDetachedSurfaceFromDialogs()
+{
+    QWidget mainWindow;
+    QWebEngineView currentView(&mainWindow);
+    QWidget detachedWindow;
+    QWebEngineView detachedSource;
+    QDialog detachedDialog(&detachedWindow);
+    QWidget unrelatedWindow;
+    const QList<BrowserInteractionSurface> surfaces = {
+        {&detachedSource, &detachedWindow},
+        {nullptr, &unrelatedWindow},
+    };
+    const std::span<const BrowserInteractionSurface> surfaceSpan(
+        surfaces.constData(),
+        static_cast<std::size_t>(surfaces.size())
+    );
+
+    QCOMPARE(
+        resolveActiveBrowserView(
+            &mainWindow,
+            &mainWindow,
+            &currentView,
+            surfaceSpan
+        ),
+        &currentView
+    );
+    QCOMPARE(
+        resolveActiveBrowserView(
+            &detachedWindow,
+            &mainWindow,
+            &currentView,
+            surfaceSpan
+        ),
+        &detachedSource
+    );
+    QVERIFY(!resolveActiveBrowserView(
+        &detachedDialog,
+        &mainWindow,
+        &currentView,
+        surfaceSpan
+    ));
+    QCOMPARE(
+        resolveBrowserCommandTarget(&detachedSource, &currentView, &currentView),
+        &detachedSource
+    );
+    QCOMPARE(
+        resolveBrowserCommandTarget(nullptr, &detachedSource, &currentView),
+        &detachedSource
+    );
+    QCOMPARE(
+        resolveBrowserCommandTarget(nullptr, nullptr, &currentView),
+        &currentView
+    );
+    QVERIFY(!resolveActiveBrowserView(
+        &unrelatedWindow,
+        &mainWindow,
+        &currentView,
+        surfaceSpan
+    ));
+    QVERIFY(!resolveActiveBrowserView(
+        nullptr,
+        &mainWindow,
+        &currentView,
+        surfaceSpan
+    ));
+}
+
+void TrustConfigurationTests::fullScreenRequestPolicyValidatesOriginAndState()
+{
+    const FullScreenRequestDecision accepted = decideFullScreenRequest(
+        true,
+        true,
+        false,
+        QUrl(QStringLiteral("HTTPS://Example.COM:443/watch?v=1#player"))
+    );
+    QCOMPARE(accepted.action, FullScreenRequestAction::Detach);
+    QCOMPARE(accepted.origin.scheme(), QStringLiteral("https"));
+    QCOMPARE(accepted.origin.host(), QStringLiteral("example.com"));
+    QCOMPARE(accepted.origin.port(), -1);
+    QCOMPARE(fullScreenOriginDisplay(accepted.origin), QStringLiteral("https://example.com"));
+
+    const FullScreenRequestDecision customPort = decideFullScreenRequest(
+        true,
+        true,
+        false,
+        QUrl(QStringLiteral("http://example.com:8080/video"))
+    );
+    QCOMPARE(customPort.action, FullScreenRequestAction::Detach);
+    QCOMPARE(customPort.origin.port(), 8080);
+    QCOMPARE(
+        fullScreenOriginDisplay(customPort.origin),
+        QStringLiteral("http://example.com:8080")
+    );
+
+    const FullScreenRequestDecision internationalizedHost = decideFullScreenRequest(
+        true,
+        true,
+        false,
+        QUrl(QStringLiteral("https://пример.рф/video"))
+    );
+    QCOMPARE(internationalizedHost.action, FullScreenRequestAction::Detach);
+    QCOMPARE(
+        fullScreenOriginDisplay(internationalizedHost.origin),
+        QStringLiteral("https://xn--e1afmkfd.xn--p1ai")
+    );
+
+    QCOMPARE(
+        decideFullScreenRequest(
+            true,
+            false,
+            false,
+            QUrl(QStringLiteral("https://example.com"))
+        ).action,
+        FullScreenRequestAction::Reject
+    );
+    QCOMPARE(
+        decideFullScreenRequest(
+            true,
+            true,
+            true,
+            QUrl(QStringLiteral("https://example.com"))
+        ).action,
+        FullScreenRequestAction::Reject
+    );
+    QCOMPARE(
+        decideFullScreenRequest(
+            true,
+            true,
+            false,
+            QUrl(QStringLiteral("ftp://example.com/video"))
+        ).action,
+        FullScreenRequestAction::Reject
+    );
+    QCOMPARE(
+        decideFullScreenRequest(
+            true,
+            true,
+            false,
+            QUrl(QStringLiteral("https://user@example.com/video"))
+        ).action,
+        FullScreenRequestAction::Reject
+    );
+    QCOMPARE(
+        decideFullScreenRequest(false, false, true, QUrl()).action,
+        FullScreenRequestAction::Restore
+    );
+    QVERIFY(fullScreenOriginDisplay(QUrl(QStringLiteral("file:///tmp/video.html"))).isEmpty());
+}
+
+void TrustConfigurationTests::detachedVideoSessionCoordinatesReturnAndFallback()
+{
+    DetachedVideoSession session(nullptr, 20);
+    QSignalSpy exitSpy(&session, &DetachedVideoSession::exitFullScreenRequested);
+    QSignalSpy restoreSpy(&session, &DetachedVideoSession::restoreRequested);
+
+    QCOMPARE(session.state(), DetachedVideoSession::State::Attached);
+    QVERIFY(session.beginDetached());
+    QVERIFY(session.isDetached());
+    QVERIFY(!session.beginDetached());
+    QVERIFY(session.requestReturn());
+    QCOMPARE(session.state(), DetachedVideoSession::State::ReturnPending);
+    QCOMPARE(exitSpy.count(), 1);
+    QVERIFY(!session.requestReturn());
+    QTRY_COMPARE_WITH_TIMEOUT(restoreSpy.count(), 1, 250);
+    QCOMPARE(session.state(), DetachedVideoSession::State::Attached);
+
+    QVERIFY(session.beginDetached());
+    QVERIFY(session.requestReturn());
+    QCOMPARE(exitSpy.count(), 2);
+    session.browserExitedFullScreen();
+    QCOMPARE(restoreSpy.count(), 2);
+    QCOMPARE(session.state(), DetachedVideoSession::State::Attached);
+    QTest::qWait(40);
+    QCOMPARE(restoreSpy.count(), 2);
+
+    QVERIFY(session.beginDetached());
+    session.forceRestore();
+    QCOMPARE(restoreSpy.count(), 3);
+    QCOMPARE(session.state(), DetachedVideoSession::State::Attached);
+
+    QVERIFY(session.beginDetached());
+    QVERIFY(session.requestReturn());
+    QCOMPARE(exitSpy.count(), 3);
+    session.reset();
+    QTest::qWait(40);
+    QCOMPARE(restoreSpy.count(), 3);
+    QCOMPARE(session.state(), DetachedVideoSession::State::Attached);
+}
+
+void TrustConfigurationTests::detachedVideoWindowMovesAndRestoresPage()
+{
+    QWebEngineView sourceView;
+    QWebEnginePage *originalPage = sourceView.page();
+    QVERIFY(originalPage);
+
+    {
+        DetachedVideoWindow detachedWindow(
+            &sourceView,
+            QStringLiteral("Video — https://example.com"),
+            QStringLiteral("Source:"),
+            QStringLiteral("https://example.com")
+        );
+        QCOMPARE(detachedWindow.windowTitle(), QStringLiteral("Video — https://example.com"));
+        QCOMPARE(
+            detachedWindow.sourceOriginText(),
+            QStringLiteral("https://example.com")
+        );
+        QCOMPARE(detachedWindow.webView()->page(), originalPage);
+        QCOMPARE(detachedWindow.webView()->contextMenuPolicy(), Qt::CustomContextMenu);
+        QCOMPARE(QWebEngineView::forPage(originalPage), detachedWindow.webView());
+        QVERIFY(sourceView.page() != originalPage);
+        QSignalSpy contextMenuSpy(
+            &detachedWindow,
+            &DetachedVideoWindow::contextMenuRequested
+        );
+        const QPoint contextMenuPosition(24, 36);
+        QVERIFY(QMetaObject::invokeMethod(
+            detachedWindow.webView(),
+            "customContextMenuRequested",
+            Qt::DirectConnection,
+            Q_ARG(QPoint, contextMenuPosition)
+        ));
+        QCOMPARE(contextMenuSpy.count(), 1);
+        QCOMPARE(contextMenuSpy.takeFirst().at(0).toPoint(), contextMenuPosition);
+
+        detachedWindow.restorePage();
+        QCOMPARE(sourceView.page(), originalPage);
+        QCOMPARE(QWebEngineView::forPage(originalPage), &sourceView);
+
+        detachedWindow.restorePage();
+        QCOMPARE(sourceView.page(), originalPage);
+    }
+
+    {
+        DetachedVideoWindow detachedWindow(
+            &sourceView,
+            QStringLiteral("Video — https://example.com"),
+            QStringLiteral("Source:"),
+            QStringLiteral("https://example.com")
+        );
+        QCOMPARE(QWebEngineView::forPage(originalPage), detachedWindow.webView());
+    }
+    QCOMPARE(sourceView.page(), originalPage);
+    QCOMPARE(QWebEngineView::forPage(originalPage), &sourceView);
+
+    QWebEngineView narrowSourceView;
+    const QString longOrigin = QStringLiteral(
+        "https://online.vtb.ru.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.evil.example"
+    );
+    const QString longCaption = QStringLiteral(
+        "A deliberately long translated source address caption:"
+    );
+    QString copiedOrigin;
+    DetachedVideoWindow narrowWindow(
+        &narrowSourceView,
+        QStringLiteral("Video"),
+        longCaption,
+        longOrigin,
+        nullptr,
+        [&copiedOrigin](const QString &text) {
+            copiedOrigin = text;
+        }
+    );
+    QLabel *narrowOriginLabel = narrowWindow.findChild<QLabel *>(
+        QStringLiteral("detachedVideoOrigin")
+    );
+    QVERIFY(narrowOriginLabel);
+    narrowWindow.resize(360, 220);
+    narrowWindow.show();
+    QApplication::processEvents();
+    QVERIFY(narrowOriginLabel->text().contains(QChar(0x2026)));
+    QVERIFY2(
+        narrowOriginLabel->text().startsWith(QStringLiteral("https://")),
+        qPrintable(QStringLiteral("Displayed origin: %1").arg(narrowOriginLabel->text()))
+    );
+    QVERIFY(narrowOriginLabel->text().endsWith(QStringLiteral("evil.example")));
+    QCOMPARE(narrowOriginLabel->toolTip(), longOrigin);
+    QCOMPARE(narrowOriginLabel->accessibleName(), longOrigin);
+    QCOMPARE(narrowWindow.sourceOriginText(), longOrigin);
+    QLabel *originCaption = narrowWindow.findChild<QLabel *>(
+        QStringLiteral("detachedVideoOriginCaption")
+    );
+    QVERIFY(originCaption);
+    QVERIFY(originCaption->text().contains(QChar(0x2026)));
+    QCOMPARE(originCaption->toolTip(), longCaption);
+    QCOMPARE(originCaption->accessibleName(), longCaption);
+
+    const QKeyCombination copyCombination = QKeySequence(QKeySequence::Copy)[0];
+    QTest::keyClick(
+        narrowOriginLabel,
+        copyCombination.key(),
+        copyCombination.keyboardModifiers()
+    );
+    QCOMPARE(copiedOrigin, longOrigin);
+}
+
+void TrustConfigurationTests::detachedVideoWindowCloseRequestsReturn()
+{
+    QWebEngineView sourceView;
+    QWebEnginePage *originalPage = sourceView.page();
+    DetachedVideoWindow detachedWindow(
+        &sourceView,
+        QStringLiteral("Video — https://example.com"),
+        QStringLiteral("Source:"),
+        QStringLiteral("https://example.com")
+    );
+    QSignalSpy returnSpy(&detachedWindow, &DetachedVideoWindow::returnRequested);
+
+    QCloseEvent closeEvent;
+    QApplication::sendEvent(&detachedWindow, &closeEvent);
+    QCOMPARE(returnSpy.count(), 1);
+    QVERIFY(!closeEvent.isAccepted());
+    QCOMPARE(detachedWindow.webView()->page(), originalPage);
+
+    detachedWindow.restorePage();
+    QCOMPARE(sourceView.page(), originalPage);
 }
 
 void TrustConfigurationTests::privateDataFilesUseOwnerOnlyPermissions()

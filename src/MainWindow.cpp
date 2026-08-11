@@ -7,10 +7,12 @@
 #include "BookmarksDialog.h"
 #include "BrowserPage.h"
 #include "BrowserProfile.h"
+#include "BrowserInteraction.h"
 #include "BrowserShortcut.h"
 #include "CertificateTrustValidator.h"
 #include "DownloadManager.h"
 #include "DownloadsPanel.h"
+#include "DetachedVideoWindow.h"
 #include "ExternalNavigationPolicy.h"
 #include "FindBar.h"
 #include "AddressCompletionPopup.h"
@@ -64,12 +66,15 @@
 #include <QToolBar>
 #include <QToolButton>
 #include <QUuid>
+#include <QVarLengthArray>
 #include <QWebEngineCertificateError>
 #include <QWebEngineFindTextResult>
+#include <QWebEngineFullScreenRequest>
 #include <QWebEngineHistory>
 #include <QWebEngineNewWindowRequest>
 #include <QWebEnginePage>
 #include <QWebEngineScript>
+#include <QWebEngineSettings>
 #include <QWebEngineView>
 #include <QWheelEvent>
 
@@ -99,20 +104,21 @@ bool isSameWebOrigin(const QUrl &left, const QUrl &right)
         && effectivePort(left) == effectivePort(right);
 }
 
+template<typename Callback>
 bool triggerShortcutAction(
     QAction *action,
     QKeyEvent *event,
-    bool consumeWhenDisabled = false
+    bool enabled,
+    Callback &&callback
 )
 {
     if (!action
-        || (!action->isEnabled() && !consumeWhenDisabled)
         || !BrowserShortcut::matches(*event, action->shortcuts())) {
         return false;
     }
     event->accept();
-    if (!event->isAutoRepeat() && action->isEnabled())
-        action->trigger();
+    if (!event->isAutoRepeat() && enabled)
+        std::forward<Callback>(callback)();
     return true;
 }
 
@@ -277,6 +283,7 @@ MainWindow::~MainWindow()
 {
     if (qApp)
         qApp->removeEventFilter(this);
+    restoreAllDetachedVideos();
     if (m_ownsBrowserResources) {
         while (!m_popupWindows.isEmpty()) {
             if (MainWindow *popup = m_popupWindows.takeLast())
@@ -311,6 +318,7 @@ QString MainWindow::startupError() const
 
 void MainWindow::closeEvent(QCloseEvent *event)
 {
+    restoreAllDetachedVideos();
     if (m_ownsBrowserResources) {
         if (m_primaryTabsInitialized) {
             saveSession();
@@ -334,37 +342,74 @@ void MainWindow::closeEvent(QCloseEvent *event)
 bool MainWindow::eventFilter(QObject *watched, QEvent *event)
 {
     Q_UNUSED(watched);
-    if (!isActiveWindow())
+    const QEvent::Type eventType = event->type();
+    if (eventType != QEvent::KeyPress
+        && eventType != QEvent::Wheel
+        && eventType != QEvent::WindowActivate) {
         return QMainWindow::eventFilter(watched, event);
+    }
 
-    if (event->type() == QEvent::KeyPress) {
+    QWebEngineView *webView = activeInteractionWebView();
+    if (!webView)
+        return QMainWindow::eventFilter(watched, event);
+    m_lastInteractionWebView = webView;
+    if (eventType == QEvent::WindowActivate) {
+        m_zoomAngleRemainder = 0;
+        m_zoomPixelRemainder = 0;
+        return QMainWindow::eventFilter(watched, event);
+    }
+
+    if (eventType == QEvent::KeyPress) {
         auto *keyEvent = static_cast<QKeyEvent *>(event);
-        if (triggerShortcutAction(m_zoomInAction, keyEvent, true)
-            || triggerShortcutAction(m_zoomOutAction, keyEvent, true)
-            || triggerShortcutAction(m_resetZoomAction, keyEvent, true)) {
+        QWebEnginePage *page = pageForTab(webView);
+        const int zoomPercentage = pageZoomPercentage(
+            page ? page->zoomFactor() : defaultPageZoomFactor
+        );
+        const bool canZoomIn = page
+            && zoomPercentage < pageZoomPercentage(maximumPageZoomFactor);
+        const bool canZoomOut = page
+            && zoomPercentage > pageZoomPercentage(minimumPageZoomFactor);
+        const bool canResetZoom = page
+            && zoomPercentage != pageZoomPercentage(defaultPageZoomFactor);
+        if (triggerShortcutAction(m_zoomInAction, keyEvent, canZoomIn, [this, webView] {
+                changePageZoomBySteps(webView, 1);
+            })
+            || triggerShortcutAction(m_zoomOutAction, keyEvent, canZoomOut, [this, webView] {
+                changePageZoomBySteps(webView, -1);
+            })
+            || triggerShortcutAction(m_resetZoomAction, keyEvent, canResetZoom, [this, webView] {
+                setPageZoom(webView, defaultPageZoomFactor);
+            })) {
             return true;
         }
         if (m_preferences.developerToolsEnabled()
-            && triggerShortcutAction(m_developerToolsAction, keyEvent)) {
+            && triggerShortcutAction(
+                m_developerToolsAction,
+                keyEvent,
+                true,
+                [this, webView] {
+                    openDeveloperTools(webView);
+                }
+            )) {
             return true;
         }
     }
 
-    if (event->type() == QEvent::Wheel) {
+    if (eventType == QEvent::Wheel) {
         auto *wheelEvent = static_cast<QWheelEvent *>(event);
-        QWebEngineView *webView = currentWebView();
         if (!hasPageZoomModifier(wheelEvent->modifiers())) {
             m_zoomAngleRemainder = 0;
             m_zoomPixelRemainder = 0;
             return QMainWindow::eventFilter(watched, event);
         }
-        if (!webView || !webView->isVisible())
+        QWebEngineView *renderingView = renderingViewForTab(webView);
+        if (!renderingView || !renderingView->isVisible())
             return QMainWindow::eventFilter(watched, event);
 
-        const QPoint localPosition = webView->mapFromGlobal(
+        const QPoint localPosition = renderingView->mapFromGlobal(
             wheelEvent->globalPosition().toPoint()
         );
-        if (!webView->rect().contains(localPosition))
+        if (!renderingView->rect().contains(localPosition))
             return QMainWindow::eventFilter(watched, event);
 
         if (wheelEvent->phase() == Qt::ScrollBegin) {
@@ -390,7 +435,7 @@ bool MainWindow::eventFilter(QObject *watched, QEvent *event)
         }
 
         if (steps != 0)
-            changeCurrentPageZoomBySteps(std::clamp(steps, -4, 4));
+            changePageZoomBySteps(webView, std::clamp(steps, -4, 4));
         if (wheelEvent->phase() == Qt::ScrollEnd) {
             m_zoomAngleRemainder = 0;
             m_zoomPixelRemainder = 0;
@@ -585,8 +630,13 @@ void MainWindow::createInterface()
         }
         if (m_permissionController)
             m_permissionController->currentViewChanged(currentWebView());
-        if (m_externalUrlSource && m_externalUrlSource != currentWebView())
-            cancelExternalUrlPrompt();
+        if (isActiveWindow())
+            m_lastInteractionWebView = currentWebView();
+        if (m_externalUrlSource && m_externalUrlSource != currentWebView()) {
+            const auto sourceState = m_tabStates.constFind(m_externalUrlSource);
+            if (sourceState == m_tabStates.cend() || !sourceState->detachedVideoWindow)
+                cancelExternalUrlPrompt();
+        }
         updateCurrentTabUi();
         if (m_findToolbar && m_findToolbar->isVisible())
             findInPage(false);
@@ -603,16 +653,16 @@ void MainWindow::createInterface()
         scheduleSessionSave();
     });
     connect(m_backAction, &QAction::triggered, this, [this] {
-        if (QWebEngineView *webView = currentWebView())
-            webView->back();
+        if (QWebEnginePage *page = pageForTab(currentWebView()))
+            page->triggerAction(QWebEnginePage::Back);
     });
     connect(m_forwardAction, &QAction::triggered, this, [this] {
-        if (QWebEngineView *webView = currentWebView())
-            webView->forward();
+        if (QWebEnginePage *page = pageForTab(currentWebView()))
+            page->triggerAction(QWebEnginePage::Forward);
     });
     connect(m_reloadAction, &QAction::triggered, this, [this] {
-        if (QWebEngineView *webView = currentWebView())
-            webView->reload();
+        if (QWebEnginePage *page = pageForTab(currentWebView()))
+            page->triggerAction(QWebEnginePage::Reload);
     });
     connect(go, &QAction::triggered, this, &MainWindow::navigateFromAddressBar);
     connect(m_bookmarkAction, &QAction::triggered, this, &MainWindow::editCurrentBookmark);
@@ -726,20 +776,23 @@ void MainWindow::createInterface()
     m_zoomInAction->setShortcutContext(Qt::WindowShortcut);
     m_zoomInAction->setAutoRepeat(false);
     connect(m_zoomInAction, &QAction::triggered, this, [this] {
-        changeCurrentPageZoomBySteps(1);
+        changePageZoomBySteps(commandTargetWebView(), 1);
     });
     m_zoomOutAction = m_zoomMenu->addAction(tr("Zoom Out"));
     m_zoomOutAction->setShortcuts(pageZoomOutShortcuts());
     m_zoomOutAction->setShortcutContext(Qt::WindowShortcut);
     m_zoomOutAction->setAutoRepeat(false);
     connect(m_zoomOutAction, &QAction::triggered, this, [this] {
-        changeCurrentPageZoomBySteps(-1);
+        changePageZoomBySteps(commandTargetWebView(), -1);
     });
     m_resetZoomAction = m_zoomMenu->addAction(tr("Actual Size"));
     m_resetZoomAction->setShortcuts(pageZoomResetShortcuts());
     m_resetZoomAction->setShortcutContext(Qt::WindowShortcut);
     m_resetZoomAction->setAutoRepeat(false);
-    connect(m_resetZoomAction, &QAction::triggered, this, &MainWindow::resetCurrentPageZoom);
+    connect(m_resetZoomAction, &QAction::triggered, this, [this] {
+        setPageZoom(commandTargetWebView(), defaultPageZoomFactor);
+    });
+    connect(m_zoomMenu, &QMenu::aboutToShow, this, &MainWindow::updateZoomActions);
 
     fileMenu->addSeparator();
     m_developerToolsAction = fileMenu->addAction(tr("Developer Tools"));
@@ -756,7 +809,7 @@ void MainWindow::createInterface()
 #endif
     m_developerToolsAction->setShortcutContext(Qt::WindowShortcut);
     connect(m_developerToolsAction, &QAction::triggered, this, [this] {
-        openDeveloperTools(currentWebView());
+        openDeveloperTools(commandTargetWebView());
     });
 
     fileMenu->addSeparator();
@@ -940,13 +993,36 @@ QWebEngineView *MainWindow::createTab(
     auto *page = new BrowserPage(m_profile, webView);
     if (m_windowRole == WindowRole::WebApp)
         page->setWebApp(m_webApp);
+    page->settings()->setAttribute(QWebEngineSettings::FullScreenSupportEnabled, true);
     webView->setPage(page);
     BrowserTabState state;
+    state.page = page;
+    state.detachedVideoSession = new DetachedVideoSession(webView);
     if (deferred) {
         state.pendingUrl = url;
         state.suppressNextHistoryVisit = true;
     }
     m_tabStates.insert(webView, state);
+    connect(
+        state.detachedVideoSession,
+        &DetachedVideoSession::exitFullScreenRequested,
+        this,
+        [this, webView] {
+            const auto state = m_tabStates.constFind(webView);
+            if (state == m_tabStates.cend() || !state->detachedVideoWindow)
+                return;
+            if (QWebEnginePage *page = state->page)
+                page->triggerAction(QWebEnginePage::ExitFullScreen);
+        }
+    );
+    connect(
+        state.detachedVideoSession,
+        &DetachedVideoSession::restoreRequested,
+        this,
+        [this, webView] {
+            restoreDetachedVideo(webView);
+        }
+    );
     connectBrowserSignals(webView);
     webView->setContextMenuPolicy(Qt::CustomContextMenu);
     connect(
@@ -954,7 +1030,7 @@ QWebEngineView *MainWindow::createTab(
         &QWidget::customContextMenuRequested,
         this,
         [this, webView](const QPoint &position) {
-            showWebContextMenu(webView, position);
+            showWebContextMenu(webView, webView, position);
         }
     );
 
@@ -985,6 +1061,7 @@ void MainWindow::closeTab(int index)
     if (!webView)
         return;
 
+    restoreDetachedVideo(webView);
     m_permissionController->cancelForView(webView);
     cancelExternalUrlPrompt(webView);
     closeDeveloperTools(webView);
@@ -1021,27 +1098,145 @@ QWebEngineView *MainWindow::currentWebView() const
     return qobject_cast<QWebEngineView *>(m_tabStack->currentWidget());
 }
 
+QWebEnginePage *MainWindow::pageForTab(QWebEngineView *webView) const
+{
+    if (!webView)
+        return nullptr;
+    const auto state = m_tabStates.constFind(webView);
+    if (state != m_tabStates.cend() && state->page)
+        return state->page;
+    return webView->page();
+}
+
+QUrl MainWindow::urlForTab(QWebEngineView *webView) const
+{
+    if (QWebEnginePage *page = pageForTab(webView))
+        return page->url();
+    return QUrl();
+}
+
+QString MainWindow::titleForTab(QWebEngineView *webView) const
+{
+    if (QWebEnginePage *page = pageForTab(webView))
+        return page->title();
+    return QString();
+}
+
+QWebEngineView *MainWindow::activeInteractionWebView() const
+{
+    QWidget *activeWindow = QApplication::activeWindow();
+    QVarLengthArray<BrowserInteractionSurface, 4> detachedSurfaces;
+    for (auto state = m_tabStates.cbegin(); state != m_tabStates.cend(); ++state) {
+        DetachedVideoWindow *detachedWindow = state->detachedVideoWindow;
+        if (detachedWindow)
+            detachedSurfaces.append({state.key(), detachedWindow});
+    }
+    return resolveActiveBrowserView(
+        activeWindow,
+        this,
+        currentWebView(),
+        std::span<const BrowserInteractionSurface>(
+            detachedSurfaces.constData(),
+            static_cast<std::size_t>(detachedSurfaces.size())
+        )
+    );
+}
+
+QWebEngineView *MainWindow::commandTargetWebView() const
+{
+    QWebEngineView *activeView = activeInteractionWebView();
+    if (activeView)
+        return activeView;
+    if (QApplication::activeModalWidget())
+        return nullptr;
+    if (QApplication::activeWindow() && !QApplication::activePopupWidget())
+        return nullptr;
+
+    QWebEngineView *lastActiveView = m_lastInteractionWebView;
+    if (lastActiveView && !m_tabStates.contains(lastActiveView))
+        lastActiveView = nullptr;
+    return resolveBrowserCommandTarget(
+        nullptr,
+        lastActiveView,
+        currentWebView()
+    );
+}
+
+QWebEngineView *MainWindow::renderingViewForTab(QWebEngineView *webView) const
+{
+    const auto state = m_tabStates.constFind(webView);
+    if (state != m_tabStates.cend() && state->detachedVideoWindow)
+        return state->detachedVideoWindow->webView();
+    return webView;
+}
+
+QWidget *MainWindow::interactionParentForTab(QWebEngineView *webView)
+{
+    const auto state = m_tabStates.constFind(webView);
+    if (state != m_tabStates.cend()
+        && state->detachedVideoWindow
+        && activeInteractionWebView() == webView) {
+        return state->detachedVideoWindow;
+    }
+    return this;
+}
+
+bool MainWindow::isTabInteractionActive(QWebEngineView *webView) const
+{
+    return webView && activeInteractionWebView() == webView;
+}
+
+void MainWindow::returnDetachedVideoForPermissionPrompt(QWebEngineView *webView)
+{
+    const auto state = m_tabStates.constFind(webView);
+    if (state != m_tabStates.cend() && state->detachedVideoWindow) {
+        if (state->page)
+            state->page->triggerAction(QWebEnginePage::ExitFullScreen);
+        if (m_tabStates.contains(webView)
+            && m_tabStates.value(webView).detachedVideoWindow) {
+            const BrowserTabState currentState = m_tabStates.value(webView);
+            if (currentState.detachedVideoSession)
+                currentState.detachedVideoSession->forceRestore();
+            if (m_tabStates.contains(webView)
+                && m_tabStates.value(webView).detachedVideoWindow) {
+                restoreDetachedVideo(webView);
+            }
+        }
+    }
+
+    const int index = m_tabStack ? m_tabStack->indexOf(webView) : -1;
+    if (index >= 0 && m_tabBar->currentIndex() != index)
+        m_tabBar->setCurrentIndex(index);
+    if (m_permissionController)
+        m_permissionController->currentViewChanged(webView);
+    show();
+    raise();
+    activateWindow();
+}
+
 QString MainWindow::developerToolsWindowTitle(QWebEngineView *webView) const
 {
-    QString pageTitle;
-    if (webView)
-        pageTitle = webView->title().trimmed();
+    QString pageTitle = titleForTab(webView).trimmed();
     if (pageTitle.isEmpty())
         pageTitle = tr("Untitled page");
     return tr("Developer Tools — %1").arg(pageTitle);
 }
 
-void MainWindow::showWebContextMenu(QWebEngineView *webView, const QPoint &position)
+void MainWindow::showWebContextMenu(
+    QWebEngineView *webView,
+    QWebEngineView *renderingView,
+    const QPoint &position
+)
 {
-    if (!webView || !m_tabStates.contains(webView))
+    if (!webView || !renderingView || !m_tabStates.contains(webView))
         return;
 
-    QMenu *menu = webView->createStandardContextMenu();
+    QMenu *menu = renderingView->createStandardContextMenu();
     if (!menu)
         return;
     menu->setAttribute(Qt::WA_DeleteOnClose);
 
-    if (QAction *defaultInspect = webView->pageAction(QWebEnginePage::InspectElement))
+    if (QAction *defaultInspect = renderingView->pageAction(QWebEnginePage::InspectElement))
         menu->removeAction(defaultInspect);
     while (!menu->actions().isEmpty() && menu->actions().constLast()->isSeparator())
         menu->removeAction(menu->actions().constLast());
@@ -1055,7 +1250,7 @@ void MainWindow::showWebContextMenu(QWebEngineView *webView, const QPoint &posit
         });
     }
 
-    menu->popup(webView->mapToGlobal(position));
+    menu->popup(renderingView->mapToGlobal(position));
 }
 
 void MainWindow::openDeveloperTools(QWebEngineView *webView, bool inspectElement)
@@ -1076,7 +1271,7 @@ void MainWindow::openDeveloperTools(QWebEngineView *webView, bool inspectElement
         developerToolsView->resize(1100, 760);
         developerToolsView->setWindowTitle(developerToolsWindowTitle(webView));
         state.developerToolsView = developerToolsView;
-        webView->page()->setDevToolsPage(developerToolsView->page());
+        pageForTab(webView)->setDevToolsPage(developerToolsView->page());
 
         const QPointer<QWebEngineView> inspectedView(webView);
         connect(developerToolsView, &QObject::destroyed, this, [this, inspectedView] {
@@ -1093,7 +1288,7 @@ void MainWindow::openDeveloperTools(QWebEngineView *webView, bool inspectElement
     developerToolsView->raise();
     developerToolsView->activateWindow();
     if (inspectElement)
-        webView->page()->triggerAction(QWebEnginePage::InspectElement);
+        pageForTab(webView)->triggerAction(QWebEnginePage::InspectElement);
 }
 
 void MainWindow::closeDeveloperTools(QWebEngineView *webView)
@@ -1104,8 +1299,9 @@ void MainWindow::closeDeveloperTools(QWebEngineView *webView)
 
     QWebEngineView *developerToolsView = stateIt->developerToolsView;
     stateIt->developerToolsView.clear();
-    if (webView && webView->page()->devToolsPage() == developerToolsView->page())
-        webView->page()->setDevToolsPage(nullptr);
+    QWebEnginePage *page = pageForTab(webView);
+    if (page && page->devToolsPage() == developerToolsView->page())
+        page->setDevToolsPage(nullptr);
     developerToolsView->setAttribute(Qt::WA_DeleteOnClose, false);
     delete developerToolsView;
 }
@@ -1139,22 +1335,25 @@ void MainWindow::activatePendingTab(QWebEngineView *webView)
 
 void MainWindow::connectBrowserSignals(QWebEngineView *webView)
 {
+    QWebEnginePage *page = pageForTab(webView);
+    Q_ASSERT(page);
     connect(
-        webView->page(),
+        page,
         &QWebEnginePage::authenticationRequired,
         this,
         [this, webView](const QUrl &requestUrl, QAuthenticator *authenticator) {
             const auto state = m_tabStates.constFind(webView);
+            const bool interactionActive = isTabInteractionActive(webView);
             const bool promptAllowed = state != m_tabStates.cend()
                 && HttpAuthenticationPolicy::promptAllowed(
                     requestUrl,
                     state->topLevelUrl,
-                    webView == currentWebView(),
-                    isActiveWindow()
+                    interactionActive,
+                    interactionActive
                 );
             if (m_httpAuthenticationController && promptAllowed) {
                 m_httpAuthenticationController->requestAuthentication(
-                    this,
+                    interactionParentForTab(webView),
                     requestUrl,
                     authenticator
                 );
@@ -1164,17 +1363,17 @@ void MainWindow::connectBrowserSignals(QWebEngineView *webView)
         }
     );
     connect(
-        webView->page(),
+        page,
         &QWebEnginePage::proxyAuthenticationRequired,
         this,
-        [this](
+        [this, webView](
             const QUrl &requestUrl,
             QAuthenticator *authenticator,
             const QString &proxyHost
         ) {
             if (m_proxyAuthenticationController) {
                 m_proxyAuthenticationController->requestAuthentication(
-                    this,
+                    interactionParentForTab(webView),
                     requestUrl,
                     authenticator,
                     proxyHost
@@ -1182,13 +1381,13 @@ void MainWindow::connectBrowserSignals(QWebEngineView *webView)
             }
         }
     );
-    connect(webView, &QWebEngineView::urlChanged, this, [this, webView](const QUrl &url) {
+    connect(page, &QWebEnginePage::urlChanged, this, [this, webView, page](const QUrl &url) {
         BrowserTabState &state = m_tabStates[webView];
         state.pendingUrl.clear();
         state.topLevelUrl = url;
         applyStoredPageZoom(webView);
         const int index = m_tabStack->indexOf(webView);
-        if (index >= 0 && webView->title().isEmpty()) {
+        if (index >= 0 && page->title().isEmpty()) {
             const QString label = url.host().isEmpty() ? tr("New Tab") : url.host();
             m_tabBar->setTabText(index, label);
             m_tabBar->setTabToolTip(index, url.toString());
@@ -1206,18 +1405,18 @@ void MainWindow::connectBrowserSignals(QWebEngineView *webView)
             updateInstallWebAppAction();
         scheduleSessionSave();
     });
-    connect(webView->page(), &QWebEnginePage::zoomFactorChanged, this, [this, webView](double) {
+    connect(page, &QWebEnginePage::zoomFactorChanged, this, [this, webView](double) {
         if (webView == currentWebView())
             updateZoomActions();
     });
-    connect(webView, &QWebEngineView::titleChanged, this, [this, webView](const QString &title) {
+    connect(page, &QWebEnginePage::titleChanged, this, [this, webView, page](const QString &title) {
         const int index = m_tabStack->indexOf(webView);
         if (index >= 0) {
             const QString label = title.isEmpty()
-                ? (webView->url().host().isEmpty() ? tr("New Tab") : webView->url().host())
+                ? (page->url().host().isEmpty() ? tr("New Tab") : page->url().host())
                 : title;
             m_tabBar->setTabText(index, label);
-            m_tabBar->setTabToolTip(index, title.isEmpty() ? webView->url().toString() : title);
+            m_tabBar->setTabToolTip(index, title.isEmpty() ? page->url().toString() : title);
         }
         if (webView == currentWebView()) {
             if (m_windowRole == WindowRole::WebApp)
@@ -1230,17 +1429,17 @@ void MainWindow::connectBrowserSignals(QWebEngineView *webView)
             stateIt->developerToolsView->setWindowTitle(developerToolsWindowTitle(webView));
         if (m_preferences.saveBrowsingHistory() && m_historyStore && m_historyStore->isOpen()) {
             QString error;
-            if (!m_historyStore->updateTitle(webView->url(), title, &error))
+            if (!m_historyStore->updateTitle(page->url(), title, &error))
                 qWarning().noquote() << "[PanBrowser history]" << error;
         }
         scheduleSessionSave();
     });
-    connect(webView, &QWebEngineView::iconChanged, this, [this, webView](const QIcon &icon) {
+    connect(page, &QWebEnginePage::iconChanged, this, [this, webView](const QIcon &icon) {
         const int index = m_tabStack->indexOf(webView);
         if (index >= 0)
             m_tabBar->setTabIcon(index, icon);
     });
-    connect(webView, &QWebEngineView::loadStarted, this, [this, webView] {
+    connect(page, &QWebEnginePage::loadStarted, this, [this, webView] {
         m_permissionController->cancelForView(webView);
         cancelExternalUrlPrompt(webView);
         BrowserTabState &state = m_tabStates[webView];
@@ -1271,12 +1470,12 @@ void MainWindow::connectBrowserSignals(QWebEngineView *webView)
         if (webView == currentWebView())
             updateInstallWebAppAction();
     });
-    connect(webView, &QWebEngineView::loadProgress, this, [this, webView](int progress) {
+    connect(page, &QWebEnginePage::loadProgress, this, [this, webView](int progress) {
         m_tabStates[webView].progress = progress;
         if (webView == currentWebView())
             m_progress->setValue(progress);
     });
-    connect(webView, &QWebEngineView::loadFinished, this, [this, webView](bool ok) {
+    connect(page, &QWebEnginePage::loadFinished, this, [this, webView, page](bool ok) {
         BrowserTabState &state = m_tabStates[webView];
         state.loading = false;
         state.progress = 100;
@@ -1302,11 +1501,11 @@ void MainWindow::connectBrowserSignals(QWebEngineView *webView)
                 && m_preferences.saveBrowsingHistory()
                 && m_historyStore
                 && m_historyStore->isOpen()
-                && HistoryStore::sanitizedUrl(webView->url()).isValid()) {
+                && HistoryStore::sanitizedUrl(page->url()).isValid()) {
                 QString historyError;
                 if (!m_historyStore->recordVisit(
-                        webView->url(),
-                        webView->title(),
+                        page->url(),
+                        page->title(),
                         state.pendingHistoryTransition,
                         QDateTime::currentDateTimeUtc(),
                         &historyError
@@ -1314,7 +1513,7 @@ void MainWindow::connectBrowserSignals(QWebEngineView *webView)
                     qWarning().noquote() << "[PanBrowser history]" << historyError;
                 }
             }
-            const QString scheme = webView->url().scheme().toLower();
+            const QString scheme = page->url().scheme().toLower();
             if (scheme == QStringLiteral("https")) {
                 if (state.lastAcceptedRule.isEmpty()) {
                     setTabTrustStatus(webView, tr("Secure · Chromium system trust"));
@@ -1340,7 +1539,7 @@ void MainWindow::connectBrowserSignals(QWebEngineView *webView)
         }
     });
     connect(
-        static_cast<BrowserPage *>(webView->page()),
+        static_cast<BrowserPage *>(page),
         &BrowserPage::mainFrameNavigationRequested,
         this,
         [this, webView](const QUrl &url, int navigationType) {
@@ -1366,7 +1565,7 @@ void MainWindow::connectBrowserSignals(QWebEngineView *webView)
         }
     );
     connect(
-        static_cast<BrowserPage *>(webView->page()),
+        static_cast<BrowserPage *>(page),
         &BrowserPage::outOfScopeNavigationRequested,
         this,
         [this](const QUrl &url, int navigationType) {
@@ -1392,13 +1591,13 @@ void MainWindow::connectBrowserSignals(QWebEngineView *webView)
         }
     );
     connect(
-        static_cast<BrowserPage *>(webView->page()),
+        static_cast<BrowserPage *>(page),
         &BrowserPage::webAppManifestFetched,
         this,
         &MainWindow::handleFetchedWebAppManifest
     );
     connect(
-        static_cast<BrowserPage *>(webView->page()),
+        static_cast<BrowserPage *>(page),
         &BrowserPage::externalUrlRequested,
         this,
         [this, webView](const QUrl &url) {
@@ -1407,7 +1606,7 @@ void MainWindow::connectBrowserSignals(QWebEngineView *webView)
         }
     );
     connect(
-        webView->page(),
+        page,
         &QWebEnginePage::certificateError,
         this,
         [this, webView](const QWebEngineCertificateError &error) {
@@ -1415,15 +1614,18 @@ void MainWindow::connectBrowserSignals(QWebEngineView *webView)
         }
     );
     connect(
-        webView->page(),
+        page,
         &QWebEnginePage::permissionRequested,
         this,
         [this, webView](const QWebEnginePermission &permission) {
+            const auto state = m_tabStates.constFind(webView);
+            if (state != m_tabStates.cend() && state->detachedVideoWindow)
+                returnDetachedVideoForPermissionPrompt(webView);
             m_permissionController->request(webView, permission);
         }
     );
     connect(
-        webView->page(),
+        page,
         &QWebEnginePage::newWindowRequested,
         this,
         [this, webView](QWebEngineNewWindowRequest &request) {
@@ -1469,14 +1671,167 @@ void MainWindow::connectBrowserSignals(QWebEngineView *webView)
             request.openIn(newView->page());
         }
     );
+    connect(
+        page,
+        &QWebEnginePage::fullScreenRequested,
+        this,
+        [this, webView](QWebEngineFullScreenRequest request) {
+            handleFullScreenRequest(webView, request);
+        }
+    );
+}
+
+void MainWindow::handleFullScreenRequest(
+    QWebEngineView *webView,
+    QWebEngineFullScreenRequest request
+)
+{
+    const auto state = m_tabStates.constFind(webView);
+    if (state == m_tabStates.cend()) {
+        request.reject();
+        return;
+    }
+
+    const FullScreenRequestDecision decision = decideFullScreenRequest(
+        request.toggleOn(),
+        isTabInteractionActive(webView),
+        state->detachedVideoSession && state->detachedVideoSession->isDetached(),
+        request.origin()
+    );
+    switch (decision.action) {
+    case FullScreenRequestAction::Reject:
+        request.reject();
+        return;
+    case FullScreenRequestAction::Detach:
+        request.accept();
+        detachVideo(webView, decision.origin);
+        return;
+    case FullScreenRequestAction::Restore:
+        request.accept();
+        if (state->detachedVideoSession)
+            state->detachedVideoSession->browserExitedFullScreen();
+        else
+            restoreDetachedVideo(webView);
+        return;
+    }
+}
+
+void MainWindow::detachVideo(QWebEngineView *webView, const QUrl &origin)
+{
+    if (!webView || !m_tabStates.contains(webView))
+        return;
+    BrowserTabState &state = m_tabStates[webView];
+    if (state.detachedVideoWindow
+        || !state.page
+        || !state.detachedVideoSession) {
+        return;
+    }
+
+    const QString originText = fullScreenOriginDisplay(origin);
+    if (originText.isEmpty())
+        return;
+    if (!state.detachedVideoSession->beginDetached())
+        return;
+
+    auto *window = new DetachedVideoWindow(
+        webView,
+        tr("Video — %1").arg(originText),
+        tr("Source:"),
+        originText,
+        nullptr
+    );
+    auto *placeholder = new DetachedVideoPlaceholder(
+        webView,
+        tr("Video is playing in a separate window."),
+        tr("Return Video")
+    );
+    state.detachedVideoWindow = window;
+    state.detachedVideoPlaceholder = placeholder;
+
+    connect(window, &DetachedVideoWindow::returnRequested, this, [this, webView] {
+        requestDetachedVideoReturn(webView);
+    });
+    connect(placeholder, &DetachedVideoPlaceholder::returnRequested, this, [this, webView] {
+        requestDetachedVideoReturn(webView);
+    });
+    connect(window, &DetachedVideoWindow::contextMenuRequested, this, [this, webView, window](
+        const QPoint &position
+    ) {
+        showWebContextMenu(webView, window->webView(), position);
+    });
+    window->show();
+    window->raise();
+    window->activateWindow();
+    m_lastInteractionWebView = webView;
+    updateCurrentTabUi();
+}
+
+void MainWindow::requestDetachedVideoReturn(QWebEngineView *webView)
+{
+    auto state = m_tabStates.find(webView);
+    if (state == m_tabStates.end()
+        || !state->detachedVideoWindow
+        || !state->detachedVideoSession) {
+        return;
+    }
+    static_cast<void>(state->detachedVideoSession->requestReturn());
+}
+
+void MainWindow::restoreDetachedVideo(QWebEngineView *webView)
+{
+    auto state = m_tabStates.find(webView);
+    if (state == m_tabStates.end())
+        return;
+    if (state->detachedVideoSession)
+        state->detachedVideoSession->reset();
+    if (!state->detachedVideoWindow)
+        return;
+
+    DetachedVideoWindow *window = state->detachedVideoWindow;
+    DetachedVideoPlaceholder *placeholder = state->detachedVideoPlaceholder;
+    cancelExternalUrlPrompt(webView);
+    state->detachedVideoWindow.clear();
+    state->detachedVideoPlaceholder.clear();
+
+    window->restorePage();
+    if (placeholder) {
+        placeholder->hide();
+        placeholder->deleteLater();
+    }
+    window->hide();
+    window->deleteLater();
+
+    if (m_lastInteractionWebView == webView)
+        m_lastInteractionWebView = currentWebView();
+
+    if (webView == currentWebView()) {
+        updateCurrentTabUi();
+        webView->setFocus(Qt::OtherFocusReason);
+    }
+}
+
+void MainWindow::restoreAllDetachedVideos()
+{
+    const QList<QWebEngineView *> webViews = m_tabStates.keys();
+    for (QWebEngineView *webView : webViews) {
+        const auto state = m_tabStates.constFind(webView);
+        if (state == m_tabStates.cend() || !state->detachedVideoWindow)
+            continue;
+        if (QWebEnginePage *page = state->page)
+            page->triggerAction(QWebEnginePage::ExitFullScreen);
+        if (m_tabStates.contains(webView)
+            && m_tabStates.value(webView).detachedVideoWindow) {
+            restoreDetachedVideo(webView);
+        }
+    }
 }
 
 void MainWindow::handleExternalUrlRequest(QWebEngineView *webView, const QUrl &url)
 {
-    if (!webView || webView != currentWebView() || m_externalUrlDialog)
+    if (!webView || !isTabInteractionActive(webView) || m_externalUrlDialog)
         return;
 
-    const QUrl sourceUrl = webView->url();
+    const QUrl sourceUrl = urlForTab(webView);
     const QString source = sourceUrl.host().isEmpty()
         ? tr("The current page")
         : QStringLiteral("%1://%2").arg(sourceUrl.scheme(), sourceUrl.host());
@@ -1485,7 +1840,7 @@ void MainWindow::handleExternalUrlRequest(QWebEngineView *webView, const QUrl &u
     if (target.size() > maximumDisplayedUrlLength)
         target = target.left(maximumDisplayedUrlLength) + QStringLiteral("…");
 
-    auto *dialog = new QMessageBox(this);
+    auto *dialog = new QMessageBox(interactionParentForTab(webView));
     dialog->setWindowTitle(tr("Open external application?"));
     dialog->setIcon(QMessageBox::Question);
     dialog->setTextFormat(Qt::PlainText);
@@ -1516,7 +1871,10 @@ void MainWindow::handleExternalUrlRequest(QWebEngineView *webView, const QUrl &u
         m_externalUrlDialog.clear();
         m_externalUrlSource.clear();
         dialog->deleteLater();
-        if (!accepted || !sourceView || sourceView != currentWebView())
+        if (!accepted || !sourceView || !m_tabStates.contains(sourceView))
+            return;
+        const BrowserTabState state = m_tabStates.value(sourceView);
+        if (sourceView != currentWebView() && !state.detachedVideoWindow)
             return;
         if (!QDesktopServices::openUrl(url)) {
             statusBar()->showMessage(
@@ -1553,10 +1911,11 @@ void MainWindow::updateCurrentTabUi()
         return;
     }
 
-    m_address->setText(webView->url().toString());
-    if (webView->url().isEmpty() && !m_tabStates.value(webView).pendingUrl.isEmpty())
+    const QUrl currentUrl = urlForTab(webView);
+    m_address->setText(currentUrl.toString());
+    if (currentUrl.isEmpty() && !m_tabStates.value(webView).pendingUrl.isEmpty())
         m_address->setText(m_tabStates.value(webView).pendingUrl.toString());
-    const QString title = webView->title();
+    const QString title = titleForTab(webView);
     if (m_windowRole == WindowRole::WebApp)
         setWindowTitle(m_webApp.name);
     else
@@ -1575,9 +1934,10 @@ void MainWindow::updateCurrentTabUi()
 void MainWindow::updateNavigationActions()
 {
     QWebEngineView *webView = currentWebView();
-    m_backAction->setEnabled(webView && webView->history()->canGoBack());
-    m_forwardAction->setEnabled(webView && webView->history()->canGoForward());
-    m_reloadAction->setEnabled(webView != nullptr);
+    QWebEnginePage *page = pageForTab(webView);
+    m_backAction->setEnabled(page && page->history()->canGoBack());
+    m_forwardAction->setEnabled(page && page->history()->canGoForward());
+    m_reloadAction->setEnabled(page != nullptr);
 }
 
 void MainWindow::updateBookmarkAction()
@@ -1585,7 +1945,7 @@ void MainWindow::updateBookmarkAction()
     if (!m_bookmarkAction)
         return;
     QWebEngineView *webView = currentWebView();
-    const QUrl url = webView ? BookmarkStore::normalizedUrl(webView->url()) : QUrl();
+    const QUrl url = BookmarkStore::normalizedUrl(urlForTab(webView));
     const bool available = m_bookmarkStore && m_bookmarkStore->isOpen() && url.isValid();
     m_bookmarkAction->setEnabled(available);
     if (!available) {
@@ -1633,7 +1993,8 @@ void MainWindow::navigateFromAddressBar()
     if (QWebEngineView *webView = currentWebView()) {
         m_tabStates[webView].pendingHistoryTransition = HistoryTransition::Typed;
         m_tabStates[webView].suppressNextHistoryVisit = false;
-        webView->setUrl(result.url);
+        if (QWebEnginePage *page = pageForTab(webView))
+            page->setUrl(result.url);
     }
 }
 
@@ -1699,7 +2060,7 @@ void MainWindow::openFindBar()
 
     QString selectedText;
     if (QWebEngineView *webView = currentWebView()) {
-        selectedText = webView->page()->selectedText().trimmed();
+        selectedText = pageForTab(webView)->selectedText().trimmed();
         if (selectedText.size() > 200
             || selectedText.contains(QLatin1Char('\n'))
             || selectedText.contains(QLatin1Char('\r'))) {
@@ -1720,7 +2081,7 @@ void MainWindow::closeFindBar()
 {
     ++m_findRequestSerial;
     if (m_findView)
-        m_findView->page()->findText(QString());
+        pageForTab(m_findView)->findText(QString());
     m_findView.clear();
     if (m_findBar)
         m_findBar->clearResults();
@@ -1728,8 +2089,13 @@ void MainWindow::closeFindBar()
         m_findToolbar->hide();
     if (m_closeFindAction)
         m_closeFindAction->setEnabled(false);
-    if (QWebEngineView *webView = currentWebView())
-        webView->setFocus(Qt::OtherFocusReason);
+    if (QWebEngineView *webView = currentWebView()) {
+        const BrowserTabState state = m_tabStates.value(webView);
+        if (state.detachedVideoWindow)
+            state.detachedVideoWindow->webView()->setFocus(Qt::OtherFocusReason);
+        else
+            webView->setFocus(Qt::OtherFocusReason);
+    }
 }
 
 void MainWindow::findInPage(bool backward)
@@ -1743,13 +2109,14 @@ void MainWindow::findInPage(bool backward)
     }
 
     if (m_findView && m_findView != webView)
-        m_findView->page()->findText(QString());
+        pageForTab(m_findView)->findText(QString());
     m_findView = webView;
 
     const QString query = m_findBar->query();
     const quint64 requestSerial = ++m_findRequestSerial;
+    QWebEnginePage *page = pageForTab(webView);
     if (query.isEmpty()) {
-        webView->page()->findText(QString());
+        page->findText(QString());
         m_findBar->clearResults();
         return;
     }
@@ -1760,7 +2127,7 @@ void MainWindow::findInPage(bool backward)
         flags.setFlag(QWebEnginePage::FindBackward);
     const QPointer<MainWindow> window(this);
     const QPointer<QWebEngineView> target(webView);
-    webView->page()->findText(query, flags, [window, target, requestSerial, query](
+    page->findText(query, flags, [window, target, requestSerial, query](
         const QWebEngineFindTextResult &result
     ) {
         if (!window
@@ -1778,56 +2145,53 @@ void MainWindow::findInPage(bool backward)
 
 void MainWindow::applyStoredPageZoom(QWebEngineView *webView)
 {
-    if (!webView)
+    QWebEnginePage *page = pageForTab(webView);
+    if (!page)
         return;
     QSettings settings(QStringLiteral("PanBrowser"), QStringLiteral("PanBrowser"));
-    webView->setZoomFactor(storedPageZoomFactor(settings, webView->url()));
+    page->setZoomFactor(storedPageZoomFactor(settings, page->url()));
     if (webView == currentWebView())
         updateZoomActions();
 }
 
-void MainWindow::changeCurrentPageZoomBySteps(int steps)
+void MainWindow::changePageZoomBySteps(QWebEngineView *webView, int steps)
 {
-    QWebEngineView *webView = currentWebView();
-    if (!webView || steps == 0)
+    QWebEnginePage *page = pageForTab(webView);
+    if (!page || steps == 0)
         return;
 
     const int boundedSteps = std::clamp(steps, -32, 32);
     const bool zoomIn = boundedSteps > 0;
-    double factor = webView->zoomFactor();
+    double factor = page->zoomFactor();
     for (int remaining = std::abs(boundedSteps); remaining > 0; --remaining)
         factor = nextPageZoomFactor(factor, zoomIn);
-    setCurrentPageZoom(factor);
+    setPageZoom(webView, factor);
 }
 
-void MainWindow::resetCurrentPageZoom()
+void MainWindow::setPageZoom(QWebEngineView *webView, double factor)
 {
-    setCurrentPageZoom(defaultPageZoomFactor);
-}
-
-void MainWindow::setCurrentPageZoom(double factor)
-{
-    QWebEngineView *webView = currentWebView();
-    if (!webView)
+    QWebEnginePage *page = pageForTab(webView);
+    if (!page)
         return;
 
     const double normalized = normalizedPageZoomFactor(factor);
-    const QString siteKey = pageZoomSiteKey(webView->url());
+    const QString siteKey = pageZoomSiteKey(page->url());
     bool persisted = true;
     if (!siteKey.isEmpty()) {
         QSettings settings(QStringLiteral("PanBrowser"), QStringLiteral("PanBrowser"));
-        persisted = persistPageZoomFactor(settings, webView->url(), normalized);
+        persisted = persistPageZoomFactor(settings, page->url(), normalized);
     }
 
     if (siteKey.isEmpty()) {
-        webView->setZoomFactor(normalized);
+        page->setZoomFactor(normalized);
         updateZoomActions();
     } else {
         MainWindow *primary = m_primaryWindow ? m_primaryWindow : this;
         const auto applyToWindow = [&siteKey, normalized](MainWindow *window) {
             for (QWebEngineView *candidate : window->m_tabStates.keys()) {
-                if (candidate && pageZoomSiteKey(candidate->url()) == siteKey)
-                    candidate->setZoomFactor(normalized);
+                QWebEnginePage *candidatePage = window->pageForTab(candidate);
+                if (candidatePage && pageZoomSiteKey(candidatePage->url()) == siteKey)
+                    candidatePage->setZoomFactor(normalized);
             }
             window->updateZoomActions();
         };
@@ -1857,20 +2221,21 @@ void MainWindow::updateZoomActions()
         return;
     }
 
-    QWebEngineView *webView = currentWebView();
+    QWebEngineView *webView = commandTargetWebView();
+    QWebEnginePage *page = pageForTab(webView);
     const int percentage = pageZoomPercentage(
-        webView ? webView->zoomFactor() : defaultPageZoomFactor
+        page ? page->zoomFactor() : defaultPageZoomFactor
     );
-    m_zoomMenu->setEnabled(webView != nullptr);
+    m_zoomMenu->setEnabled(page != nullptr);
     m_zoomLevelAction->setText(QStringLiteral("%1%").arg(percentage));
     m_zoomInAction->setEnabled(
-        webView && percentage < pageZoomPercentage(maximumPageZoomFactor)
+        page && percentage < pageZoomPercentage(maximumPageZoomFactor)
     );
     m_zoomOutAction->setEnabled(
-        webView && percentage > pageZoomPercentage(minimumPageZoomFactor)
+        page && percentage > pageZoomPercentage(minimumPageZoomFactor)
     );
     m_resetZoomAction->setEnabled(
-        webView && percentage != pageZoomPercentage(defaultPageZoomFactor)
+        page && percentage != pageZoomPercentage(defaultPageZoomFactor)
     );
 }
 
@@ -1885,7 +2250,7 @@ void MainWindow::editCurrentBookmark()
         );
         return;
     }
-    const QUrl url = BookmarkStore::normalizedUrl(webView->url());
+    const QUrl url = BookmarkStore::normalizedUrl(urlForTab(webView));
     if (!url.isValid()) {
         statusBar()->showMessage(tr("Only web pages can be bookmarked"), 4000);
         return;
@@ -1897,9 +2262,10 @@ void MainWindow::editCurrentBookmark()
         QMessageBox::warning(this, tr("Bookmarks unavailable"), error);
         return;
     }
-    const QString title = webView->title().trimmed().isEmpty()
+    const QString pageTitle = titleForTab(webView).trimmed();
+    const QString title = pageTitle.isEmpty()
         ? url.host()
-        : webView->title().trimmed();
+        : pageTitle;
     BookmarkDialog dialog(m_bookmarkStore, url, title, existing, this);
     dialog.exec();
 }
@@ -1923,7 +2289,7 @@ void MainWindow::openBookmarks()
         BrowserTabState &state = m_tabStates[currentWebView()];
         state.pendingHistoryTransition = HistoryTransition::Other;
         state.suppressNextHistoryVisit = false;
-        currentWebView()->setUrl(url);
+        pageForTab(currentWebView())->setUrl(url);
     });
     dialog.exec();
 }
@@ -1932,7 +2298,8 @@ void MainWindow::detectWebAppManifest(QWebEngineView *webView)
 {
     if (!webView || !m_tabStates.contains(webView))
         return;
-    const QUrl documentUrl = webView->url();
+    QWebEnginePage *page = pageForTab(webView);
+    const QUrl documentUrl = page->url();
     if (documentUrl.scheme().compare(QStringLiteral("https"), Qt::CaseInsensitive) != 0) {
         m_tabStates[webView].manifestUrl = QUrl();
         if (webView == currentWebView())
@@ -1942,7 +2309,7 @@ void MainWindow::detectWebAppManifest(QWebEngineView *webView)
 
     const QPointer<MainWindow> window(this);
     const QPointer<QWebEngineView> target(webView);
-    webView->page()->runJavaScript(
+    page->runJavaScript(
         QStringLiteral(R"JS(
 (() => {
     const link = document.querySelector('link[rel~="manifest"]');
@@ -1958,7 +2325,7 @@ void MainWindow::detectWebAppManifest(QWebEngineView *webView)
             BrowserTabState &state = window->m_tabStates[target];
             state.manifestUrl = QUrl();
             state.manifestTitle.clear();
-            if (target->url() == documentUrl) {
+            if (window->urlForTab(target) == documentUrl) {
                 const QVariantMap object = result.toMap();
                 const QUrl manifestUrl(object.value(QStringLiteral("url")).toString());
                 if (manifestUrl.scheme().compare(QStringLiteral("https"), Qt::CaseInsensitive) == 0
@@ -1995,7 +2362,7 @@ void MainWindow::updateInstallWebAppAction()
         return;
     }
     const QString name = state.manifestTitle.isEmpty()
-        ? webView->url().host()
+        ? urlForTab(webView).host()
         : state.manifestTitle.left(80);
     m_installWebAppAction->setText(tr("Install “%1”…").arg(name));
     m_installWebAppAction->setEnabled(true);
@@ -2021,12 +2388,12 @@ void MainWindow::installCurrentWebApp()
     m_manifestRequests.insert(requestId, {
         webView,
         state.manifestUrl,
-        webView->url(),
+        urlForTab(webView),
         state.manifestTitle,
     });
     m_installWebAppAction->setEnabled(false);
     m_installWebAppAction->setText(tr("Reading web app manifest…"));
-    static_cast<BrowserPage *>(webView->page())->fetchWebAppManifest(
+    static_cast<BrowserPage *>(pageForTab(webView))->fetchWebAppManifest(
         requestId,
         state.manifestUrl,
         WebAppStore::maximumManifestBytes
@@ -2038,7 +2405,7 @@ void MainWindow::installCurrentWebApp()
         const QPointer<QWebEngineView> webView = found->webView;
         m_manifestRequests.erase(found);
         if (webView) {
-            static_cast<BrowserPage *>(webView->page())->cancelWebAppManifestFetch(requestId);
+            static_cast<BrowserPage *>(pageForTab(webView))->cancelWebAppManifestFetch(requestId);
         }
         updateInstallWebAppAction();
         statusBar()->showMessage(tr("Timed out while reading the web app manifest"), 5000);
@@ -2084,7 +2451,8 @@ void MainWindow::handleFetchedWebAppManifest(
         return;
     }
 
-    const QPixmap pixmap = request.webView->icon().pixmap(256, 256);
+    QWebEnginePage *page = pageForTab(request.webView);
+    const QPixmap pixmap = page ? page->icon().pixmap(256, 256) : QPixmap();
     if (!pixmap.isNull()) {
         QByteArray iconPng;
         QBuffer buffer(&iconPng);
@@ -2285,7 +2653,7 @@ void MainWindow::openSettingsPage(int page)
         m_profile,
         m_historyStore,
         m_webAppStore,
-        currentWebView() ? currentWebView()->url() : QUrl(),
+        urlForTab(currentWebView()),
         static_cast<SettingsDialog::Page>(page),
         this
     );
@@ -2422,7 +2790,7 @@ BrowserSession MainWindow::currentSession() const
         if (!webView)
             continue;
         const BrowserTabState state = m_tabStates.value(webView);
-        const QUrl url = state.pendingUrl.isEmpty() ? webView->url() : state.pendingUrl;
+        const QUrl url = state.pendingUrl.isEmpty() ? urlForTab(webView) : state.pendingUrl;
         session.tabs.append({url, m_tabBar->tabText(index)});
     }
     return session;
