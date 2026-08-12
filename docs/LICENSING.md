@@ -7,14 +7,16 @@ reviewing the exact source, toolchain, and runtime components in each package.
 
 ## 1. Source repository
 
-The repository contains three licensing groups:
+The repository contains four licensing groups:
 
 1. PanBrowser-owned source code, documentation, translations, build scripts,
    and original visual design, licensed under the Apache License 2.0.
 2. Lucide and Feather-derived artwork committed under `src/assets/`. Their ISC
    and MIT notices are reproduced in
    [THIRD_PARTY_NOTICES.md](../THIRD_PARTY_NOTICES.md).
-3. References to external build and runtime dependencies. Qt, Chromium, and
+3. The bundled Public Suffix List under `src/assets/`, licensed under MPL-2.0
+   and identified in the third-party notices.
+4. References to external build and runtime dependencies. Qt, Chromium, and
    OpenSSL source or binaries are not committed to this repository.
 
 Publishing a source tag does not require publishing a GitHub Release or a
@@ -108,6 +110,8 @@ to another person, and a downloadable CI artifact. The absence of a formal
 - [ ] Include all Qt WebEngine and Chromium notices for the exact Qt version,
   including applicable LGPL-2.1 text and component-specific notices.
 - [ ] Preserve the Lucide ISC and Feather MIT notices.
+- [ ] Preserve the Public Suffix List MPL-2.0 notice and make its source form
+  available with the distributed version.
 - [ ] Include the exact OpenSSL notice when OpenSSL is bundled.
 - [ ] Keep Qt dynamically linked and verify that recipients can replace the Qt
   libraries with ABI-compatible modified builds. Document any platform signing
@@ -166,3 +170,11 @@ packaging layout changes:
 2. review the upstream license and SBOM files for that exact version;
 3. update `THIRD_PARTY_NOTICES.md` and the packaged license directory;
 4. rerun the final package audit on all supported platforms.
+
+The bundled site-connection recommendation catalog is currently curated by the
+PanBrowser project and is not copied from an external tracker or advertising
+filter database. Every catalog change must remain reviewable in source control.
+Do not import, derive, or automate updates from a third-party filter list until
+its database/content license has been reviewed and the applicable attribution,
+share-alike, source, and redistribution requirements have been added to the
+package inventory and notices.

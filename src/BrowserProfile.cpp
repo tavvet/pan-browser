@@ -1,6 +1,7 @@
 #include "BrowserProfile.h"
 
 #include "BrowserDataCleanup.h"
+#include "CrossDomainRequestInterceptor.h"
 #include "PrivateData.h"
 
 #include <QCoreApplication>
@@ -9,8 +10,6 @@
 #include <QSettings>
 #include <QStandardPaths>
 #include <QWebEngineCookieStore>
-#include <QWebEngineUrlRequestInfo>
-#include <QWebEngineUrlRequestInterceptor>
 
 namespace {
 
@@ -39,20 +38,6 @@ QSettings browserSettings()
     return QSettings(QStringLiteral("PanBrowser"), QStringLiteral("PanBrowser"));
 }
 
-class FailClosedNetworkInterceptor final : public QWebEngineUrlRequestInterceptor {
-public:
-    explicit FailClosedNetworkInterceptor(QObject *parent)
-        : QWebEngineUrlRequestInterceptor(parent)
-    {
-    }
-
-    void interceptRequest(QWebEngineUrlRequestInfo &info) override
-    {
-        if (BrowserProfile::shouldBlockForProxyConfigurationError(info.requestUrl()))
-            info.block(true);
-    }
-};
-
 bool settingsSucceeded(const QSettings &settings, QString *error)
 {
     if (settings.status() == QSettings::NoError)
@@ -70,9 +55,13 @@ bool settingsSucceeded(const QSettings &settings, QString *error)
 BrowserProfile::BrowserProfile(
     bool persistSessionCookies,
     QObject *parent,
-    bool blockNetwork
+    bool blockNetwork,
+    const CrossDomainSettings &crossDomainSettings,
+    const QString &crossDomainSettingsPath
 )
     : QWebEngineProfile(QStringLiteral("PanBrowser"), parent)
+    , m_crossDomainSettings(crossDomainSettings)
+    , m_crossDomainSettingsPath(crossDomainSettingsPath)
 {
     const QString storagePath = profilePath();
     const QString cachePath = webEngineCachePath();
@@ -88,8 +77,18 @@ BrowserProfile::BrowserProfile(
     setHttpCacheType(QWebEngineProfile::DiskHttpCache);
     setPersistentPermissionsPolicy(QWebEngineProfile::PersistentPermissionsPolicy::AskEveryTime);
     setPersistSessionCookies(persistSessionCookies);
-    if (blockNetwork)
-        setUrlRequestInterceptor(new FailClosedNetworkInterceptor(this));
+    m_requestInterceptor = new CrossDomainRequestInterceptor(
+        blockNetwork,
+        m_crossDomainSettings,
+        this
+    );
+    connect(
+        m_requestInterceptor,
+        &CrossDomainRequestInterceptor::requestBlocked,
+        this,
+        &BrowserProfile::crossDomainRequestBlocked
+    );
+    setUrlRequestInterceptor(m_requestInterceptor);
 }
 
 bool BrowserProfile::applyPendingDataReset(QString *error)
@@ -152,4 +151,98 @@ void BrowserProfile::setPersistSessionCookies(bool persist)
 void BrowserProfile::clearAllCookies()
 {
     cookieStore()->deleteAllCookies();
+}
+
+CrossDomainSettings BrowserProfile::crossDomainSettings() const
+{
+    return m_crossDomainSettings;
+}
+
+bool BrowserProfile::setCrossDomainSettings(
+    const CrossDomainSettings &settings,
+    QString *error
+)
+{
+    if (error)
+        error->clear();
+    if (!settings.validate(error))
+        return false;
+    m_crossDomainSettings = settings;
+    m_requestInterceptor->setSettings(settings);
+    return true;
+}
+
+bool BrowserProfile::resolveCrossDomainRequest(
+    const QString &sourceSite,
+    const QString &targetHost,
+    CrossDomainRuleDecision decision,
+    bool persist,
+    QString *error
+)
+{
+    if (error)
+        error->clear();
+    if (!persist) {
+        m_requestInterceptor->resolveForSession(sourceSite, targetHost, decision);
+        return true;
+    }
+    if (m_crossDomainSettingsPath.isEmpty()) {
+        if (error) {
+            *error = QCoreApplication::translate(
+                "BrowserProfile",
+                "Site connection settings path is unavailable"
+            );
+        }
+        return false;
+    }
+
+    CrossDomainSettings updated = m_crossDomainSettings;
+    updated.setRule(sourceSite, targetHost, decision);
+    if (!updated.save(m_crossDomainSettingsPath, error))
+        return false;
+    m_crossDomainSettings = updated;
+    m_requestInterceptor->setSettingsResolvingPendingRequest(
+        updated,
+        sourceSite,
+        targetHost
+    );
+    return true;
+}
+
+void BrowserProfile::dismissCrossDomainRequest(
+    const QString &sourceSite,
+    const QString &targetHost
+)
+{
+    m_requestInterceptor->dismiss(sourceSite, targetHost);
+}
+
+void BrowserProfile::dismissCrossDomainRequestSource(
+    const QString &sourceSite,
+    const QString &targetHost,
+    const QUrl &sourceUrl,
+    bool sourceUrlIsOriginOnly
+)
+{
+    m_requestInterceptor->dismissSource(
+        sourceSite,
+        targetHost,
+        sourceUrl,
+        sourceUrlIsOriginOnly
+    );
+}
+
+bool BrowserProfile::isCrossDomainRequestPending(
+    const QString &sourceSite,
+    const QString &targetHost,
+    const QUrl &sourceUrl,
+    bool sourceUrlIsOriginOnly
+) const
+{
+    return m_requestInterceptor->isPending(
+        sourceSite,
+        targetHost,
+        sourceUrl,
+        sourceUrlIsOriginOnly
+    );
 }

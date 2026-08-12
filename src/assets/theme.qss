@@ -165,20 +165,24 @@ QWidget#findBarContent QToolButton:disabled {
     opacity: 0.35;
 }
 
-QWidget#permissionPrompt {
+QWidget#permissionPrompt,
+QWidget#crossDomainPrompt {
     background: #20242c;
 }
 
-QLabel#permissionTitle {
+QLabel#permissionTitle,
+QLabel#crossDomainTitle {
     color: #f3f5f9;
     font-weight: 600;
 }
 
-QLabel#permissionDescription {
+QLabel#permissionDescription,
+QLabel#crossDomainDescription {
     color: #aeb6c3;
 }
 
-QWidget#permissionPrompt QPushButton {
+QWidget#permissionPrompt QPushButton,
+QWidget#crossDomainPrompt QPushButton {
     min-height: 29px;
     color: #e9edf5;
     background: #2b313b;
@@ -187,18 +191,21 @@ QWidget#permissionPrompt QPushButton {
     padding: 2px 14px;
 }
 
-QWidget#permissionPrompt QPushButton:hover {
+QWidget#permissionPrompt QPushButton:hover,
+QWidget#crossDomainPrompt QPushButton:hover {
     background: #353d49;
     border-color: #4a5665;
 }
 
-QWidget#permissionPrompt QPushButton#permissionAllow {
+QWidget#permissionPrompt QPushButton#permissionAllow,
+QWidget#crossDomainPrompt QPushButton#crossDomainAllow {
     color: #ffffff;
     background: #3d72d9;
     border-color: #5689ea;
 }
 
-QWidget#permissionPrompt QPushButton#permissionAllow:hover {
+QWidget#permissionPrompt QPushButton#permissionAllow:hover,
+QWidget#crossDomainPrompt QPushButton#crossDomainAllow:hover {
     background: #487fe6;
 }
 
@@ -400,6 +407,9 @@ QDialog#settingsDialog QWidget#diagnosticsSettingsPage,
 QDialog#settingsDialog QScrollArea#diagnosticsScroll,
 QDialog#settingsDialog QWidget#diagnosticsContent,
 QDialog#settingsDialog QWidget#privacyDataSettingsPage,
+QDialog#settingsDialog QScrollArea#settingsPageScrollArea,
+QDialog#settingsDialog QScrollArea#settingsPageScrollArea > QWidget > QWidget,
+QDialog#settingsDialog QWidget#crossDomainSettingsPage,
 QDialog#settingsDialog QStackedWidget#settingsPages {
     background: #15181e;
 }
@@ -454,6 +464,7 @@ QDialog#settingsDialog QFrame#settingsSeparator {
 }
 
 QDialog#settingsDialog QLineEdit,
+QDialog#settingsDialog QPlainTextEdit,
 QDialog#settingsDialog QComboBox {
     min-height: 30px;
     background: #20242c;
@@ -465,6 +476,7 @@ QDialog#settingsDialog QComboBox {
 }
 
 QDialog#settingsDialog QLineEdit:focus,
+QDialog#settingsDialog QPlainTextEdit:focus,
 QDialog#settingsDialog QComboBox:focus {
     border-color: #5b8def;
 }
@@ -524,7 +536,8 @@ QDialog#settingsDialog QPushButton#dangerButton {
 }
 
 QDialog#settingsDialog QListWidget#searchEnginesList,
-QDialog#settingsDialog QListWidget#webAppsList {
+QDialog#settingsDialog QListWidget#webAppsList,
+QDialog#settingsDialog QListWidget#crossDomainRulesList {
     background: #1b1f26;
     color: #e3e7ee;
     border: 1px solid #303641;
@@ -576,13 +589,21 @@ QDialog#settingsDialog QListWidget#webAppsList::item {
     padding: 5px 8px;
 }
 
+QDialog#settingsDialog QListWidget#crossDomainRulesList::item {
+    min-height: 34px;
+    border-radius: 7px;
+    padding: 4px 8px;
+}
+
 QDialog#settingsDialog QListWidget#searchEnginesList::item:hover,
-QDialog#settingsDialog QListWidget#webAppsList::item:hover {
+QDialog#settingsDialog QListWidget#webAppsList::item:hover,
+QDialog#settingsDialog QListWidget#crossDomainRulesList::item:hover {
     background: #262c35;
 }
 
 QDialog#settingsDialog QListWidget#searchEnginesList::item:selected,
-QDialog#settingsDialog QListWidget#webAppsList::item:selected {
+QDialog#settingsDialog QListWidget#webAppsList::item:selected,
+QDialog#settingsDialog QListWidget#crossDomainRulesList::item:selected {
     background: #315ea8;
     color: #ffffff;
 }

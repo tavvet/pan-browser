@@ -1,6 +1,7 @@
 #pragma once
 
 #include "BrowserPreferences.h"
+#include "CrossDomainSettings.h"
 #include "DnsSettings.h"
 #include "HistoryStore.h"
 #include "ProxySettings.h"
@@ -39,6 +40,8 @@ class HttpAuthenticationController;
 class AddressCompletionPopup;
 class PermissionController;
 class PermissionPrompt;
+class CrossDomainPrompt;
+class CrossDomainPromptController;
 class ProxyAuthenticationController;
 class QCloseEvent;
 class QWebEngineCertificateError;
@@ -107,6 +110,11 @@ private:
         QUrl manifestUrl;
         QUrl documentUrl;
         QString fallbackTitle;
+    };
+
+    struct CrossDomainPromptRoute {
+        QPointer<MainWindow> window;
+        QPointer<QWebEngineView> anchor;
     };
 
     MainWindow(
@@ -210,6 +218,17 @@ private:
     void initializeSearchSettings();
     void initializeDnsSettings();
     void initializeProxySettings();
+    void initializeCrossDomainSettings();
+    void cancelCrossDomainPromptsForView(QWebEngineView *webView);
+    void routeCrossDomainRequest(
+        const QUrl &sourceUrl,
+        const QString &sourceSite,
+        const QString &targetHost,
+        int resourceType,
+        bool sourceUrlIsOriginOnly,
+        int attempt = 0
+    );
+    void showCrossDomainConfigurationError();
     void showProxyConfigurationError();
 
     BrowserProfile *m_profile = nullptr;
@@ -224,6 +243,8 @@ private:
     AddressCompletionPopup *m_addressCompletionPopup = nullptr;
     PermissionController *m_permissionController = nullptr;
     PermissionPrompt *m_permissionPrompt = nullptr;
+    CrossDomainPromptController *m_crossDomainPromptController = nullptr;
+    CrossDomainPrompt *m_crossDomainPrompt = nullptr;
     HttpAuthenticationController *m_httpAuthenticationController = nullptr;
     ProxyAuthenticationController *m_proxyAuthenticationController = nullptr;
     QPointer<QMessageBox> m_externalUrlDialog;
@@ -255,18 +276,22 @@ private:
     WindowChromeController *m_windowChromeController = nullptr;
     QHash<QWebEngineView *, BrowserTabState> m_tabStates;
     QHash<QString, PendingManifestRequest> m_manifestRequests;
+    QHash<QString, CrossDomainPromptRoute> m_crossDomainPromptRoutes;
     BrowserPreferences m_preferences;
     SearchSettings m_searchSettings;
     DnsSettings m_dnsSettings;
     ProxySettings m_proxySettings;
     ProxySettings m_activeProxySettings;
+    CrossDomainSettings m_crossDomainSettings;
     SessionStore m_sessionStore;
     TrustPolicy m_trustPolicy;
     QString m_configurationPath;
     QString m_searchConfigurationPath;
     QString m_dnsConfigurationPath;
     QString m_proxyConfigurationPath;
+    QString m_crossDomainConfigurationPath;
     QString m_proxyConfigurationError;
+    QString m_crossDomainConfigurationError;
     QString m_historyError;
     QString m_bookmarkError;
     QString m_startupError;
@@ -279,6 +304,7 @@ private:
     bool m_restoringSession = false;
     bool m_discardSessionOnClose = false;
     bool m_networkBlockedByProxyError = false;
+    bool m_crossDomainRecoveredFromBackup = false;
     bool m_integratedWindowChrome = false;
     int m_zoomAngleRemainder = 0;
     int m_zoomPixelRemainder = 0;

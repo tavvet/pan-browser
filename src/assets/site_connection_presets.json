@@ -1,0 +1,66 @@
+{
+    "version": 1,
+    "revision": "2026-08-11.1",
+    "presets": [
+        {
+            "id": "common-trackers",
+            "decision": "block",
+            "recommended": true,
+            "patterns": [
+                "adnxs.com",
+                "ads-twitter.com",
+                "adsrvr.org",
+                "amplitude.com",
+                "analytics.twitter.com",
+                "bidswitch.net",
+                "casalemedia.com",
+                "chartbeat.com",
+                "clarity.ms",
+                "connect.facebook.net",
+                "counter.yadro.ru",
+                "criteo.com",
+                "criteo.net",
+                "demdex.net",
+                "doubleclick.net",
+                "fullstory.com",
+                "google-analytics.com",
+                "googleadservices.com",
+                "googlesyndication.com",
+                "googletagmanager.com",
+                "hotjar.com",
+                "mathtag.com",
+                "mc.yandex.ru",
+                "metrika.yandex.ru",
+                "mixpanel.com",
+                "moatads.com",
+                "mouseflow.com",
+                "openx.net",
+                "outbrain.com",
+                "pubmatic.com",
+                "quantserve.com",
+                "rubiconproject.com",
+                "scorecardresearch.com",
+                "segment.io",
+                "taboola.com",
+                "tns-counter.ru",
+                "top-fwz1.mail.ru"
+            ]
+        },
+        {
+            "id": "public-cdns",
+            "decision": "allow",
+            "recommended": false,
+            "patterns": [
+                "ajax.googleapis.com",
+                "cdn.jsdelivr.net",
+                "cdn.skypack.dev",
+                "cdnjs.cloudflare.com",
+                "code.jquery.com",
+                "esm.sh",
+                "fonts.googleapis.com",
+                "fonts.gstatic.com",
+                "unpkg.com"
+            ]
+        }
+    ]
+}

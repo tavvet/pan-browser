@@ -7,6 +7,8 @@
 #include "BookmarksDialog.h"
 #include "BrowserPage.h"
 #include "BrowserProfile.h"
+#include "CrossDomainPrompt.h"
+#include "CrossDomainPromptController.h"
 #include "BrowserInteraction.h"
 #include "BrowserShortcut.h"
 #include "CertificateTrustValidator.h"
@@ -23,6 +25,7 @@
 #include "PrivateData.h"
 #include "ProxyAuthenticationController.h"
 #include "SettingsDialog.h"
+#include "SiteDomain.h"
 #include "WindowPlacement.h"
 #include "WindowChrome.h"
 #include "WebAppStore.h"
@@ -102,6 +105,13 @@ bool isSameWebOrigin(const QUrl &left, const QUrl &right)
         && left.scheme().compare(right.scheme(), Qt::CaseInsensitive) == 0
         && left.host().compare(right.host(), Qt::CaseInsensitive) == 0
         && effectivePort(left) == effectivePort(right);
+}
+
+QString crossDomainRequestKey(const QString &sourceSite, const QString &targetHost)
+{
+    return SiteDomain::registrableDomain(sourceSite)
+        + QLatin1Char('\n')
+        + SiteDomain::normalizeHost(targetHost);
 }
 
 template<typename Callback>
@@ -186,13 +196,16 @@ MainWindow::MainWindow(
         initializeSearchSettings();
         initializeDnsSettings();
         initializeProxySettings();
+        initializeCrossDomainSettings();
         QString dataResetError;
         if (!BrowserProfile::applyPendingDataReset(&dataResetError))
             qWarning().noquote() << "[PanBrowser data reset]" << dataResetError;
         m_profile = new BrowserProfile(
             m_preferences.persistSessionCookies(),
             nullptr,
-            m_networkBlockedByProxyError
+            m_networkBlockedByProxyError,
+            m_crossDomainSettings,
+            m_crossDomainConfigurationPath
         );
         m_downloadManager = new DownloadManager(
             m_profile,
@@ -244,12 +257,14 @@ MainWindow::MainWindow(
         m_searchConfigurationPath = primaryWindow->m_searchConfigurationPath;
         m_dnsConfigurationPath = primaryWindow->m_dnsConfigurationPath;
         m_proxyConfigurationPath = primaryWindow->m_proxyConfigurationPath;
+        m_crossDomainConfigurationPath = primaryWindow->m_crossDomainConfigurationPath;
         m_trustPolicy = primaryWindow->m_trustPolicy;
         m_preferences = primaryWindow->m_preferences;
         m_searchSettings = primaryWindow->m_searchSettings;
         m_dnsSettings = primaryWindow->m_dnsSettings;
         m_proxySettings = primaryWindow->m_proxySettings;
         m_activeProxySettings = primaryWindow->m_activeProxySettings;
+        m_crossDomainSettings = primaryWindow->m_crossDomainSettings;
         m_proxyConfigurationError = primaryWindow->m_proxyConfigurationError;
         m_networkBlockedByProxyError = primaryWindow->m_networkBlockedByProxyError;
         m_proxyAuthenticationController = primaryWindow->m_proxyAuthenticationController;
@@ -261,7 +276,122 @@ MainWindow::MainWindow(
     if (!m_historyError.isEmpty())
         setTrustStatus(tr("History unavailable: %1").arg(m_historyError), true);
     m_permissionController = new PermissionController(m_permissionPrompt, this);
+    m_crossDomainPromptController = new CrossDomainPromptController(
+        m_profile,
+        m_crossDomainPrompt,
+        this
+    );
+    connect(
+        m_crossDomainPromptController,
+        &CrossDomainPromptController::errorOccurred,
+        this,
+        [this](const QString &error) {
+            QMessageBox::warning(
+                this,
+                tr("Cannot save site connection decision"),
+                error
+            );
+        }
+    );
+    MainWindow *promptCoordinator = m_primaryWindow ? m_primaryWindow : this;
+    connect(
+        m_crossDomainPromptController,
+        &CrossDomainPromptController::requestFinished,
+        promptCoordinator,
+        [promptCoordinator, this](
+            const QString &sourceSite,
+            const QString &targetHost
+        ) {
+            const QString key = crossDomainRequestKey(sourceSite, targetHost);
+            const auto route = promptCoordinator->m_crossDomainPromptRoutes.find(key);
+            if (route != promptCoordinator->m_crossDomainPromptRoutes.end()
+                && route->window == this) {
+                promptCoordinator->m_crossDomainPromptRoutes.erase(route);
+            }
+        }
+    );
+    connect(
+        m_crossDomainPromptController,
+        &CrossDomainPromptController::requestReanchorRequested,
+        promptCoordinator,
+        [promptCoordinator, this](
+            QWebEngineView *webView,
+            const QList<CrossDomainAffectedView> &affectedViews,
+            const QList<CrossDomainPromptSource> &sources,
+            const QString &sourceSite,
+            const QString &targetHost,
+            int resourceType
+        ) {
+            const QString key = crossDomainRequestKey(sourceSite, targetHost);
+            MainWindow *newPromptWindow = nullptr;
+            QList<MainWindow *> windows{promptCoordinator};
+            for (MainWindow *window : std::as_const(promptCoordinator->m_popupWindows)) {
+                if (window)
+                    windows.append(window);
+            }
+            for (MainWindow *window : std::as_const(windows)) {
+                if (window->m_tabStates.contains(webView)) {
+                    newPromptWindow = window;
+                    break;
+                }
+            }
+
+            auto route = promptCoordinator->m_crossDomainPromptRoutes.find(key);
+            if (!newPromptWindow) {
+                if (route != promptCoordinator->m_crossDomainPromptRoutes.end()
+                    && route->window == this) {
+                    promptCoordinator->m_crossDomainPromptRoutes.erase(route);
+                }
+                for (const CrossDomainPromptSource &source : sources) {
+                    promptCoordinator->m_profile->dismissCrossDomainRequestSource(
+                        sourceSite,
+                        targetHost,
+                        source.url,
+                        source.originOnly
+                    );
+                }
+                return;
+            }
+            if (route == promptCoordinator->m_crossDomainPromptRoutes.end()) {
+                promptCoordinator->m_crossDomainPromptRoutes.insert(
+                    key,
+                    {newPromptWindow, webView}
+                );
+            } else {
+                route->window = newPromptWindow;
+                route->anchor = webView;
+            }
+            newPromptWindow->m_crossDomainPromptController->request(
+                webView,
+                affectedViews,
+                sources,
+                sourceSite,
+                targetHost,
+                resourceType
+            );
+        }
+    );
     if (m_ownsBrowserResources) {
+        connect(
+            m_profile,
+            &BrowserProfile::crossDomainRequestBlocked,
+            this,
+            [this](
+                const QUrl &sourceUrl,
+                const QString &sourceSite,
+                const QString &targetHost,
+                int resourceType,
+                bool sourceUrlIsOriginOnly
+            ) {
+                routeCrossDomainRequest(
+                    sourceUrl,
+                    sourceSite,
+                    targetHost,
+                    resourceType,
+                    sourceUrlIsOriginOnly
+                );
+            }
+        );
         restoreWindowPlacement();
         reloadRules();
         if (initializePrimaryTabs) {
@@ -271,6 +401,11 @@ MainWindow::MainWindow(
         if (m_networkBlockedByProxyError) {
             QTimer::singleShot(0, this, [this] {
                 showProxyConfigurationError();
+            });
+        }
+        if (!m_crossDomainConfigurationError.isEmpty()) {
+            QTimer::singleShot(0, this, [this] {
+                showCrossDomainConfigurationError();
             });
         }
     } else {
@@ -284,17 +419,21 @@ MainWindow::~MainWindow()
     if (qApp)
         qApp->removeEventFilter(this);
     restoreAllDetachedVideos();
+    const QList<QWebEngineView *> webViews = m_tabStates.keys();
+    for (QWebEngineView *webView : webViews)
+        cancelCrossDomainPromptsForView(webView);
     if (m_ownsBrowserResources) {
         while (!m_popupWindows.isEmpty()) {
             if (MainWindow *popup = m_popupWindows.takeLast())
                 delete popup;
         }
     }
-    const QList<QWebEngineView *> webViews = m_tabStates.keys();
     for (QWebEngineView *webView : webViews)
         closeDeveloperTools(webView);
     delete m_permissionController;
     m_permissionController = nullptr;
+    delete m_crossDomainPromptController;
+    m_crossDomainPromptController = nullptr;
     delete takeCentralWidget();
     m_tabStack = nullptr;
     m_tabStates.clear();
@@ -586,6 +725,16 @@ void MainWindow::createInterface()
     addToolBar(Qt::TopToolBarArea, permissionToolbar);
     permissionToolbar->hide();
 
+    addToolBarBreak(Qt::TopToolBarArea);
+    QToolBar *crossDomainToolbar = new QToolBar(tr("Site connection request"), this);
+    crossDomainToolbar->setObjectName(QStringLiteral("crossDomainBar"));
+    crossDomainToolbar->setMovable(false);
+    crossDomainToolbar->setFloatable(false);
+    m_crossDomainPrompt = new CrossDomainPrompt(crossDomainToolbar);
+    crossDomainToolbar->addWidget(m_crossDomainPrompt);
+    addToolBar(Qt::TopToolBarArea, crossDomainToolbar);
+    crossDomainToolbar->hide();
+
     connect(m_findBar, &FindBar::queryChanged, this, [this] {
         findInPage(false);
     });
@@ -630,6 +779,8 @@ void MainWindow::createInterface()
         }
         if (m_permissionController)
             m_permissionController->currentViewChanged(currentWebView());
+        if (m_crossDomainPromptController)
+            m_crossDomainPromptController->currentViewChanged(currentWebView());
         if (isActiveWindow())
             m_lastInteractionWebView = currentWebView();
         if (m_externalUrlSource && m_externalUrlSource != currentWebView()) {
@@ -692,7 +843,7 @@ void MainWindow::createInterface()
     connect(m_bookmarkStore, &BookmarkStore::bookmarksChanged, this, &MainWindow::updateBookmarkAction);
 
 #if defined(Q_OS_MACOS)
-    QMenu *fileMenu = menuBar()->addMenu(tr("PanBrowser"));
+    QMenu *fileMenu = menuBar()->addMenu(tr("Browser"));
 #else
     auto *fileMenu = new QMenu(tr("PanBrowser"), this);
 #endif
@@ -1063,6 +1214,7 @@ void MainWindow::closeTab(int index)
 
     restoreDetachedVideo(webView);
     m_permissionController->cancelForView(webView);
+    cancelCrossDomainPromptsForView(webView);
     cancelExternalUrlPrompt(webView);
     closeDeveloperTools(webView);
     if (m_findView == webView) {
@@ -1441,6 +1593,7 @@ void MainWindow::connectBrowserSignals(QWebEngineView *webView)
     });
     connect(page, &QWebEnginePage::loadStarted, this, [this, webView] {
         m_permissionController->cancelForView(webView);
+        cancelCrossDomainPromptsForView(webView);
         cancelExternalUrlPrompt(webView);
         BrowserTabState &state = m_tabStates[webView];
         state.previousTrustStatus = state.trustStatus;
@@ -2644,11 +2797,13 @@ void MainWindow::openSettingsPage(int page)
     settingsContext.searchConfigurationPath = m_searchConfigurationPath;
     settingsContext.dnsConfigurationPath = m_dnsConfigurationPath;
     settingsContext.proxyConfigurationPath = m_proxyConfigurationPath;
+    settingsContext.crossDomainConfigurationPath = m_crossDomainConfigurationPath;
     settingsContext.preferences = m_preferences;
     settingsContext.searchSettings = m_searchSettings;
     settingsContext.dnsSettings = m_dnsSettings;
     settingsContext.proxySettings = m_proxySettings;
     settingsContext.activeProxySettings = m_activeProxySettings;
+    settingsContext.crossDomainSettings = m_profile->crossDomainSettings();
     settingsContext.networkBlockedByProxyError = m_networkBlockedByProxyError;
     settingsContext.profile = m_profile;
     settingsContext.historyStore = m_historyStore;
@@ -2681,6 +2836,19 @@ void MainWindow::openSettingsPage(int page)
         m_searchSettings = dialog.searchSettings();
         m_dnsSettings = dialog.dnsSettings();
         m_proxySettings = dialog.proxySettings();
+        m_crossDomainSettings = dialog.crossDomainSettings();
+        QString crossDomainError;
+        if (!m_profile->setCrossDomainSettings(
+                m_crossDomainSettings,
+                &crossDomainError
+            )) {
+            QMessageBox::warning(
+                this,
+                tr("Cannot apply site connection settings"),
+                crossDomainError
+            );
+        }
+        m_crossDomainPromptController->reset();
         applyDeveloperToolsPreference();
         if (!m_preferences.saveBrowsingHistory() && m_addressCompletionPopup)
             m_addressCompletionPopup->hide();
@@ -2696,6 +2864,8 @@ void MainWindow::openSettingsPage(int page)
                 popup->m_searchSettings = m_searchSettings;
                 popup->m_dnsSettings = m_dnsSettings;
                 popup->m_proxySettings = m_proxySettings;
+                popup->m_crossDomainSettings = m_crossDomainSettings;
+                popup->m_crossDomainPromptController->reset();
                 popup->applyDeveloperToolsPreference();
                 popup->updateAddressPlaceholder();
                 if (!m_preferences.saveBrowsingHistory()
@@ -2704,6 +2874,7 @@ void MainWindow::openSettingsPage(int page)
                 }
             }
         }
+        m_crossDomainPromptRoutes.clear();
         reloadRules();
         if (languageChanged || proxyRestartRequired) {
             QString restartMessage;
@@ -2825,7 +2996,7 @@ void MainWindow::reloadRulesLocal()
 
     const qsizetype count = m_trustPolicy.ruleCount();
     m_ruleCount->setText(
-        tr("%n custom rule(s)", nullptr, count)
+        tr("%n custom rule(s)", nullptr, static_cast<int>(count))
     );
     setTrustStatus(tr("Trust rules loaded"));
 }
@@ -3091,6 +3262,238 @@ void MainWindow::initializeProxySettings()
                          << "Blocking network access without overwriting the file.";
     m_proxyConfigurationError = error;
     m_networkBlockedByProxyError = true;
+}
+
+void MainWindow::initializeCrossDomainSettings()
+{
+    const QString directory = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+    QString directoryError;
+    if (!PrivateData::ensureDirectory(directory, &directoryError))
+        qWarning().noquote() << "[PanBrowser site connections]" << directoryError;
+    m_crossDomainConfigurationPath = QDir(directory).filePath(
+        QStringLiteral("site-connections.json")
+    );
+    m_crossDomainSettings = CrossDomainSettings::defaults();
+
+    QString error;
+    if (QFile::exists(m_crossDomainConfigurationPath)
+        || QFile::exists(m_crossDomainConfigurationPath + QStringLiteral(".backup"))) {
+        CrossDomainSettings loaded;
+        bool recoveredFromBackup = false;
+        if (loaded.loadRecoveringBackup(
+                m_crossDomainConfigurationPath,
+                &recoveredFromBackup,
+                &error
+            )) {
+            m_crossDomainSettings = loaded;
+            if (recoveredFromBackup) {
+                m_crossDomainRecoveredFromBackup = true;
+                m_crossDomainConfigurationError = error;
+                qWarning().noquote() << "[PanBrowser site connections]" << error
+                                     << "Loaded the backup configuration.";
+            }
+        } else {
+            m_crossDomainSettings.setEnabled(true);
+            m_crossDomainConfigurationError = error;
+            qWarning().noquote() << "[PanBrowser site connections]" << error
+                                 << "Using fail-closed in-memory settings; the file was not overwritten.";
+        }
+        return;
+    }
+
+    if (!m_crossDomainSettings.save(m_crossDomainConfigurationPath, &error))
+        qWarning().noquote() << "[PanBrowser site connections]" << error;
+}
+
+void MainWindow::cancelCrossDomainPromptsForView(QWebEngineView *webView)
+{
+    if (!webView)
+        return;
+    MainWindow *primary = m_primaryWindow ? m_primaryWindow : this;
+    QList<QPointer<MainWindow>> windows;
+    windows.append(primary);
+    for (MainWindow *window : std::as_const(primary->m_popupWindows)) {
+        if (window)
+            windows.append(window);
+    }
+    if (!windows.contains(this))
+        windows.append(this);
+
+    for (MainWindow *window : std::as_const(windows)) {
+        if (window && window->m_crossDomainPromptController)
+            window->m_crossDomainPromptController->cancelForView(webView);
+    }
+}
+
+void MainWindow::routeCrossDomainRequest(
+    const QUrl &sourceUrl,
+    const QString &sourceSite,
+    const QString &targetHost,
+    int resourceType,
+    bool sourceUrlIsOriginOnly,
+    int attempt
+)
+{
+    MainWindow *primary = m_primaryWindow ? m_primaryWindow : this;
+    if (primary != this) {
+        primary->routeCrossDomainRequest(
+            sourceUrl,
+            sourceSite,
+            targetHost,
+            resourceType,
+            sourceUrlIsOriginOnly,
+            attempt
+        );
+        return;
+    }
+
+    if (!m_profile->isCrossDomainRequestPending(
+            sourceSite,
+            targetHost,
+            sourceUrl,
+            sourceUrlIsOriginOnly
+        )) {
+        return;
+    }
+
+    if (m_profile->crossDomainSettings().evaluate(sourceSite, targetHost)
+        != CrossDomainEvaluation::Ask) {
+        m_profile->dismissCrossDomainRequest(sourceSite, targetHost);
+        return;
+    }
+
+    const QString requestKey = crossDomainRequestKey(sourceSite, targetHost);
+    auto route = m_crossDomainPromptRoutes.find(requestKey);
+    if (route != m_crossDomainPromptRoutes.end()
+        && (!route->window
+            || !route->anchor
+            || !route->window->m_crossDomainPromptController
+            || !route->window->m_tabStates.contains(route->anchor))) {
+        route = m_crossDomainPromptRoutes.erase(route);
+    }
+    const bool hasPromptOwner = route != m_crossDomainPromptRoutes.end();
+
+    QList<MainWindow *> windows;
+    windows.append(this);
+    for (MainWindow *window : std::as_const(m_popupWindows)) {
+        if (window)
+            windows.append(window);
+    }
+    if (auto *active = qobject_cast<MainWindow *>(QApplication::activeWindow())) {
+        if (windows.removeOne(active))
+            windows.prepend(active);
+    }
+
+    struct Candidate {
+        MainWindow *window = nullptr;
+        QWebEngineView *view = nullptr;
+    };
+    QList<Candidate> candidates;
+    QList<QUrl> candidateUrls;
+    for (MainWindow *window : std::as_const(windows)) {
+        QList<QWebEngineView *> views = window->m_tabStates.keys();
+        if (QWebEngineView *current = window->currentWebView()) {
+            if (views.removeOne(current))
+                views.prepend(current);
+        }
+        for (QWebEngineView *view : std::as_const(views)) {
+            candidates.append({window, view});
+            candidateUrls.append(window->urlForTab(view));
+        }
+    }
+
+    const QList<qsizetype> matchingIndexes = crossDomainPromptCandidateIndexes(
+        sourceUrl,
+        sourceSite,
+        sourceUrlIsOriginOnly,
+        candidateUrls
+    );
+    const Candidate candidate = matchingIndexes.isEmpty()
+        ? Candidate()
+        : candidates.at(matchingIndexes.constFirst());
+    if (candidate.window && candidate.view) {
+        QList<CrossDomainAffectedView> affectedViews;
+        affectedViews.reserve(matchingIndexes.size());
+        for (const qsizetype index : matchingIndexes) {
+            const Candidate &matchingCandidate = candidates.at(index);
+            affectedViews.append({
+                matchingCandidate.view,
+                SiteDomain::normalizedPageUrl(
+                    matchingCandidate.window->urlForTab(matchingCandidate.view)
+                ),
+            });
+        }
+        MainWindow *promptWindow = candidate.window;
+        QWebEngineView *promptAnchor = candidate.view;
+        if (hasPromptOwner) {
+            promptWindow = route->window;
+            promptAnchor = route->anchor;
+        } else {
+            m_crossDomainPromptRoutes.insert(
+                requestKey,
+                {promptWindow, promptAnchor}
+            );
+        }
+        promptWindow->m_crossDomainPromptController->request(
+            promptAnchor,
+            affectedViews,
+            QList<CrossDomainPromptSource>{
+                {sourceUrl, sourceUrlIsOriginOnly},
+            },
+            sourceSite,
+            targetHost,
+            resourceType
+        );
+        return;
+    }
+
+    if (attempt < 3) {
+        QTimer::singleShot(50 * (attempt + 1), this, [
+            this,
+            sourceUrl,
+            sourceSite,
+            targetHost,
+            resourceType,
+            sourceUrlIsOriginOnly,
+            attempt
+        ] {
+            routeCrossDomainRequest(
+                sourceUrl,
+                sourceSite,
+                targetHost,
+                resourceType,
+                sourceUrlIsOriginOnly,
+                attempt + 1
+            );
+        });
+        return;
+    }
+    m_profile->dismissCrossDomainRequestSource(
+        sourceSite,
+        targetHost,
+        sourceUrl,
+        sourceUrlIsOriginOnly
+    );
+}
+
+void MainWindow::showCrossDomainConfigurationError()
+{
+    if (m_crossDomainConfigurationError.isEmpty())
+        return;
+    const QString message = m_crossDomainRecoveredFromBackup
+        ? tr(
+            "PanBrowser could not load the primary site connection settings and recovered the previous backup. Review Site Connections and save the settings to repair the primary file."
+        )
+        : tr(
+            "PanBrowser could not load the site connection settings. Unknown third-party connections are being blocked until you save a valid configuration in Site Connections."
+        );
+    QMessageBox::warning(
+        this,
+        m_crossDomainRecoveredFromBackup
+            ? tr("Site connection settings recovered")
+            : tr("Site connection settings unavailable"),
+        message + QStringLiteral("\n\n") + m_crossDomainConfigurationError
+    );
 }
 
 void MainWindow::showProxyConfigurationError()

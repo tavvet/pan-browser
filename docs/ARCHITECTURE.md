@@ -55,6 +55,9 @@ flowchart TD
     MW --> Permissions["PermissionController"]
     MW --> HttpAuth["HttpAuthenticationController"]
     MW --> ProxyAuth["ProxyAuthenticationController"]
+    Profile --> RequestFilter["CrossDomainRequestInterceptor"]
+    RequestFilter --> ConnectionPolicy["CrossDomainSettings / site-connections.json"]
+    ConnectionPolicy --> PSL["Bundled Public Suffix List"]
     MW --> Session["SessionStore"]
     MW --> WebApps["WebAppStore / web-apps.json"]
     WebApps --> Shortcuts["WebAppShortcutManager / macOS .app launchers"]
@@ -492,7 +495,130 @@ application step or use Chromium-supported mechanisms explicitly. Proxy mode
 is not a VPN boundary; external applications and traffic outside Chromium's
 HTTP proxy path are not covered.
 
-### 6.4 HTTP server authentication
+### 6.5 Third-party site connections
+
+`CrossDomainRequestInterceptor` is the single interceptor installed on
+`BrowserProfile`. It preserves the existing fail-closed proxy-error path and,
+when the optional connection firewall is enabled, evaluates non-main-frame URL
+requests before Chromium's network stack. Installing a second profile
+interceptor would replace the first one and is therefore forbidden.
+
+The source is derived from an attributable HTTP(S) `firstPartyUrl()`, falling
+back to an attributable HTTP(S) `initiator()` when the first-party page has an
+opaque or non-web URL. The destination comes from `requestUrl()`. If neither
+source value identifies a web site, an interceptable HTTP(S), WS, or WSS
+request is blocked without prompting instead of being implicitly allowed.
+Because Qt exposes `initiator()` as an origin rather than a complete page URL,
+fallback identities are explicitly marked origin-only for bounded fingerprinting
+and safe single-candidate prompt routing.
+HTTP(S), WS, and WSS requests inside the same registrable site are allowed.
+Site boundaries are calculated by `SiteDomain` using the bundled ICANN and
+PRIVATE sections of the Public Suffix List; IP addresses and single-label hosts
+remain exact-host sites. Host patterns match only the exact host or a
+dot-delimited subdomain, never a textual suffix such as `evil-example.com`.
+
+Main-frame navigation and explicit downloads are not blocked. For other
+requests the runtime precedence is: same-site allowance, personal global target
+block, personal persistent exact source/target-host rule, personal global target allow,
+session decision, bundled preset block, bundled preset allow, then unknown. A
+personal global block is deliberately absolute for third-party requests, so
+repeated tracker hosts cannot be re-enabled by an older site-specific rule.
+Overlapping personal global allow and block patterns are rejected during
+validation. Personal and session decisions override bundled recommendations,
+which makes false-positive recovery possible without mutating application
+resources. Unknown requests are blocked immediately. Notifications are
+deduplicated by normalized first-party page URL within a source-site/target-host
+decision, allowing several pages on the same site to join one prompt. The
+  pending tracker retains only URL fingerprints and is capped at 16 source URLs
+  per decision and 128 source URLs overall; overflow requests remain blocked but
+  do not allocate more prompt state. Normal source URLs are normalized before
+  fingerprinting. A source URL with an oversized path, query, fragment, or
+  user-info component is reduced to its origin before both fingerprinting and
+  queued UI delivery, so hostile page URLs cannot retain unbounded payloads or
+  force proportional normalization and hashing work for every blocked
+  subresource. Several oversized pages at one origin intentionally share one
+  fail-closed routing identity. The page/origin-only discriminator is part of
+  the pending fingerprint, so that identity cannot collide with a genuine page
+  at the origin root. The queued notification marks the bounded identity as
+  origin-only: it is never treated as an exact page match and is routed only
+  when there is a single tab candidate for the preserved source origin. Other
+  subdomains, schemes, and ports in the same registrable site are not candidates.
+  The interceptor must never wait for UI: Qt stalls network work while
+  `interceptRequest()` executes. It emits a queued notification and returns.
+
+`CrossDomainPolicySnapshot` compiles personal global lists into suffix matchers,
+indexes exact persistent decisions by source site and target host, and combines
+enabled bundled presets into separate allow and block matchers. The interceptor
+publishes a new immutable snapshot only when settings change; per-request work
+is therefore bounded by hostname label count and hash lookups rather than the
+total number of saved rules.
+
+`CrossDomainPresetCatalog` validates the immutable, versioned
+`site_connection_presets.json` resource. Only preset IDs are written to user
+configuration. Unknown well-formed IDs are preserved across saves for forward
+and downgrade compatibility but have no runtime effect unless the bundled
+catalog contains them. Preset patterns are compiled into
+`DomainPatternMatcher`, which tests dot-delimited host suffixes in time bounded
+by the number of labels instead of scanning the whole list for every request.
+The initial catalog is curated by the PanBrowser project; it does not embed or
+download third-party filter subscriptions. Catalog updates ship with the
+application so they remain reviewable and reproducible.
+
+The interceptor includes the normalized selected source identity in its queued
+notification, except for the bounded origin-only case described above.
+`MainWindow` requires an exact page identity for normal notifications. It falls
+back to an exact-origin match only for an explicitly marked origin-only identity
+and only when there is a single candidate, avoiding attribution to a page that
+navigated elsewhere before queued delivery.
+The primary `MainWindow` assigns one prompt owner to each source-site/target-host
+decision and merges matching views from browser, popup, and installed web-app
+windows as further URL notifications arrive. Before routing a queued
+notification, it confirms that the corresponding URL fingerprint is still
+pending; a session decision or dismissal therefore cannot reopen a stale
+prompt. If no matching source view remains after bounded retries, only that
+source fingerprint is discarded; other pages waiting on the same site/host
+decision remain pending. Saving a persistent prompt decision swaps in the new
+policy and removes only that decision's pending key, preserving unrelated
+notifications; replacing the complete policy from Settings clears all pending
+state while every window's prompt controller is reset.
+`CrossDomainPromptController` retains the bounded source identities that have
+joined each prompt, so canceling a prompt removes only its routed fingerprints
+and cannot discard a queued source that has not reached the UI yet. It attaches
+that prompt to its original matching tab. When several tabs have the same exact
+first-party URL, one prompt represents the shared decision and an
+allow action reloads every matching tab so the actual request source is not
+left blocked because of arbitrary tab ordering. A view is reloaded only if its
+normalized URL still equals the URL recorded when it was blocked, preventing a
+late decision from reloading unrelated content after navigation. If the prompt's
+anchor view closes or navigates while another affected view remains, ownership
+moves to a surviving view instead of dismissing the shared decision. Reload
+targets are capped at 64 views per prompt. View cancellation is broadcast through
+the primary-window coordinator because the prompt owner may live in a different
+browser, popup, or installed web-app window from the affected view.
+Allow and block choices can last for the process session or be written as a
+versioned persistent rule. An allow action reloads the page because the blocked
+request cannot be resumed. Closing or navigating the last affected source view
+dismisses its stale pending prompt. The feature defaults to disabled and applies
+to the shared profile, including popups and installed web apps.
+
+The settings page can create an exact source-site/target-host rule manually.
+This provides scoped recovery for a bundled block-list false positive without
+prompting for every known tracker or weakening isolation through a global allow
+entry.
+
+An invalid primary `site-connections.json` is loaded from its `.backup` when
+possible and reported visibly, including when the primary file is missing. A
+save never replaces a valid backup with an invalid primary. If both files are
+invalid, PanBrowser preserves them, enables an in-memory fail-closed policy,
+and blocks unknown third-party requests until the user saves a valid
+configuration.
+
+This boundary covers only requests visible through Qt WebEngine's URL request
+interceptor. It is not a complete network sandbox: raw WebRTC/STUN/TURN paths,
+some speculative resolution, and Chromium-internal traffic may not be
+represented as interceptable page requests.
+
+### 6.6 HTTP server authentication
 
 Every page forwards `QWebEnginePage::authenticationRequired` synchronously to
 the primary window, which accepts the challenge only from the current tab in
@@ -548,6 +674,8 @@ directory.
 | `search-engines.json` | `SearchSettings` | Versioned engines and default selection; atomic write with `.backup`. |
 | `dns-settings.json` | `DnsSettings` | Versioned DNS mode, selected provider, and custom HTTPS templates; atomic write with `.backup`. Files use owner-only mode bits on Unix-like systems and inherit the per-user application-data ACL on Windows. |
 | `proxy-settings.json` | `ProxySettings` | Versioned system/direct/manual mode plus proxy type, host, port, and optional HTTP username; no password; atomic write with `.backup` and owner-only mode bits on Unix-like systems. |
+| `site-connections.json` | `CrossDomainSettings` | Disabled-by-default firewall mode, enabled bundled preset IDs, personal global target allow/block lists, and persistent source-site/target-host decisions; atomic write with `.backup`. |
+| `site_connection_presets.json` | `CrossDomainPresetCatalog` | Immutable versioned tracker/CDN recommendation catalog bundled in Qt resources; never modified at runtime. |
 | `history.sqlite` | `HistoryStore` | WAL-mode SQLite browsing history, limited to 50,000 visits. |
 | `bookmarks.sqlite` | `BookmarkStore` | WAL-mode SQLite bookmarks with normalized URL and title fields for local lookup. |
 | `web-apps.json` | `WebAppStore` | Validated installed-app metadata and bounded page icons, atomically written. |
@@ -567,19 +695,21 @@ recursive deletion target is a strict child of the expected managed root.
 
 ### 7.1 Settings save transaction
 
-The unified Settings dialog spans native `QSettings` and four JSON files, so a
+The unified Settings dialog spans native `QSettings` and five JSON files, so a
 single filesystem transaction is unavailable. Its save order and rollback are
 therefore deliberate:
 
 1. validate every page without changing persistent state;
-2. snapshot all four JSON files and their backups;
+2. snapshot all five JSON files and their backups;
 3. save general preferences;
 4. save search settings;
 5. save DNS settings;
 6. save proxy settings;
-7. save trust rules last;
-8. apply the new DNS mode to Qt WebEngine;
-9. finalize imported certificate files only after every save and runtime apply succeeds.
+7. save site-connection settings;
+8. save trust rules last;
+9. apply the new DNS mode to Qt WebEngine;
+10. finalize imported certificate files only after every save and runtime apply succeeds;
+11. after dialog acceptance, replace the profile's live site-connection policy.
 
 If a later step fails, earlier preferences and files are restored from their
 snapshots. If rollback itself is incomplete, the error dialog says so rather
@@ -908,6 +1038,9 @@ Before merging a change, verify the relevant invariants:
 - HTTP authentication passwords never enter settings, files, diagnostics, or
   application logs; background and cross-origin subresource challenges are
   rejected, and unencrypted challenges receive an explicit warning;
+- the optional site-connection interceptor never waits for UI, never blocks
+  main-frame navigation, and matches host boundaries through the bundled Public
+  Suffix List rather than textual suffixes;
 - diagnostics do not expose custom DNS templates, proxy hosts, or usernames;
 - new persistent data is documented in both this file and the README data tree.
 

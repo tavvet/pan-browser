@@ -61,6 +61,24 @@ The upstream notice and the list of Lucide icons derived from Feather are
 available in the
 [Lucide license file](https://github.com/lucide-icons/lucide/blob/main/LICENSE).
 
+### Public Suffix List
+
+`src/assets/public_suffix_list.dat` is the Public Suffix List published at
+[publicsuffix.org](https://publicsuffix.org/). PanBrowser uses it to determine
+registrable site boundaries for the optional third-party connection firewall.
+The committed snapshot identifies itself as version
+`2026-07-25_14-20-03_UTC`, commit
+`e1b8015c3b2f0f4f8c18659c2480fc1a22c07b20`.
+
+The list is licensed under the Mozilla Public License, version 2.0. Its source
+form and upstream license notice are retained in the repository. The complete
+license is available at
+[mozilla.org/MPL/2.0](https://www.mozilla.org/MPL/2.0/).
+
+This Source Code Form is subject to the terms of the Mozilla Public License,
+v. 2.0. If a copy of the MPL was not distributed with this file, You can obtain
+one at https://mozilla.org/MPL/2.0/.
+
 ## Runtime and deployment dependencies
 
 The following components are not copied into the PanBrowser source tree. They

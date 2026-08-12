@@ -6,6 +6,14 @@ class PersistenceAndPolicyTests final : public QObject {
 private slots:
     void privateDataFilesUseOwnerOnlyPermissions();
     void settingsSaveTransactionRestoresFiles();
+    void siteDomainsUsePublicSuffixBoundaries();
+    void domainPatternMatcherUsesLabelBoundaries();
+    void bundledConnectionPresetsAreValidAndRespectUserRules();
+    void crossDomainPolicyEvaluatesRulesAndExceptions();
+    void compiledCrossDomainPolicyPreservesPrecedence();
+    void crossDomainSourceResolutionFailsClosed();
+    void crossDomainSettingsRoundTripAndRejectCorruption();
+    void crossDomainPendingRequestsAreBoundedAndDeduplicated();
     void interfaceLanguagePreferenceRoundTrips();
     void interfaceLanguageSettingsParsing();
     void systemInterfaceLanguageUsesFirstSupportedLanguage();
@@ -47,6 +55,12 @@ void PersistenceAndPolicyTests::privateDataFilesUseOwnerOnlyPermissions()
     DownloadHistoryStore downloadStore(downloadsPath);
     QVERIFY2(downloadStore.save({}, &error), qPrintable(error));
 
+    const QString siteConnectionsPath = QDir(privateDirectory).filePath(
+        QStringLiteral("site-connections.json")
+    );
+    CrossDomainSettings siteConnections;
+    QVERIFY2(siteConnections.save(siteConnectionsPath, &error), qPrintable(error));
+
     const QString historyPath = QDir(privateDirectory).filePath(
         QStringLiteral("history.sqlite")
     );
@@ -74,6 +88,7 @@ void PersistenceAndPolicyTests::privateDataFilesUseOwnerOnlyPermissions()
     QVERIFY(QFileInfo(privateDirectory).permissions().testFlag(QFileDevice::ExeOwner));
     QVERIFY(isOwnerOnly(sessionPath));
     QVERIFY(isOwnerOnly(downloadsPath));
+    QVERIFY(isOwnerOnly(siteConnectionsPath));
     QVERIFY(isOwnerOnly(historyPath));
     QVERIFY(isOwnerOnly(bookmarksPath));
     if (QFileInfo::exists(historyPath + QStringLiteral("-wal")))
@@ -117,6 +132,636 @@ void PersistenceAndPolicyTests::settingsSaveTransactionRestoresFiles()
     QCOMPARE(existing.readAll(), QByteArray("before"));
     existing.close();
     QVERIFY(!QFile::exists(newPath));
+}
+
+void PersistenceAndPolicyTests::siteDomainsUsePublicSuffixBoundaries()
+{
+    QCOMPARE(
+        SiteDomain::registrableDomain(QStringLiteral("online.example.co.uk")),
+        QStringLiteral("example.co.uk")
+    );
+    QCOMPARE(
+        SiteDomain::registrableDomain(QStringLiteral("project.github.io")),
+        QStringLiteral("project.github.io")
+    );
+    QCOMPARE(
+        SiteDomain::registrableDomain(QStringLiteral("sub.project.github.io")),
+        QStringLiteral("project.github.io")
+    );
+    QCOMPARE(
+        SiteDomain::registrableDomain(QStringLiteral("LOCALHOST")),
+        QStringLiteral("localhost")
+    );
+    QVERIFY(SiteDomain::hostMatchesPattern(
+        QStringLiteral("img.cdn.example.net"),
+        QStringLiteral("*.cdn.example.net")
+    ));
+    QVERIFY(!SiteDomain::hostMatchesPattern(
+        QStringLiteral("evilcdn.example.net"),
+        QStringLiteral("cdn.example.net")
+    ));
+    QCOMPARE(
+        SiteDomain::normalizedPageUrl(
+            QUrl(QStringLiteral("https://user@example.com:443/path/../page#section"))
+        ),
+        QUrl(QStringLiteral("https://example.com/page"))
+    );
+}
+
+void PersistenceAndPolicyTests::domainPatternMatcherUsesLabelBoundaries()
+{
+    DomainPatternMatcher matcher;
+    matcher.setPatterns({
+        QStringLiteral("cdn.example.net"),
+        QStringLiteral("metrics.example.org"),
+    });
+    QVERIFY(matcher.matches(QStringLiteral("cdn.example.net")));
+    QVERIFY(matcher.matches(QStringLiteral("images.cdn.example.net")));
+    QVERIFY(!matcher.matches(QStringLiteral("evilcdn.example.net")));
+    QVERIFY(!matcher.matches(QStringLiteral("example.net")));
+    QCOMPARE(
+        matcher.patterns(),
+        QStringList({
+            QStringLiteral("cdn.example.net"),
+            QStringLiteral("metrics.example.org"),
+        })
+    );
+}
+
+void PersistenceAndPolicyTests::bundledConnectionPresetsAreValidAndRespectUserRules()
+{
+    const CrossDomainPresetCatalog &catalog = CrossDomainPresetCatalog::bundled();
+    QVERIFY(!catalog.revision().isEmpty());
+    QVERIFY(catalog.preset(QStringLiteral("common-trackers")));
+    QVERIFY(catalog.preset(QStringLiteral("public-cdns")));
+    QVERIFY(
+        catalog.evaluate(
+            {QStringLiteral("common-trackers")},
+            QStringLiteral("www.google-analytics.com")
+        ) == std::optional(CrossDomainPresetDecision::Block)
+    );
+    QVERIFY(
+        catalog.evaluate(
+            {QStringLiteral("public-cdns")},
+            QStringLiteral("cdn.jsdelivr.net")
+        ) == std::optional(CrossDomainPresetDecision::Allow)
+    );
+    QVERIFY(!catalog.evaluate({}, QStringLiteral("google-analytics.com")).has_value());
+
+    CrossDomainPresetCatalog invalid;
+    QString error;
+    QVERIFY(!invalid.loadJson(
+        R"({"version":1,"revision":"test","presets":[{"id":"unsafe","decision":"allow","recommended":false,"patterns":["co.uk"]}]})",
+        &error
+    ));
+    QVERIFY(!error.isEmpty());
+
+    CrossDomainSettings settings;
+    settings.setEnabled(true);
+    settings.setEnabledPresetIds({QStringLiteral("common-trackers")});
+    const QString source = QStringLiteral("example.com");
+    const QString tracker = QStringLiteral("google-analytics.com");
+    QCOMPARE(settings.evaluate(source, tracker), CrossDomainEvaluation::Block);
+
+    settings.setRule(source, tracker, CrossDomainRuleDecision::Allow);
+    QCOMPARE(settings.evaluate(source, tracker), CrossDomainEvaluation::Allow);
+    QCOMPARE(
+        settings.evaluate(source, QStringLiteral("www.google-analytics.com")),
+        CrossDomainEvaluation::Block
+    );
+    settings.setRules({});
+    settings.setGlobalAllowPatterns({tracker});
+    QCOMPARE(settings.evaluate(source, tracker), CrossDomainEvaluation::Allow);
+
+    settings.setEnabledPresetIds({QStringLiteral("public-cdns")});
+    settings.setGlobalAllowPatterns({});
+    settings.setGlobalBlockPatterns({QStringLiteral("cdn.jsdelivr.net")});
+    QCOMPARE(
+        settings.evaluate(source, QStringLiteral("cdn.jsdelivr.net")),
+        CrossDomainEvaluation::Block
+    );
+}
+
+void PersistenceAndPolicyTests::crossDomainPolicyEvaluatesRulesAndExceptions()
+{
+    CrossDomainSettings settings = CrossDomainSettings::defaults();
+    const QUrl source(QStringLiteral("https://login.example.com/page"));
+    const QUrl sameSite(QStringLiteral("https://api.example.com/data"));
+    const QUrl thirdParty(QStringLiteral("https://assets.example.net/app.js"));
+    const QUrl tracker(QStringLiteral("https://metrics.example.org/pixel"));
+
+    QCOMPARE(settings.evaluate(source, thirdParty), CrossDomainEvaluation::Allow);
+    settings.setEnabled(true);
+    QCOMPARE(settings.evaluate(source, sameSite), CrossDomainEvaluation::Allow);
+    QCOMPARE(settings.evaluate(source, thirdParty), CrossDomainEvaluation::Ask);
+
+    settings.setGlobalAllowPatterns({QStringLiteral("example.net")});
+    QCOMPARE(settings.evaluate(source, thirdParty), CrossDomainEvaluation::Allow);
+    settings.setRule(
+        QStringLiteral("example.com"),
+        QStringLiteral("assets.example.net"),
+        CrossDomainRuleDecision::Block
+    );
+    QCOMPARE(settings.evaluate(source, thirdParty), CrossDomainEvaluation::Block);
+    settings.setRule(
+        QStringLiteral("example.com"),
+        QStringLiteral("assets.example.net"),
+        CrossDomainRuleDecision::Allow
+    );
+    QCOMPARE(settings.evaluate(source, thirdParty), CrossDomainEvaluation::Allow);
+    settings.setGlobalAllowPatterns({});
+    QCOMPARE(
+        settings.evaluate(
+            source,
+            QUrl(QStringLiteral("https://child.assets.example.net/app.js"))
+        ),
+        CrossDomainEvaluation::Ask
+    );
+
+    settings.setGlobalBlockPatterns({QStringLiteral("metrics.example.org")});
+    settings.setRule(
+        QStringLiteral("example.com"),
+        QStringLiteral("metrics.example.org"),
+        CrossDomainRuleDecision::Allow
+    );
+    QCOMPARE(settings.evaluate(source, tracker), CrossDomainEvaluation::Block);
+
+    settings.setGlobalAllowPatterns({QStringLiteral("*.example.org")});
+    QString validationError;
+    QVERIFY(!settings.validate(&validationError));
+    QVERIFY(validationError.contains(QStringLiteral("both globally allowed")));
+
+    settings.setGlobalAllowPatterns({QStringLiteral("https://invalid.example")});
+    QVERIFY(!settings.validate(&validationError));
+    QVERIFY(!validationError.isEmpty());
+
+    QCOMPARE(
+        settings.evaluate(
+            QUrl(QStringLiteral("https://other.example.org")),
+            QUrl(QStringLiteral("data:text/plain,hello"))
+        ),
+        CrossDomainEvaluation::Allow
+    );
+}
+
+void PersistenceAndPolicyTests::compiledCrossDomainPolicyPreservesPrecedence()
+{
+    CrossDomainSettings settings;
+    settings.setEnabled(true);
+    settings.setGlobalAllowPatterns({QStringLiteral("cdn.example.net")});
+    settings.setGlobalBlockPatterns({QStringLiteral("metrics.example.org")});
+    settings.setEnabledPresetIds({
+        QStringLiteral("common-trackers"),
+        QStringLiteral("public-cdns"),
+    });
+    settings.setRule(
+        QStringLiteral("shop.example.com"),
+        QStringLiteral("api.vendor.example"),
+        CrossDomainRuleDecision::Allow
+    );
+
+    const CrossDomainPolicySnapshot policy(settings);
+    const QUrl source(QStringLiteral("https://shop.example.com/account"));
+    QCOMPARE(
+        policy.evaluateUserPolicy(
+            source,
+            QUrl(QStringLiteral("https://metrics.example.org/pixel"))
+        ).decision,
+        CrossDomainEvaluation::Block
+    );
+    QCOMPARE(
+        policy.evaluateUserPolicy(
+            source,
+            QUrl(QStringLiteral("https://api.vendor.example/data"))
+        ).decision,
+        CrossDomainEvaluation::Allow
+    );
+    QCOMPARE(
+        policy.evaluateUserPolicy(
+            source,
+            QUrl(QStringLiteral("https://child.api.vendor.example/data"))
+        ).decision,
+        CrossDomainEvaluation::Ask
+    );
+    QCOMPARE(
+        policy.evaluatePresetPolicy(QStringLiteral("google-analytics.com")),
+        CrossDomainEvaluation::Block
+    );
+    QCOMPARE(
+        policy.evaluatePresetPolicy(QStringLiteral("cdn.jsdelivr.net")),
+        CrossDomainEvaluation::Allow
+    );
+}
+
+void PersistenceAndPolicyTests::crossDomainSourceResolutionFailsClosed()
+{
+    const QUrl firstParty(QStringLiteral("https://app.example.com/page"));
+    const QUrl initiator(QStringLiteral("https://frame.example.net/"));
+    const CrossDomainResolvedSource firstPartySource = crossDomainRequestSource(
+        firstParty,
+        initiator
+    );
+    QCOMPARE(firstPartySource.url, firstParty);
+    QVERIFY(!firstPartySource.originOnly);
+
+    const CrossDomainResolvedSource initiatorSource = crossDomainRequestSource(
+        QUrl(QStringLiteral("blob:https://app.example.com/id")),
+        initiator
+    );
+    QCOMPARE(initiatorSource.url, initiator);
+    QVERIFY(initiatorSource.originOnly);
+
+    const CrossDomainResolvedSource opaqueSource = crossDomainRequestSource(
+        QUrl(QStringLiteral("data:text/html,opaque")),
+        QUrl(QStringLiteral("about:blank"))
+    );
+    QVERIFY(opaqueSource.url.isEmpty());
+    QVERIFY(!opaqueSource.originOnly);
+    QVERIFY(crossDomainRequestSource(
+        QUrl(QStringLiteral("https:///missing-host")),
+        QUrl()
+    ).url.isEmpty());
+
+    CrossDomainPendingRequestTracker fallbackTracker;
+    QUrl promptSourceUrl;
+    bool promptSourceIsOriginOnly = false;
+    QVERIFY(fallbackTracker.record(
+        QStringLiteral("example.net\ntracker.example"),
+        initiatorSource.url,
+        &promptSourceUrl,
+        &promptSourceIsOriginOnly,
+        initiatorSource.originOnly
+    ));
+    QCOMPARE(promptSourceUrl, initiator);
+    QVERIFY(promptSourceIsOriginOnly);
+
+    CrossDomainSettings settings;
+    settings.setEnabled(true);
+    const QUrl target(QStringLiteral("https://tracker.example/pixel"));
+    const QList<QUrl> unattributableSources = {
+        QUrl(),
+        QUrl(QStringLiteral("about:blank")),
+        QUrl(QStringLiteral("blob:https://app.example.com/id")),
+        QUrl(QStringLiteral("data:text/html,opaque")),
+        QUrl(QStringLiteral("https:///missing-host")),
+    };
+    const CrossDomainPolicySnapshot policy(settings);
+    for (const QUrl &source : unattributableSources) {
+        QCOMPARE(settings.evaluate(source, target), CrossDomainEvaluation::Block);
+        QCOMPARE(
+            policy.evaluateUserPolicy(source, target).decision,
+            CrossDomainEvaluation::Block
+        );
+    }
+
+    settings.setEnabled(false);
+    QCOMPARE(
+        settings.evaluate(QUrl(QStringLiteral("about:blank")), target),
+        CrossDomainEvaluation::Allow
+    );
+}
+
+void PersistenceAndPolicyTests::crossDomainSettingsRoundTripAndRejectCorruption()
+{
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+    const QString path = directory.filePath(QStringLiteral("site-connections.json"));
+
+    CrossDomainSettings source;
+    source.setEnabled(true);
+    source.setGlobalAllowPatterns({
+        QStringLiteral("*.cdn.example.net"),
+        QStringLiteral("cdn.example.net"),
+    });
+    source.setGlobalBlockPatterns({
+        QStringLiteral("*.metrics.example.org"),
+        QStringLiteral("metrics.example.org"),
+    });
+    source.setEnabledPresetIds({
+        QStringLiteral("common-trackers"),
+        QStringLiteral("future-preset"),
+    });
+    source.setRule(
+        QStringLiteral("shop.example.com"),
+        QStringLiteral("payments.example.org"),
+        CrossDomainRuleDecision::Allow
+    );
+    QString error;
+    QVERIFY2(source.save(path, &error), qPrintable(error));
+
+    CrossDomainSettings restored;
+    QVERIFY2(restored.load(path, &error), qPrintable(error));
+    QVERIFY(restored.enabled());
+    QCOMPARE(restored.globalAllowPatterns(), QStringList{QStringLiteral("cdn.example.net")});
+    QCOMPARE(
+        restored.globalBlockPatterns(),
+        QStringList{QStringLiteral("metrics.example.org")}
+    );
+    QCOMPARE(
+        restored.enabledPresetIds(),
+        QStringList({QStringLiteral("common-trackers"), QStringLiteral("future-preset")})
+    );
+    QCOMPARE(restored.rules().size(), 1);
+    QCOMPARE(restored.rules().constFirst().sourceSite, QStringLiteral("example.com"));
+    QCOMPARE(
+        restored.rules().constFirst().targetHost,
+        QStringLiteral("payments.example.org")
+    );
+
+    const QString legacyPath = directory.filePath(QStringLiteral("legacy-site-connections.json"));
+    QFile legacyFile(legacyPath);
+    QVERIFY(legacyFile.open(QIODevice::WriteOnly));
+    const QByteArray legacyContents = R"({
+        "version": 1,
+        "enabled": true,
+        "globalAllowPatterns": [],
+        "rules": [{
+            "sourceSite": "shop.example.com",
+            "targetPattern": "cdn.example.net",
+            "decision": "allow"
+        }]
+    })";
+    QCOMPARE(legacyFile.write(legacyContents), qint64(legacyContents.size()));
+    legacyFile.close();
+    CrossDomainSettings legacy;
+    QVERIFY2(legacy.load(legacyPath, &error), qPrintable(error));
+    QVERIFY(legacy.globalBlockPatterns().isEmpty());
+    QVERIFY(legacy.enabledPresetIds().isEmpty());
+    QCOMPARE(legacy.rules().size(), 1);
+    QCOMPARE(legacy.rules().constFirst().targetHost, QStringLiteral("cdn.example.net"));
+
+    const QString ambiguousPath = directory.filePath(
+        QStringLiteral("ambiguous-site-connections.json")
+    );
+    QFile ambiguousFile(ambiguousPath);
+    QVERIFY(ambiguousFile.open(QIODevice::WriteOnly));
+    const QByteArray ambiguousContents = R"({
+        "version": 1,
+        "enabled": true,
+        "globalAllowPatterns": [],
+        "rules": [{
+            "sourceSite": "example.com",
+            "targetHost": "cdn.example.net",
+            "targetPattern": "tracker.example.net",
+            "decision": "allow"
+        }]
+    })";
+    QCOMPARE(
+        ambiguousFile.write(ambiguousContents),
+        qint64(ambiguousContents.size())
+    );
+    ambiguousFile.close();
+    CrossDomainSettings ambiguous;
+    QVERIFY(!ambiguous.load(ambiguousPath, &error));
+    QVERIFY(!error.isEmpty());
+
+    const QString backupPath = path + QStringLiteral(".backup");
+    QVERIFY(QFile::copy(path, backupPath));
+    QFile corrupt(path);
+    QVERIFY(corrupt.open(QIODevice::WriteOnly | QIODevice::Truncate));
+    QCOMPARE(corrupt.write("not json"), qint64(8));
+    corrupt.close();
+    CrossDomainSettings invalid;
+    QVERIFY(!invalid.load(path, &error));
+    QVERIFY(!error.isEmpty());
+    QCOMPARE(QFileInfo(path).size(), qint64(8));
+
+    CrossDomainSettings recovered;
+    bool recoveredFromBackup = false;
+    QVERIFY(recovered.loadRecoveringBackup(path, &recoveredFromBackup, &error));
+    QVERIFY(recoveredFromBackup);
+    QVERIFY(!error.isEmpty());
+    QVERIFY(recovered.enabled());
+    QCOMPARE(recovered.rules().size(), 1);
+
+    recovered.setRule(
+        QStringLiteral("example.com"),
+        QStringLiteral("images.example.net"),
+        CrossDomainRuleDecision::Block
+    );
+    QVERIFY2(recovered.save(path, &error), qPrintable(error));
+
+    CrossDomainSettings preservedBackup;
+    QVERIFY2(preservedBackup.load(backupPath, &error), qPrintable(error));
+    QCOMPARE(preservedBackup.rules().size(), 1);
+
+    CrossDomainSettings repairedPrimary;
+    QVERIFY2(repairedPrimary.load(path, &error), qPrintable(error));
+    QCOMPARE(repairedPrimary.rules().size(), 2);
+
+    QVERIFY(QFile::remove(path));
+    CrossDomainSettings recoveredWithoutPrimary;
+    recoveredFromBackup = false;
+    QVERIFY(
+        recoveredWithoutPrimary.loadRecoveringBackup(
+            path,
+            &recoveredFromBackup,
+            &error
+        )
+    );
+    QVERIFY(recoveredFromBackup);
+    QCOMPARE(recoveredWithoutPrimary.rules().size(), 1);
+
+    QFile corruptAgain(path);
+    QVERIFY(corruptAgain.open(QIODevice::WriteOnly));
+    QCOMPARE(corruptAgain.write("not json"), qint64(8));
+    corruptAgain.close();
+
+    QFile corruptBackup(backupPath);
+    QVERIFY(corruptBackup.open(QIODevice::WriteOnly | QIODevice::Truncate));
+    QCOMPARE(corruptBackup.write("bad backup"), qint64(10));
+    corruptBackup.close();
+    QVERIFY(!recovered.loadRecoveringBackup(path, &recoveredFromBackup, &error));
+    QVERIFY(!recoveredFromBackup);
+}
+
+void PersistenceAndPolicyTests::crossDomainPendingRequestsAreBoundedAndDeduplicated()
+{
+    CrossDomainPendingRequestTracker tracker;
+    const QString sharedRequest = QStringLiteral("example.com\ntracker.example");
+    QVERIFY(tracker.record(
+        sharedRequest,
+        QUrl(QStringLiteral("https://example.com/page#first"))
+    ));
+    QVERIFY(tracker.contains(
+        sharedRequest,
+        QUrl(QStringLiteral("https://example.com/page#second"))
+    ));
+    QVERIFY(!tracker.record(
+        sharedRequest,
+        QUrl(QStringLiteral("https://example.com/page#second"))
+    ));
+
+    CrossDomainPendingRequestTracker oversizedTracker;
+    const QString oversizedQuery(
+        2 * CrossDomainPendingRequestTracker::maximumPendingSources
+            * CrossDomainPendingRequestTracker::maximumSourcesPerRequest,
+        QLatin1Char('x')
+    );
+    const QUrl oversizedSource(
+        QStringLiteral("https://example.com/page?value=%1#first").arg(oversizedQuery)
+    );
+    QUrl oversizedPromptSource;
+    bool oversizedSourceIsOriginOnly = false;
+    QVERIFY(oversizedTracker.record(
+        sharedRequest,
+        oversizedSource,
+        &oversizedPromptSource,
+        &oversizedSourceIsOriginOnly
+    ));
+    QVERIFY(oversizedSourceIsOriginOnly);
+    QCOMPARE(
+        oversizedPromptSource,
+        QUrl(QStringLiteral("https://example.com/"))
+    );
+    QVERIFY(oversizedTracker.contains(
+        sharedRequest,
+        oversizedPromptSource,
+        true
+    ));
+    QVERIFY(!oversizedTracker.contains(
+        sharedRequest,
+        oversizedPromptSource,
+        false
+    ));
+    QUrl rootPromptSource;
+    bool rootSourceIsOriginOnly = true;
+    QVERIFY(oversizedTracker.record(
+        sharedRequest,
+        QUrl(QStringLiteral("https://example.com/")),
+        &rootPromptSource,
+        &rootSourceIsOriginOnly
+    ));
+    QVERIFY(!rootSourceIsOriginOnly);
+    QCOMPARE(rootPromptSource, QUrl(QStringLiteral("https://example.com/")));
+    QCOMPARE(oversizedTracker.size(), qsizetype(2));
+    QVERIFY(oversizedTracker.contains(sharedRequest, rootPromptSource, false));
+    QVERIFY(oversizedTracker.contains(sharedRequest, oversizedPromptSource, true));
+    QUrl sameOversizedSource = oversizedSource;
+    sameOversizedSource.setFragment(QStringLiteral("second"));
+    QVERIFY(oversizedTracker.contains(sharedRequest, sameOversizedSource));
+    const QUrl anotherOversizedPageAtTheSameOrigin(
+        QStringLiteral("https://example.com/other?value=%1").arg(
+            QString(oversizedQuery.size(), QLatin1Char('y'))
+        )
+    );
+    QVERIFY(oversizedTracker.contains(
+        sharedRequest,
+        anotherOversizedPageAtTheSameOrigin
+    ));
+    QVERIFY(!oversizedTracker.contains(
+        sharedRequest,
+        QUrl(QStringLiteral("https://other.example/"))
+    ));
+    oversizedTracker.removeSource(sharedRequest, oversizedPromptSource, true);
+    QVERIFY(!oversizedTracker.contains(sharedRequest, oversizedPromptSource, true));
+    QVERIFY(oversizedTracker.contains(sharedRequest, rootPromptSource, false));
+    QCOMPARE(oversizedTracker.size(), qsizetype(1));
+    oversizedTracker.removeSource(sharedRequest, rootPromptSource, false);
+    QVERIFY(!oversizedTracker.contains(sharedRequest, rootPromptSource, false));
+    QCOMPARE(oversizedTracker.size(), qsizetype(0));
+    oversizedTracker.removeSource(sharedRequest, rootPromptSource, false);
+    QCOMPARE(oversizedTracker.size(), qsizetype(0));
+
+    QUrl oversizedFragmentSource(QStringLiteral("https://fragment.example/page"));
+    oversizedFragmentSource.setFragment(
+        QString(oversizedQuery.size() + 1, QLatin1Char('f'))
+    );
+    CrossDomainPendingRequestTracker fragmentTracker;
+    QUrl fragmentPromptSource;
+    bool fragmentIsOriginOnly = false;
+    QVERIFY(fragmentTracker.record(
+        sharedRequest,
+        oversizedFragmentSource,
+        &fragmentPromptSource,
+        &fragmentIsOriginOnly
+    ));
+    QVERIFY(fragmentIsOriginOnly);
+    QCOMPARE(
+        fragmentPromptSource,
+        QUrl(QStringLiteral("https://fragment.example/"))
+    );
+
+    QUrl oversizedUserInfoSource(QStringLiteral("https://userinfo.example/page"));
+    oversizedUserInfoSource.setUserInfo(
+        QString(oversizedQuery.size() + 1, QLatin1Char('u'))
+    );
+    CrossDomainPendingRequestTracker userInfoTracker;
+    QUrl userInfoPromptSource;
+    bool userInfoIsOriginOnly = false;
+    QVERIFY(userInfoTracker.record(
+        sharedRequest,
+        oversizedUserInfoSource,
+        &userInfoPromptSource,
+        &userInfoIsOriginOnly
+    ));
+    QVERIFY(userInfoIsOriginOnly);
+    QCOMPARE(
+        userInfoPromptSource,
+        QUrl(QStringLiteral("https://userinfo.example/"))
+    );
+
+    CrossDomainPendingRequestTracker resolutionTracker;
+    const QString unrelatedRequest = QStringLiteral(
+        "example.com\nsecond-tracker.example"
+    );
+    const QUrl unrelatedSource(QStringLiteral("https://example.com/other"));
+    QVERIFY(resolutionTracker.record(sharedRequest, oversizedSource));
+    QVERIFY(resolutionTracker.record(unrelatedRequest, unrelatedSource));
+    resolutionTracker.remove(sharedRequest);
+    QVERIFY(resolutionTracker.contains(unrelatedRequest, unrelatedSource));
+
+    for (qsizetype index = 1;
+         index < CrossDomainPendingRequestTracker::maximumSourcesPerRequest;
+         ++index) {
+        QVERIFY(tracker.record(
+            sharedRequest,
+            QUrl(QStringLiteral("https://example.com/page/%1").arg(index))
+        ));
+    }
+    QCOMPARE(
+        tracker.size(),
+        CrossDomainPendingRequestTracker::maximumSourcesPerRequest
+    );
+    QVERIFY(!tracker.record(
+        sharedRequest,
+        QUrl(QStringLiteral("https://example.com/overflow"))
+    ));
+
+    tracker.remove(sharedRequest);
+    QCOMPARE(tracker.size(), qsizetype(0));
+    QVERIFY(!tracker.contains(
+        sharedRequest,
+        QUrl(QStringLiteral("https://example.com/page"))
+    ));
+    for (qsizetype index = 0;
+         index < CrossDomainPendingRequestTracker::maximumPendingSources;
+         ++index) {
+        QVERIFY(tracker.record(
+            QStringLiteral("source-%1.example\ntarget.example").arg(index),
+            QUrl(QStringLiteral("https://source-%1.example/").arg(index))
+        ));
+    }
+    QCOMPARE(
+        tracker.size(),
+        CrossDomainPendingRequestTracker::maximumPendingSources
+    );
+    QVERIFY(!tracker.record(
+        QStringLiteral("overflow.example\ntarget.example"),
+        QUrl(QStringLiteral("https://overflow.example/"))
+    ));
+
+    tracker.remove(QStringLiteral("source-0.example\ntarget.example"));
+    QVERIFY(tracker.record(
+        QStringLiteral("replacement.example\ntarget.example"),
+        QUrl(QStringLiteral("https://replacement.example/"))
+    ));
+    tracker.clear();
+    QCOMPARE(tracker.size(), qsizetype(0));
+    QVERIFY(!tracker.contains(
+        QStringLiteral("replacement.example\ntarget.example"),
+        QUrl(QStringLiteral("https://replacement.example/"))
+    ));
 }
 
 void PersistenceAndPolicyTests::interfaceLanguagePreferenceRoundTrips()
@@ -212,6 +857,14 @@ void PersistenceAndPolicyTests::embeddedTranslationCatalogsLoad()
     QCOMPARE(
         QCoreApplication::translate("ProxySettingsPage", "Manual proxy"),
         QStringLiteral("Ручной прокси")
+    );
+    QCOMPARE(
+        QCoreApplication::translate("CrossDomainSettingsPage", "Site Connections"),
+        QStringLiteral("Подключения сайтов")
+    );
+    QCOMPARE(
+        QCoreApplication::translate("CrossDomainSettingsPage", "Common trackers"),
+        QStringLiteral("Распространённые трекеры")
     );
     QCOMPARE(
         QCoreApplication::translate("QPlatformTheme", "Cancel"),

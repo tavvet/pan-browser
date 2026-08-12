@@ -17,6 +17,10 @@ may be unstable.
 - [ ] Allow user-initiated `chrome://` navigation from the address bar behind a
   safety warning. Keep redirects, page scripts, and popups blocked; offer a
   per-profile "Don't show again" preference that can be reset in settings.
+- [x] Add an opt-in experimental third-party connection firewall with
+  Public-Suffix-List site boundaries, global allow/block lists, per-site
+  session and persistent decisions, browser-owned prompts, and separately
+  managed PanBrowser tracker/CDN recommendation sets.
 
 ### Portable app and trust workflows
 

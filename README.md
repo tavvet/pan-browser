@@ -54,6 +54,8 @@ test environments, and other deliberately scoped trust configurations.
   HTTP Basic authentication, and HTTP proxy authentication.
 - Browser-wide System/Direct/HTTP/SOCKS5 proxy modes and configurable
   DNS-over-HTTPS providers.
+- An opt-in experimental firewall for third-party page connections, with
+  global exceptions and per-site session or persistent decisions.
 - Manifest-based web app installation, including lightweight application
   shortcuts on macOS.
 - English and Russian interfaces with system-language detection.
@@ -224,11 +226,57 @@ Rules are stored in `rules.json`. Imported DER (`.cer`, `.der`) and PEM
 `www.example-service.test`, but not the base domain `example-service.test`;
 list the base separately when both are required. Single-label wildcard bases
 such as `*.com` are rejected. PanBrowser does not implement Public Suffix List
-validation. API, CDN, and other subresource hosts need their own matching
-entries.
+validation for trust-rule wildcards. API, CDN, and other subresource hosts need
+their own matching entries.
 
 Version 1 files retain the legacy `startPage` field for compatibility. After
 its first import, the start page selected in Settings is authoritative.
+
+## Restrict third-party connections
+
+Open **Settings → Site Connections** to enable the experimental connection
+firewall. It is disabled by default. When enabled, HTTP(S), WebSocket, frame,
+script, media, worker, and data requests remain allowed inside the current
+registrable site. An unknown request to another host is blocked before reaching
+Chromium's network stack and shown in a browser-owned prompt.
+
+Top-level navigation remains allowed: opening another site establishes that
+site as the new first party. A prompt can allow or block the exact target host
+for the current PanBrowser session, or save the exact-host decision for the
+source site. Source-specific rules can also be added manually in Settings so a
+bundled recommendation false positive does not require a browser-wide
+exception. Global
+allow entries let every site connect to a listed host and its subdomains.
+Global block entries reject listed hosts for every site without prompting and
+take priority over source-specific and global allow rules. Conflicting global
+entries are rejected when Settings is saved. Allowing a previously blocked
+request reloads the page because Qt WebEngine cannot pause an intercepted
+request while PanBrowser waits for UI input.
+
+When Qt WebEngine cannot attribute a web request to an HTTP(S) first party or
+initiator, PanBrowser blocks that request without prompting while this
+protection is enabled. This fail-closed behavior prevents `blob:`, `data:`, and
+other opaque page URLs from bypassing the configured connection policy.
+
+PanBrowser also ships two optional, separately managed recommendation sets: a
+small recommended tracker block set and a compatibility-oriented public CDN
+allow set. Neither is mixed into personal lists, and existing configurations
+are not changed automatically. The CDN set is intentionally opt-in because
+allowing shared content hosts weakens third-party isolation. Use **View lists…**
+to inspect every bundled hostname and its action. Bundled sets are maintained
+by the PanBrowser project and update only with the application; PanBrowser does
+not download remote filter subscriptions.
+
+Site boundaries use the bundled Public Suffix List, so domains such as
+`example.co.uk` and private suffixes such as `github.io` are not reduced with a
+naive last-two-label rule. Personal configuration and enabled recommendation
+IDs are stored in `site-connections.json`; the versioned recommendation catalog
+is an immutable application resource.
+
+If the primary site-connection file becomes unreadable, PanBrowser first tries
+its last valid backup. If neither copy is valid, the original files are
+preserved, a visible warning is shown, and unknown third-party connections are
+blocked until a valid configuration is saved.
 
 ## Security and privacy notes
 
@@ -245,8 +293,12 @@ its first import, the start page selected in Settings is authoritative.
   falls back to System DNS without overwriting the unreadable file.
 - DNS and proxy settings are browser-wide. PanBrowser is not a VPN, and some
   WebRTC traffic may not use Chromium's HTTP proxy path.
+- The experimental connection firewall covers URL requests exposed through Qt
+  WebEngine. It is not a complete network sandbox and does not claim to block
+  every WebRTC, DNS-prefetch, or internal Chromium connection.
 - Installed web apps currently share the main PanBrowser profile, including
-  cookies, permissions, proxy, DNS, and trust rules.
+  cookies, permissions, proxy, DNS, trust rules, and the site-connection
+  firewall.
 - Custom recovery validation does not fetch CRLs or OCSP responses. Revocations
   already known to Chromium remain blocked; otherwise unavailable status is a
   soft failure.
@@ -260,6 +312,8 @@ PanBrowser uses the platform's per-user application-data and cache locations.
 Open **Settings → Diagnostics** to see their exact paths. The profile contains
 WebEngine cookies and site data together with PanBrowser's session, download,
 history, bookmark, web-app, search, DNS, proxy, and trust configuration.
+The same directory contains `site-connections.json` with the opt-in firewall
+mode, global exceptions, and persistent source-to-target decisions.
 
 On macOS, application data is stored under:
 

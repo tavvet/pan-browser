@@ -71,10 +71,26 @@ set(PANBROWSER_APP_SOURCES
     src/PageZoom.h
     src/CredentialPromptDialog.cpp
     src/CredentialPromptDialog.h
+    src/CrossDomainPresetCatalog.cpp
+    src/CrossDomainPresetCatalog.h
+    src/CrossDomainPolicySnapshot.cpp
+    src/CrossDomainPolicySnapshot.h
+    src/CrossDomainPrompt.cpp
+    src/CrossDomainPrompt.h
+    src/CrossDomainPromptController.cpp
+    src/CrossDomainPromptController.h
+    src/CrossDomainRequestInterceptor.cpp
+    src/CrossDomainRequestInterceptor.h
+    src/CrossDomainSettings.cpp
+    src/CrossDomainSettings.h
+    src/CrossDomainSettingsPage.cpp
+    src/CrossDomainSettingsPage.h
     src/DownloadHistoryStore.cpp
     src/DownloadHistoryStore.h
     src/DownloadManager.cpp
     src/DownloadManager.h
+    src/DomainPatternMatcher.cpp
+    src/DomainPatternMatcher.h
     src/DownloadsPanel.cpp
     src/DownloadsPanel.h
     src/DiagnosticsPage.cpp
@@ -128,6 +144,8 @@ set(PANBROWSER_APP_SOURCES
     src/SearchSettings.h
     src/SearchSettingsPage.cpp
     src/SearchSettingsPage.h
+    src/SiteDomain.cpp
+    src/SiteDomain.h
     src/SettingsDialog.cpp
     src/SettingsDialog.h
     src/SettingsSaveTransaction.cpp
@@ -333,10 +351,26 @@ qt_add_executable(PanBrowserTests
     src/PageZoom.h
     src/CredentialPromptDialog.cpp
     src/CredentialPromptDialog.h
+    src/CrossDomainPresetCatalog.cpp
+    src/CrossDomainPresetCatalog.h
+    src/CrossDomainPolicySnapshot.cpp
+    src/CrossDomainPolicySnapshot.h
+    src/CrossDomainPrompt.cpp
+    src/CrossDomainPrompt.h
+    src/CrossDomainPromptController.cpp
+    src/CrossDomainPromptController.h
+    src/CrossDomainRequestInterceptor.cpp
+    src/CrossDomainRequestInterceptor.h
+    src/CrossDomainSettings.cpp
+    src/CrossDomainSettings.h
+    src/CrossDomainSettingsPage.cpp
+    src/CrossDomainSettingsPage.h
     src/CertificateDetailsDialog.cpp
     src/CertificateDetailsDialog.h
     src/DownloadHistoryStore.cpp
     src/DownloadHistoryStore.h
+    src/DomainPatternMatcher.cpp
+    src/DomainPatternMatcher.h
     src/DiagnosticsPage.cpp
     src/DiagnosticsPage.h
     src/DetachedVideoWindow.cpp
@@ -379,6 +413,8 @@ qt_add_executable(PanBrowserTests
     src/SearchSettings.h
     src/SearchSettingsPage.cpp
     src/SearchSettingsPage.h
+    src/SiteDomain.cpp
+    src/SiteDomain.h
     src/SettingsDialog.cpp
     src/SettingsDialog.h
     src/SettingsSaveTransaction.cpp

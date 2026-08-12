@@ -22,6 +22,8 @@ private slots:
     void detachedVideoWindowMovesAndRestoresPage();
     void detachedVideoWindowCloseRequestsReturn();
     void popupGeometryIsVisibleAndUsable();
+    void crossDomainPromptRoutesOnlyMatchingPageIdentities();
+    void crossDomainPromptCoordinatesCanceledViewsAcrossControllers();
     void settingsDialogRegistersEveryPageAndSelectsInitialPage();
     void generalSettingsPageRoundTripsPreferences();
 };
@@ -167,6 +169,292 @@ void WindowInteractionTests::browserPreferencesValidateStartPage()
     );
 }
 
+void WindowInteractionTests::crossDomainPromptCoordinatesCanceledViewsAcrossControllers()
+{
+    CrossDomainPromptController originalController(nullptr, nullptr);
+    CrossDomainPromptController remainingController(nullptr, nullptr);
+    QWebEngineView originalView;
+    QWebEngineView remainingView;
+    const QUrl expectedUrl(QStringLiteral("https://example.com/page"));
+    const QString sourceSite = QStringLiteral("example.com");
+    const QString targetHost = QStringLiteral("tracker.example");
+    const QList<CrossDomainPromptSource> promptSources = {
+        {expectedUrl, false},
+    };
+
+    int anchorChanges = 0;
+    QWebEngineView *newAnchor = nullptr;
+    connect(
+        &originalController,
+        &CrossDomainPromptController::requestReanchorRequested,
+        &originalController,
+        [&](QWebEngineView *webView,
+            const QList<CrossDomainAffectedView> &affectedViews,
+            const QList<CrossDomainPromptSource> &sources,
+            const QString &changedSourceSite,
+            const QString &changedTargetHost,
+            int resourceType) {
+            QCOMPARE(changedSourceSite, sourceSite);
+            QCOMPARE(changedTargetHost, targetHost);
+            QCOMPARE(sources.size(), 1);
+            QCOMPARE(sources.constFirst().url, expectedUrl);
+            QVERIFY(!sources.constFirst().originOnly);
+            ++anchorChanges;
+            newAnchor = webView;
+            remainingController.request(
+                webView,
+                affectedViews,
+                sources,
+                changedSourceSite,
+                changedTargetHost,
+                resourceType
+            );
+        }
+    );
+    int finishedRequests = 0;
+    connect(
+        &originalController,
+        &CrossDomainPromptController::requestFinished,
+        &originalController,
+        [&](const QString &, const QString &) {
+            ++finishedRequests;
+        }
+    );
+    connect(
+        &remainingController,
+        &CrossDomainPromptController::requestFinished,
+        &remainingController,
+        [&](const QString &, const QString &) {
+            ++finishedRequests;
+        }
+    );
+
+    originalController.currentViewChanged(&originalView);
+    remainingController.currentViewChanged(&remainingView);
+    originalController.request(
+        &originalView,
+        {
+            {&originalView, expectedUrl},
+            {&remainingView, expectedUrl},
+        },
+        promptSources,
+        sourceSite,
+        targetHost,
+        int(QWebEngineUrlRequestInfo::ResourceTypeScript)
+    );
+    originalController.cancelForView(&originalView);
+    QCOMPARE(anchorChanges, 1);
+    QCOMPARE(newAnchor, &remainingView);
+    QCOMPARE(finishedRequests, 0);
+
+    remainingController.cancelForView(&remainingView);
+    QCOMPARE(finishedRequests, 1);
+
+    CrossDomainPromptController ownerController(nullptr, nullptr);
+    CrossDomainPromptController nonOwnerController(nullptr, nullptr);
+    QWebEngineView ownerView;
+    QWebEngineView nonOwnerView;
+    int unexpectedReanchors = 0;
+    int coordinatedFinishes = 0;
+    connect(
+        &ownerController,
+        &CrossDomainPromptController::requestReanchorRequested,
+        &ownerController,
+        [&](QWebEngineView *,
+            const QList<CrossDomainAffectedView> &,
+            const QList<CrossDomainPromptSource> &,
+            const QString &,
+            const QString &,
+            int) {
+            ++unexpectedReanchors;
+        }
+    );
+    connect(
+        &ownerController,
+        &CrossDomainPromptController::requestFinished,
+        &ownerController,
+        [&](const QString &, const QString &) {
+            ++coordinatedFinishes;
+        }
+    );
+    ownerController.currentViewChanged(&ownerView);
+    ownerController.request(
+        &ownerView,
+        {
+            {&ownerView, expectedUrl},
+            {&nonOwnerView, expectedUrl},
+        },
+        promptSources,
+        sourceSite,
+        targetHost,
+        int(QWebEngineUrlRequestInfo::ResourceTypeScript)
+    );
+
+    for (CrossDomainPromptController *candidate : {
+             &nonOwnerController,
+             &ownerController,
+         }) {
+        candidate->cancelForView(&nonOwnerView);
+    }
+    QCOMPARE(coordinatedFinishes, 0);
+    ownerController.cancelForView(&ownerView);
+    QCOMPARE(unexpectedReanchors, 0);
+    QCOMPARE(coordinatedFinishes, 1);
+
+    CrossDomainPromptController preciseDismissController(nullptr, nullptr);
+    QWebEngineView preciseDismissView;
+    QList<CrossDomainPromptSource> dismissedSources;
+    connect(
+        &preciseDismissController,
+        &CrossDomainPromptController::requestDismissed,
+        &preciseDismissController,
+        [&](const QString &dismissedSourceSite,
+            const QString &dismissedTargetHost,
+            const QList<CrossDomainPromptSource> &sources) {
+            QCOMPARE(dismissedSourceSite, sourceSite);
+            QCOMPARE(dismissedTargetHost, targetHost);
+            dismissedSources = sources;
+        }
+    );
+    preciseDismissController.currentViewChanged(&preciseDismissView);
+    preciseDismissController.request(
+        &preciseDismissView,
+        {{&preciseDismissView, expectedUrl}},
+        {{QUrl(QStringLiteral("https://example.com/")), false}},
+        sourceSite,
+        targetHost,
+        int(QWebEngineUrlRequestInfo::ResourceTypeScript)
+    );
+    preciseDismissController.request(
+        &preciseDismissView,
+        {{&preciseDismissView, expectedUrl}},
+        {{QUrl(QStringLiteral("https://example.com/")), true}},
+        sourceSite,
+        targetHost,
+        int(QWebEngineUrlRequestInfo::ResourceTypeScript)
+    );
+    preciseDismissController.cancelForView(&preciseDismissView);
+    QCOMPARE(dismissedSources.size(), 2);
+    QCOMPARE(dismissedSources.at(0).url, QUrl(QStringLiteral("https://example.com/")));
+    QVERIFY(!dismissedSources.at(0).originOnly);
+    QCOMPARE(dismissedSources.at(1).url, QUrl(QStringLiteral("https://example.com/")));
+    QVERIFY(dismissedSources.at(1).originOnly);
+
+    CrossDomainPromptController navigationController(nullptr, nullptr);
+    QWebEngineView navigationAnchor;
+    QWebEngineView navigationSurvivor;
+    const QUrl originalRoute(QStringLiteral("https://example.com/route/one"));
+    const QUrl currentRoute(QStringLiteral("https://example.com/route/two"));
+    QList<CrossDomainAffectedView> reanchoredViews;
+    connect(
+        &navigationController,
+        &CrossDomainPromptController::requestReanchorRequested,
+        &navigationController,
+        [&](QWebEngineView *,
+            const QList<CrossDomainAffectedView> &affectedViews,
+            const QList<CrossDomainPromptSource> &,
+            const QString &,
+            const QString &,
+            int) {
+            reanchoredViews = affectedViews;
+        }
+    );
+    navigationController.currentViewChanged(&navigationAnchor);
+    navigationController.request(
+        &navigationAnchor,
+        {
+            {&navigationAnchor, originalRoute},
+            {&navigationSurvivor, originalRoute},
+        },
+        {{originalRoute, false}},
+        sourceSite,
+        targetHost,
+        int(QWebEngineUrlRequestInfo::ResourceTypeScript)
+    );
+    navigationController.request(
+        &navigationAnchor,
+        {
+            {&navigationAnchor, currentRoute},
+            {&navigationSurvivor, currentRoute},
+        },
+        {{currentRoute, false}},
+        sourceSite,
+        targetHost,
+        int(QWebEngineUrlRequestInfo::ResourceTypeScript)
+    );
+    navigationController.cancelForView(&navigationAnchor);
+    QCOMPARE(reanchoredViews.size(), 1);
+    QCOMPARE(reanchoredViews.constFirst().webView, &navigationSurvivor);
+    QCOMPARE(reanchoredViews.constFirst().expectedUrl, currentRoute);
+}
+
+void WindowInteractionTests::crossDomainPromptRoutesOnlyMatchingPageIdentities()
+{
+    const QUrl sourceUrl(QStringLiteral("https://example.com/old?request=1#fragment"));
+    const QList<QUrl> candidates = {
+        QUrl(QStringLiteral("https://example.com/new?request=1")),
+        QUrl(QStringLiteral("https://example.com/old?request=1#other-fragment")),
+        QUrl(QStringLiteral("https://other.example/page")),
+    };
+
+    QCOMPARE(
+        crossDomainPromptCandidateIndexes(
+            sourceUrl,
+            QStringLiteral("example.com"),
+            false,
+            candidates
+        ),
+        QList<qsizetype>({1})
+    );
+    QVERIFY(
+        crossDomainPromptCandidateIndexes(
+            sourceUrl,
+            QStringLiteral("example.com"),
+            false,
+            {candidates.constFirst()}
+        ).isEmpty()
+    );
+    QCOMPARE(
+        crossDomainPromptCandidateIndexes(
+            QUrl(QStringLiteral("https://example.com/")),
+            QStringLiteral("example.com"),
+            true,
+            {candidates.constFirst()}
+        ),
+        QList<qsizetype>({0})
+    );
+    QVERIFY(
+        crossDomainPromptCandidateIndexes(
+            QUrl(QStringLiteral("https://example.com/")),
+            QStringLiteral("example.com"),
+            true,
+            candidates
+        ).isEmpty()
+    );
+
+    const QList<QUrl> sameSiteDifferentOrigins = {
+        QUrl(QStringLiteral("https://news.example.com/page")),
+        QUrl(QStringLiteral("https://app.example.com/another-page")),
+    };
+    QCOMPARE(
+        crossDomainPromptCandidateIndexes(
+            QUrl(QStringLiteral("https://app.example.com/")),
+            QStringLiteral("example.com"),
+            true,
+            sameSiteDifferentOrigins
+        ),
+        QList<qsizetype>({1})
+    );
+    QVERIFY(
+        crossDomainPromptCandidateIndexes(
+            QUrl(QStringLiteral("https://app.example.com/")),
+            QStringLiteral("example.com"),
+            true,
+            {sameSiteDifferentOrigins.constFirst()}
+        ).isEmpty()
+    );
+}
+
 void WindowInteractionTests::settingsDialogRegistersEveryPageAndSelectsInitialPage()
 {
     QTemporaryDir directory;
@@ -180,6 +468,10 @@ void WindowInteractionTests::settingsDialogRegistersEveryPageAndSelectsInitialPa
     context.searchConfigurationPath = directory.filePath(QStringLiteral("search.json"));
     context.dnsConfigurationPath = directory.filePath(QStringLiteral("dns.json"));
     context.proxyConfigurationPath = directory.filePath(QStringLiteral("proxy.json"));
+    context.crossDomainConfigurationPath = directory.filePath(
+        QStringLiteral("site-connections.json")
+    );
+    context.crossDomainSettings.setEnabledPresetIds({QStringLiteral("public-cdns")});
     context.profile = &profile;
     context.historyStore = &historyStore;
     context.webAppStore = &webAppStore;
@@ -193,13 +485,19 @@ void WindowInteractionTests::settingsDialogRegistersEveryPageAndSelectsInitialPa
     auto *pages = dialog.findChild<QStackedWidget *>(QStringLiteral("settingsPages"));
     QVERIFY(sidebar);
     QVERIFY(pages);
-    QCOMPARE(sidebar->count(), 9);
-    QCOMPARE(pages->count(), 9);
+    QCOMPARE(sidebar->count(), 10);
+    QCOMPARE(pages->count(), 10);
     QCOMPARE(
         sidebar->currentItem()->data(Qt::UserRole).toInt(),
         static_cast<int>(SettingsDialog::Page::WebApps)
     );
     QCOMPARE(pages->currentWidget()->objectName(), QStringLiteral("webAppsSettingsPage"));
+    auto *cdnPreset = dialog.findChild<QCheckBox *>(
+        QStringLiteral("connectionPreset_public-cdns")
+    );
+    QVERIFY(cdnPreset);
+    QVERIFY(cdnPreset->isChecked());
+    QVERIFY(dialog.findChild<QPushButton *>(QStringLiteral("addCrossDomainRule")));
 
     const QList<SettingsDialog::Page> expectedPages{
         SettingsDialog::Page::General,
@@ -209,6 +507,7 @@ void WindowInteractionTests::settingsDialogRegistersEveryPageAndSelectsInitialPa
         SettingsDialog::Page::PrivacyData,
         SettingsDialog::Page::Dns,
         SettingsDialog::Page::Proxy,
+        SettingsDialog::Page::SiteConnections,
         SettingsDialog::Page::TrustRules,
         SettingsDialog::Page::Diagnostics,
     };
@@ -220,6 +519,7 @@ void WindowInteractionTests::settingsDialogRegistersEveryPageAndSelectsInitialPa
         QStringLiteral("privacyDataSettingsPage"),
         QStringLiteral("dnsSettingsPage"),
         QStringLiteral("proxySettingsPage"),
+        QStringLiteral("settingsPageScrollArea"),
         QStringLiteral("trustRulesSettingsPage"),
         QStringLiteral("diagnosticsSettingsPage"),
     };

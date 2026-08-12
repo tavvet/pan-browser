@@ -5,15 +5,34 @@
     <name>BookmarksDialog</name>
     <message numerus="yes">
         <location filename="../src/BookmarksDialog.cpp" line="154"/>
-        <location filename="../tests/PersistenceAndPolicyTests.cpp" line="221"/>
-        <location filename="../tests/PersistenceAndPolicyTests.cpp" line="225"/>
-        <location filename="../tests/PersistenceAndPolicyTests.cpp" line="229"/>
-        <location filename="../tests/PersistenceAndPolicyTests.cpp" line="238"/>
-        <location filename="../tests/PersistenceAndPolicyTests.cpp" line="242"/>
+        <location filename="../tests/PersistenceAndPolicyTests.cpp" line="551"/>
+        <location filename="../tests/PersistenceAndPolicyTests.cpp" line="555"/>
+        <location filename="../tests/PersistenceAndPolicyTests.cpp" line="559"/>
+        <location filename="../tests/PersistenceAndPolicyTests.cpp" line="568"/>
+        <location filename="../tests/PersistenceAndPolicyTests.cpp" line="572"/>
         <source>%n bookmark(s)</source>
         <translation>
             <numerusform>%n bookmark</numerusform>
             <numerusform>%n bookmarks</numerusform>
+        </translation>
+    </message>
+</context>
+<context>
+    <name>CrossDomainSettingsPage</name>
+    <message numerus="yes">
+        <location filename="../src/CrossDomainSettingsPage.cpp" line="116"/>
+        <source>%1 — %n host(s)</source>
+        <translation>
+            <numerusform>%1 — %n host</numerusform>
+            <numerusform>%1 — %n hosts</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <location filename="../src/CrossDomainSettingsPage.cpp" line="477"/>
+        <source>Action: %1 · %n host(s)</source>
+        <translation>
+            <numerusform>Action: %1 · %n host</numerusform>
+            <numerusform>Action: %1 · %n hosts</numerusform>
         </translation>
     </message>
 </context>
@@ -31,7 +50,7 @@
 <context>
     <name>MainWindow</name>
     <message numerus="yes">
-        <location filename="../src/MainWindow.cpp" line="2828"/>
+        <location filename="../src/MainWindow.cpp" line="2923"/>
         <source>%n custom rule(s)</source>
         <translation>
             <numerusform>%n custom rule</numerusform>

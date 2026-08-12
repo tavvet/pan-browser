@@ -7,6 +7,12 @@
 #include "BookmarkStore.h"
 #include "BrowserPreferences.h"
 #include "BrowserShortcut.h"
+#include "CrossDomainPresetCatalog.h"
+#include "CrossDomainPolicySnapshot.h"
+#include "CrossDomainPromptController.h"
+#include "CrossDomainRequestInterceptor.h"
+#include "CrossDomainSettings.h"
+#include "DomainPatternMatcher.h"
 #include "BrowserDataCleanup.h"
 #include "BrowserInteraction.h"
 #include "BrowserProfile.h"
@@ -28,6 +34,7 @@
 #include "SearchSettings.h"
 #include "SettingsDialog.h"
 #include "SettingsSaveTransaction.h"
+#include "SiteDomain.h"
 #include "TrustConfiguration.h"
 #include "TrustCertificateRepository.h"
 #include "TrustRulesSettingsPage.h"
@@ -39,6 +46,7 @@
 
 #include <QApplication>
 #include <QAuthenticator>
+#include <QCheckBox>
 #include <QCloseEvent>
 #include <QDialog>
 #include <QDir>
@@ -54,6 +62,7 @@
 #include <QNetworkProxyFactory>
 #include <QPlatformSurfaceEvent>
 #include <QProcess>
+#include <QPushButton>
 #include <QSignalSpy>
 #include <QStackedWidget>
 #include <QSettings>

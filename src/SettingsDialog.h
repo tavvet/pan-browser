@@ -1,6 +1,7 @@
 #pragma once
 
 #include "BrowserPreferences.h"
+#include "CrossDomainSettings.h"
 #include "DnsSettings.h"
 #include "ProxySettings.h"
 #include "SearchSettings.h"
@@ -13,6 +14,7 @@ class QListWidget;
 class QStackedWidget;
 class BrowserProfile;
 class DiagnosticsPage;
+class CrossDomainSettingsPage;
 class DnsSettingsPage;
 class GeneralSettingsPage;
 class HistorySettingsPage;
@@ -29,11 +31,13 @@ struct SettingsDialogContext {
     QString searchConfigurationPath;
     QString dnsConfigurationPath;
     QString proxyConfigurationPath;
+    QString crossDomainConfigurationPath;
     BrowserPreferences preferences;
     SearchSettings searchSettings;
     DnsSettings dnsSettings;
     ProxySettings proxySettings;
     ProxySettings activeProxySettings;
+    CrossDomainSettings crossDomainSettings;
     bool networkBlockedByProxyError = false;
     BrowserProfile *profile = nullptr;
     HistoryStore *historyStore = nullptr;
@@ -52,6 +56,7 @@ public:
         PrivacyData,
         Dns,
         Proxy,
+        SiteConnections,
         TrustRules,
         Diagnostics,
     };
@@ -68,6 +73,7 @@ public:
     [[nodiscard]] SearchSettings searchSettings() const;
     [[nodiscard]] DnsSettings dnsSettings() const;
     [[nodiscard]] ProxySettings proxySettings() const;
+    [[nodiscard]] CrossDomainSettings crossDomainSettings() const;
 
 public slots:
     void reject() override;
@@ -91,11 +97,13 @@ private:
     QString m_searchConfigurationPath;
     QString m_dnsConfigurationPath;
     QString m_proxyConfigurationPath;
+    QString m_crossDomainConfigurationPath;
     BrowserPreferences m_preferences;
     SearchSettings m_searchSettings;
     DnsSettings m_dnsSettings;
     ProxySettings m_proxySettings;
     ProxySettings m_activeProxySettings;
+    CrossDomainSettings m_crossDomainSettings;
     bool m_networkBlockedByProxyError = false;
     BrowserProfile *m_profile = nullptr;
     QListWidget *m_sidebar = nullptr;
@@ -106,6 +114,7 @@ private:
     SearchSettingsPage *m_searchPage = nullptr;
     DnsSettingsPage *m_dnsPage = nullptr;
     ProxySettingsPage *m_proxyPage = nullptr;
+    CrossDomainSettingsPage *m_crossDomainPage = nullptr;
     HistorySettingsPage *m_historyPage = nullptr;
     WebAppsSettingsPage *m_webAppsPage = nullptr;
     DiagnosticsPage *m_diagnosticsPage = nullptr;

@@ -1,6 +1,7 @@
 #include "SettingsDialog.h"
 
 #include "BrowserProfile.h"
+#include "CrossDomainSettingsPage.h"
 #include "DiagnosticsPage.h"
 #include "DnsSettingsPage.h"
 #include "GeneralSettingsPage.h"
@@ -19,6 +20,7 @@
 #include <QListWidget>
 #include <QMessageBox>
 #include <QPushButton>
+#include <QScrollArea>
 #include <QStackedWidget>
 #include <QStringList>
 #include <QVBoxLayout>
@@ -74,11 +76,13 @@ SettingsDialog::SettingsDialog(
     , m_searchConfigurationPath(context.searchConfigurationPath)
     , m_dnsConfigurationPath(context.dnsConfigurationPath)
     , m_proxyConfigurationPath(context.proxyConfigurationPath)
+    , m_crossDomainConfigurationPath(context.crossDomainConfigurationPath)
     , m_preferences(context.preferences)
     , m_searchSettings(context.searchSettings)
     , m_dnsSettings(context.dnsSettings)
     , m_proxySettings(context.proxySettings)
     , m_activeProxySettings(context.activeProxySettings)
+    , m_crossDomainSettings(context.crossDomainSettings)
     , m_networkBlockedByProxyError(context.networkBlockedByProxyError)
     , m_profile(context.profile)
 {
@@ -108,6 +112,11 @@ DnsSettings SettingsDialog::dnsSettings() const
 ProxySettings SettingsDialog::proxySettings() const
 {
     return m_proxySettings;
+}
+
+CrossDomainSettings SettingsDialog::crossDomainSettings() const
+{
+    return m_crossDomainSettings;
 }
 
 void SettingsDialog::reject()
@@ -229,6 +238,23 @@ void SettingsDialog::createInterface(
         m_proxyPage
     );
 
+    auto *crossDomainScrollArea = new QScrollArea(m_pages);
+    crossDomainScrollArea->setObjectName(QStringLiteral("settingsPageScrollArea"));
+    crossDomainScrollArea->setFrameShape(QFrame::NoFrame);
+    crossDomainScrollArea->setWidgetResizable(true);
+    crossDomainScrollArea->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    m_crossDomainPage = new CrossDomainSettingsPage(
+        m_crossDomainSettings,
+        crossDomainScrollArea
+    );
+    crossDomainScrollArea->setWidget(m_crossDomainPage);
+    registerPage(
+        Page::SiteConnections,
+        QIcon(QStringLiteral(":/assets/icons/shield-ban.svg")),
+        tr("Site Connections"),
+        crossDomainScrollArea
+    );
+
     m_trustRules = new TrustRulesSettingsPage(m_configurationPath, m_pages);
     registerPage(
         Page::TrustRules,
@@ -340,6 +366,11 @@ void SettingsDialog::saveAndClose()
         QMessageBox::warning(this, tr("Cannot save proxy settings"), error);
         return;
     }
+    if (!m_crossDomainPage->validate(&error)) {
+        selectPage(Page::SiteConnections);
+        QMessageBox::warning(this, tr("Cannot save site connection settings"), error);
+        return;
+    }
     SettingsSaveTransaction transaction;
     if (!transaction.capture(
             {
@@ -349,6 +380,8 @@ void SettingsDialog::saveAndClose()
                 m_dnsConfigurationPath + QStringLiteral(".backup"),
                 m_proxyConfigurationPath,
                 m_proxyConfigurationPath + QStringLiteral(".backup"),
+                m_crossDomainConfigurationPath,
+                m_crossDomainConfigurationPath + QStringLiteral(".backup"),
                 m_configurationPath,
                 m_configurationPath + QStringLiteral(".backup"),
             },
@@ -361,6 +394,7 @@ void SettingsDialog::saveAndClose()
     SearchSettings searchSettings = m_searchPage->settings();
     DnsSettings dnsSettings = m_dnsPage->settings();
     ProxySettings proxySettings = m_proxyPage->settings();
+    CrossDomainSettings crossDomainSettings = m_crossDomainPage->settings();
     if (!preferences.save(&error)) {
         selectPage(Page::General);
         QMessageBox::warning(this, tr("Cannot save settings"), error);
@@ -390,6 +424,14 @@ void SettingsDialog::saveAndClose()
         QMessageBox::warning(this, tr("Cannot save proxy settings"), error);
         return;
     }
+    if (!crossDomainSettings.save(m_crossDomainConfigurationPath, &error)) {
+        const QString rollbackError = rollbackSettings(m_preferences, transaction);
+        selectPage(Page::SiteConnections);
+        if (!rollbackError.isEmpty())
+            error += tr("\n\nRollback was incomplete:\n") + rollbackError;
+        QMessageBox::warning(this, tr("Cannot save site connection settings"), error);
+        return;
+    }
     if (!m_trustRules->save(&error)) {
         const QString rollbackError = rollbackSettings(m_preferences, transaction);
         selectPage(Page::TrustRules);
@@ -412,6 +454,7 @@ void SettingsDialog::saveAndClose()
     m_searchSettings = searchSettings;
     m_dnsSettings = dnsSettings;
     m_proxySettings = proxySettings;
+    m_crossDomainSettings = crossDomainSettings;
     if (!certificateCleanupFailures.isEmpty()) {
         QMessageBox::warning(
             this,
