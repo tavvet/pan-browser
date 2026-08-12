@@ -1,0 +1,28 @@
+#pragma once
+
+#include <QTabBar>
+
+class QMouseEvent;
+
+class BrowserTabBar final : public QTabBar {
+public:
+    explicit BrowserTabBar(QWidget *parent = nullptr);
+
+    [[nodiscard]] bool isTabPinned(int index) const;
+    void setTabPinned(int index, bool pinned);
+    [[nodiscard]] int pinnedTabCount() const;
+    [[nodiscard]] int normalizedMoveDestination(int movedIndex) const;
+
+protected:
+    [[nodiscard]] QSize tabSizeHint(int index) const override;
+    void mousePressEvent(QMouseEvent *event) override;
+    void mouseReleaseEvent(QMouseEvent *event) override;
+
+private:
+    [[nodiscard]] quint64 ensureTabIdentity(int index);
+    [[nodiscard]] int indexForIdentity(quint64 identity) const;
+    void updateCloseButtonVisibility(int index);
+
+    quint64 m_nextTabIdentity = 0;
+    quint64 m_draggedTabIdentity = 0;
+};

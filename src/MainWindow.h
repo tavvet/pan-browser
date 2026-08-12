@@ -21,13 +21,13 @@ class AddressLineEdit;
 class QMessageBox;
 class QProgressBar;
 class QStackedWidget;
-class QTabBar;
 class QTimer;
 class QToolBar;
 class QMenu;
 class QAction;
 class QPoint;
 class BookmarkStore;
+class BrowserTabBar;
 class BrowserProfile;
 class DownloadButton;
 class DownloadManager;
@@ -83,6 +83,7 @@ private:
     };
 
     struct BrowserTabState {
+        QString title;
         QString lastAcceptedRule;
         QString trustStatus = QStringLiteral("Ready");
         QString previousAcceptedRule;
@@ -92,6 +93,7 @@ private:
         bool externalNavigationDelegated = false;
         bool suppressNextHistoryVisit = false;
         bool loading = false;
+        bool pinned = false;
         int progress = 0;
         QUrl topLevelUrl;
         QUrl pendingUrl;
@@ -138,9 +140,14 @@ private:
         const QUrl &url,
         bool activate = true,
         bool deferred = false,
-        const QString &restoredTitle = QString()
+        const QString &restoredTitle = QString(),
+        bool pinned = false
     );
     void closeTab(int index);
+    void showTabContextMenu(const QPoint &position);
+    void setTabPinned(int index, bool pinned);
+    void updateTabPresentation(QWebEngineView *webView);
+    [[nodiscard]] bool hasPinnedTabs() const;
     QWebEngineView *currentWebView() const;
     QWebEnginePage *pageForTab(QWebEngineView *webView) const;
     QUrl urlForTab(QWebEngineView *webView) const;
@@ -204,7 +211,7 @@ private:
     void restoreInitialTabs();
     void scheduleSessionSave();
     void saveSession();
-    BrowserSession currentSession() const;
+    BrowserSession currentSession(bool includeRegularTabs = true) const;
     void handleCertificateError(
         QWebEngineView *webView,
         const QWebEngineCertificateError &error
@@ -251,7 +258,7 @@ private:
     QPointer<QWebEngineView> m_externalUrlSource;
     QPointer<QWebEngineView> m_findView;
     QPointer<QWebEngineView> m_lastInteractionWebView;
-    QTabBar *m_tabBar = nullptr;
+    BrowserTabBar *m_tabBar = nullptr;
     QStackedWidget *m_tabStack = nullptr;
     AddressLineEdit *m_address = nullptr;
     QAction *m_backAction = nullptr;

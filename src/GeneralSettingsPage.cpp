@@ -113,6 +113,14 @@ GeneralSettingsPage::GeneralSettingsPage(
     ));
     startupLayout->addRow(tr("On launch"), m_startupMode);
 
+    auto *pinnedTabsHint = new QLabel(
+        tr("Pinned tabs reopen on launch regardless of this setting."),
+        startupCard
+    );
+    pinnedTabsHint->setObjectName(QStringLiteral("fieldHint"));
+    pinnedTabsHint->setWordWrap(true);
+    startupLayout->addRow(pinnedTabsHint);
+
     auto *restoreSignInHint = new QLabel(
         tr("Some restored tabs may ask you to sign in again unless “Keep sign-ins between launches” is enabled."),
         startupCard

@@ -11,6 +11,8 @@ private slots:
     void integratedChromePreservesBaseMarginsAndAvoidsSystemControls();
     void integratedChromeSurvivesSurfaceAndLayoutTeardown();
     void browserPreferencesValidateStartPage();
+    void browserTabBarKeepsPinnedTabsInTheirGroup();
+    void browserTabBarRestoresBoundaryAfterMouseDrag();
     void developerToolsPreferenceDefaultsToDisabled();
     void browserShortcutFallbackMatchesRegisteredKeys();
     void pageZoomUsesCanonicalOriginsAndDiscreteLevels();
@@ -27,6 +29,77 @@ private slots:
     void settingsDialogRegistersEveryPageAndSelectsInitialPage();
     void generalSettingsPageRoundTripsPreferences();
 };
+
+void WindowInteractionTests::browserTabBarKeepsPinnedTabsInTheirGroup()
+{
+    BrowserTabBar tabBar;
+    tabBar.setTabsClosable(true);
+    tabBar.setMovable(true);
+    tabBar.setExpanding(false);
+    tabBar.resize(600, 40);
+    tabBar.addTab(QStringLiteral("Pinned one"));
+    tabBar.addTab(QStringLiteral("Pinned two"));
+    tabBar.addTab(QStringLiteral("A much longer regular tab title"));
+    tabBar.setTabPinned(0, true);
+    tabBar.setTabPinned(1, true);
+
+    QCOMPARE(tabBar.pinnedTabCount(), 2);
+    QVERIFY(tabBar.isTabPinned(0));
+    QVERIFY(tabBar.isTabPinned(1));
+    QVERIFY(!tabBar.isTabPinned(2));
+    QVERIFY(tabBar.tabRect(0).width() < tabBar.tabRect(2).width());
+    QWidget *pinnedCloseButton = tabBar.tabButton(0, QTabBar::RightSide);
+    if (!pinnedCloseButton)
+        pinnedCloseButton = tabBar.tabButton(0, QTabBar::LeftSide);
+    QVERIFY(pinnedCloseButton);
+    QVERIFY(pinnedCloseButton->isHidden());
+
+    tabBar.moveTab(0, 2);
+    QCOMPARE(tabBar.normalizedMoveDestination(2), 1);
+    tabBar.moveTab(2, 1);
+    QVERIFY(tabBar.isTabPinned(1));
+
+    tabBar.moveTab(2, 0);
+    QCOMPARE(tabBar.normalizedMoveDestination(0), 2);
+    tabBar.moveTab(0, 2);
+    QVERIFY(!tabBar.isTabPinned(2));
+
+    tabBar.setTabPinned(1, false);
+    QCOMPARE(tabBar.pinnedTabCount(), 1);
+    QWidget *unpinnedCloseButton = tabBar.tabButton(1, QTabBar::RightSide);
+    if (!unpinnedCloseButton)
+        unpinnedCloseButton = tabBar.tabButton(1, QTabBar::LeftSide);
+    QVERIFY(unpinnedCloseButton);
+    QVERIFY(!unpinnedCloseButton->isHidden());
+}
+
+void WindowInteractionTests::browserTabBarRestoresBoundaryAfterMouseDrag()
+{
+    BrowserTabBar tabBar;
+    tabBar.setMovable(true);
+    tabBar.setExpanding(false);
+    tabBar.resize(640, 40);
+    tabBar.addTab(QStringLiteral("Pinned one"));
+    tabBar.addTab(QStringLiteral("Pinned two"));
+    tabBar.addTab(QStringLiteral("Regular one"));
+    tabBar.addTab(QStringLiteral("Regular two"));
+    tabBar.setTabPinned(0, true);
+    tabBar.setTabPinned(1, true);
+
+    const QPoint pressPosition = tabBar.tabRect(0).center();
+    const QPoint destination(tabBar.rect().right() - 2, pressPosition.y());
+    QTest::mousePress(&tabBar, Qt::LeftButton, Qt::NoModifier, pressPosition);
+    tabBar.moveTab(0, 3);
+    QCOMPARE(tabBar.tabText(3), QStringLiteral("Pinned one"));
+    QTest::mouseRelease(&tabBar, Qt::LeftButton, Qt::NoModifier, destination);
+
+    QCOMPARE(tabBar.tabText(0), QStringLiteral("Pinned two"));
+    QCOMPARE(tabBar.tabText(1), QStringLiteral("Pinned one"));
+    QVERIFY(tabBar.isTabPinned(0));
+    QVERIFY(tabBar.isTabPinned(1));
+    QVERIFY(!tabBar.isTabPinned(2));
+    QVERIFY(!tabBar.isTabPinned(3));
+}
 
 void WindowInteractionTests::visibleWindowPlacementIsPreserved()
 {

@@ -93,8 +93,10 @@ independent browser profiles.
 Each tab owns one `QWebEngineView` and one `BrowserPage`. `BrowserTabState` in
 `MainWindow` contains UI state that Qt WebEngine does not provide as a single
 unit: loading progress, pending restored URL, history transition, TLS status,
-the custom rule accepted for the top-level origin, and an optional developer
-tools window.
+the custom rule accepted for the top-level origin, the persisted title and pin
+state, and an optional developer tools window. `BrowserTabBar` owns the visual
+pin marker, compact size, hidden close button, and pinned-group movement
+boundary; `MainWindow` mirrors every accepted tab move in the page stack.
 
 `MainWindow.cpp` is intentionally the orchestration layer. Parsing, policy,
 storage, and geometry calculations live in smaller classes so they can be unit
@@ -135,6 +137,14 @@ Background tabs restored from a previous session are lazy. Their URL is held in
 `BrowserTabState::pendingUrl` and loaded only when the tab becomes active. This
 reduces startup traffic and avoids immediately creating many authenticated
 sessions.
+
+Pinned tabs form one stable group at the left of the primary tab bar. Pinning
+or unpinning moves a tab to its corresponding boundary, and drag reordering is
+limited to the tab's current group. Pinning does not prevent an explicit close.
+Pinned tabs are saved and restored regardless of the startup preference; when
+the start-page mode is selected, only pinned tabs are restored from the session
+and the configured start page remains active. Popup and web-app windows do not
+expose pin controls.
 
 Popup tabs are not included in session restoration. Closing the last primary
 tab marks the session as intentionally discarded, clears `session.json`, and
@@ -680,7 +690,7 @@ directory.
 | `bookmarks.sqlite` | `BookmarkStore` | WAL-mode SQLite bookmarks with normalized URL and title fields for local lookup. |
 | `web-apps.json` | `WebAppStore` | Validated installed-app metadata and bounded page icons, atomically written. |
 | `~/Applications/PanBrowser Apps/*.app` | `WebAppShortcutManager` | macOS-only signed launchers; each deletion target is verified by its embedded app ID. |
-| `session.json` | `SessionStore` | Up to 30 restorable HTTP(S) tabs, atomically written. URL credentials are removed before persistence and again when legacy data is loaded. |
+| `session.json` | `SessionStore` | Version 2 stores up to 30 restorable HTTP(S) tabs with title and pin state, atomically written in canonical pinned-first order. Version 1 migrates with all tabs unpinned. URL credentials are removed before persistence and again when legacy data is loaded. |
 | `downloads.json` | `DownloadHistoryStore` | Up to 200 download records; paths and source host, not complete source URLs. |
 | native `QSettings` | `BrowserPreferences`, `PageZoom`, window/download UI | Start page, startup/cookie/history/language/developer-tools choices, per-origin page zoom, window geometry, last download directory, and pending data-reset marker. |
 
@@ -850,11 +860,12 @@ Primary-window startup is ordered as follows:
 8. create the UI and permission/authentication controllers;
 9. restore safe window geometry;
 10. reload runtime trust rules;
-11. restore command-line, start-page, or lazy session tabs.
+11. restore pinned tabs and then the start page, or restore the complete lazy
+    session when that startup mode is enabled.
 
-On close, the primary window saves or clears the tab session according to the
-startup preference, persists geometry, closes popups, destroys tab pages, and
-only then destroys shared browser resources.
+On close, the primary window always saves pinned tabs and includes regular tabs
+only when session restoration is enabled. It then persists geometry, closes
+popups, destroys tab pages, and only then destroys shared browser resources.
 
 ## 12. Build, packaging, and diagnostics
 

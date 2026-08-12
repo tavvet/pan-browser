@@ -48,8 +48,9 @@ test environments, and other deliberately scoped trust configurations.
   on Windows, and OpenSSL on Linux.
 - A dedicated WebEngine profile for cookies, storage, cache, history,
   bookmarks, downloads, and installed web apps.
-- Tabs, session restoration, popup handling, find in page, per-site page zoom,
-  local address completion, configurable search engines, and a download manager.
+- Movable and persistent pinned tabs, session restoration, popup handling,
+  find in page, per-site page zoom, local address completion, configurable
+  search engines, and a download manager.
 - Browser-owned prompts for camera, microphone, location, external schemes,
   HTTP Basic authentication, and HTTP proxy authentication.
 - Browser-wide System/Direct/HTTP/SOCKS5 proxy modes and configurable
@@ -314,6 +315,10 @@ WebEngine cookies and site data together with PanBrowser's session, download,
 history, bookmark, web-app, search, DNS, proxy, and trust configuration.
 The same directory contains `site-connections.json` with the opt-in firewall
 mode, global exceptions, and persistent source-to-target decisions.
+
+Pinned tabs are stored in `session.json` and reopen on every launch. Ordinary
+tabs are stored only when **Continue with previous tabs** is selected. Closing
+a pinned tab explicitly removes it from the next session.
 
 On macOS, application data is stored under:
 

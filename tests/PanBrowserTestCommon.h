@@ -7,6 +7,7 @@
 #include "BookmarkStore.h"
 #include "BrowserPreferences.h"
 #include "BrowserShortcut.h"
+#include "BrowserTabBar.h"
 #include "CrossDomainPresetCatalog.h"
 #include "CrossDomainPolicySnapshot.h"
 #include "CrossDomainPromptController.h"

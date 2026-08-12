@@ -65,6 +65,8 @@ set(PANBROWSER_APP_SOURCES
     src/BrowserInteraction.h
     src/BrowserShortcut.cpp
     src/BrowserShortcut.h
+    src/BrowserTabBar.cpp
+    src/BrowserTabBar.h
     src/BrowserPage.cpp
     src/BrowserPage.h
     src/PageZoom.cpp
@@ -347,6 +349,8 @@ qt_add_executable(PanBrowserTests
     src/BrowserInteraction.h
     src/BrowserShortcut.cpp
     src/BrowserShortcut.h
+    src/BrowserTabBar.cpp
+    src/BrowserTabBar.h
     src/PageZoom.cpp
     src/PageZoom.h
     src/CredentialPromptDialog.cpp

@@ -1,5 +1,9 @@
 #include "PanBrowserTestCommon.h"
 
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
+
 class PersistenceAndPolicyTests final : public QObject {
     Q_OBJECT
 
@@ -24,6 +28,7 @@ private slots:
     void bookmarkEditRejectsDuplicateAddress();
     void corruptBookmarksArePreservedAndDisabled();
     void sessionRoundTripFiltersInvalidUrls();
+    void oversizedSessionPrioritizesPinnedTabsWithinBound();
     void invalidSessionFileFailsClosed();
     void managedDataCleanupStaysInsideRoot();
     void downloadHistoryRoundTripAndLimit();
@@ -1057,11 +1062,11 @@ void PersistenceAndPolicyTests::sessionRoundTripFiltersInvalidUrls()
     SessionStore store(path);
 
     BrowserSession source;
-    source.activeIndex = 8;
+    source.activeIndex = 2;
     source.tabs = {
-        {QUrl(QStringLiteral("https://alice:secret@one.example/path")), QStringLiteral("One")},
+        {QUrl(QStringLiteral("https://alice:secret@one.example/path")), QStringLiteral("One"), false},
         {QUrl(QStringLiteral("file:///tmp/private")), QStringLiteral("Private")},
-        {QUrl(QStringLiteral("http://two.example")), QStringLiteral("Two")},
+        {QUrl(QStringLiteral("http://two.example")), QStringLiteral("Two"), true},
     };
 
     QString error;
@@ -1069,10 +1074,12 @@ void PersistenceAndPolicyTests::sessionRoundTripFiltersInvalidUrls()
     const BrowserSession restored = store.load(&error);
     QVERIFY2(error.isEmpty(), qPrintable(error));
     QCOMPARE(restored.tabs.size(), 2);
-    QCOMPARE(restored.tabs.at(0).title, QStringLiteral("One"));
-    QCOMPARE(restored.tabs.at(0).url, QUrl(QStringLiteral("https://one.example/path")));
-    QCOMPARE(restored.tabs.at(1).url, QUrl(QStringLiteral("http://two.example")));
-    QCOMPARE(restored.activeIndex, 1);
+    QCOMPARE(restored.tabs.at(0).title, QStringLiteral("Two"));
+    QCOMPARE(restored.tabs.at(0).url, QUrl(QStringLiteral("http://two.example")));
+    QVERIFY(restored.tabs.at(0).pinned);
+    QCOMPARE(restored.tabs.at(1).url, QUrl(QStringLiteral("https://one.example/path")));
+    QVERIFY(!restored.tabs.at(1).pinned);
+    QCOMPARE(restored.activeIndex, 0);
 
     QFile saved(path);
     QVERIFY(saved.open(QIODevice::ReadOnly));
@@ -1094,8 +1101,12 @@ void PersistenceAndPolicyTests::sessionRoundTripFiltersInvalidUrls()
         migrated.tabs.constFirst().url,
         QUrl(QStringLiteral("https://legacy.example/path"))
     );
+    QVERIFY(!migrated.tabs.constFirst().pinned);
     QVERIFY(saved.open(QIODevice::ReadOnly));
-    QVERIFY(!saved.readAll().contains("legacy-secret"));
+    const QByteArray migratedContents = saved.readAll();
+    QVERIFY(!migratedContents.contains("legacy-secret"));
+    QVERIFY(migratedContents.contains("\"version\": 2"));
+    QVERIFY(migratedContents.contains("\"pinned\": false"));
 }
 
 void PersistenceAndPolicyTests::invalidSessionFileFailsClosed()
@@ -1114,6 +1125,71 @@ void PersistenceAndPolicyTests::invalidSessionFileFailsClosed()
     QVERIFY(restored.tabs.isEmpty());
     QVERIFY(!error.isEmpty());
 
+    QVERIFY(file.open(QIODevice::WriteOnly | QIODevice::Truncate));
+    file.write(
+        R"json({"version":2,"activeIndex":0,"tabs":[{"url":"https://example.com","title":"Example"}]})json"
+    );
+    file.close();
+
+    error.clear();
+    const BrowserSession missingPinState = store.load(&error);
+    QVERIFY(missingPinState.tabs.isEmpty());
+    QVERIFY(!error.isEmpty());
+
+    QVERIFY(file.open(QIODevice::WriteOnly | QIODevice::Truncate));
+    file.write(
+        R"json({"version":2,"activeIndex":-2147483648,"tabs":[{"url":"https://example.com","title":"Example","pinned":false}]})json"
+    );
+    file.close();
+
+    error.clear();
+    const BrowserSession extremeActiveIndex = store.load(&error);
+    QVERIFY2(error.isEmpty(), qPrintable(error));
+    QCOMPARE(extremeActiveIndex.tabs.size(), 1);
+    QCOMPARE(extremeActiveIndex.activeIndex, 0);
+}
+
+void PersistenceAndPolicyTests::oversizedSessionPrioritizesPinnedTabsWithinBound()
+{
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+    const QString path = directory.filePath(QStringLiteral("session.json"));
+
+    QJsonArray tabs;
+    for (int index = 0; index < 40; ++index) {
+        tabs.append(QJsonObject{
+            {QStringLiteral("url"), QStringLiteral("https://regular-%1.example").arg(index)},
+            {QStringLiteral("title"), QStringLiteral("Regular %1").arg(index)},
+            {QStringLiteral("pinned"), false},
+        });
+    }
+    tabs.append(QJsonObject{
+        {QStringLiteral("url"), QStringLiteral("https://pinned.example")},
+        {QStringLiteral("title"), QStringLiteral("Pinned")},
+        {QStringLiteral("pinned"), true},
+    });
+    QFile file(path);
+    QVERIFY(file.open(QIODevice::WriteOnly));
+    const QByteArray contents = QJsonDocument(QJsonObject{
+        {QStringLiteral("version"), 2},
+        {QStringLiteral("activeIndex"), 40},
+        {QStringLiteral("tabs"), tabs},
+    }).toJson();
+    QCOMPARE(file.write(contents), contents.size());
+    file.close();
+
+    SessionStore store(path);
+    QString error;
+    const BrowserSession restored = store.load(&error);
+    QVERIFY2(error.isEmpty(), qPrintable(error));
+    QCOMPARE(restored.tabs.size(), 30);
+    QCOMPARE(restored.tabs.constFirst().url, QUrl(QStringLiteral("https://pinned.example")));
+    QVERIFY(restored.tabs.constFirst().pinned);
+    QCOMPARE(restored.activeIndex, 0);
+
+    QVERIFY(file.open(QIODevice::ReadOnly));
+    const QJsonDocument rewritten = QJsonDocument::fromJson(file.readAll());
+    QCOMPARE(rewritten.object().value(QStringLiteral("tabs")).toArray().size(), 30);
 }
 
 void PersistenceAndPolicyTests::managedDataCleanupStaysInsideRoot()

@@ -13,6 +13,8 @@ portable web-app integration, and safe transfer of trust configuration.
   an Inspect Element context action, and platform-appropriate shortcuts.
 - Added page zoom from the application menu, keyboard, mouse wheel, and
   trackpad, with discrete levels and per-origin persistence.
+- Added compact pinned tabs with constrained group reordering and restoration
+  on every browser launch, independent of ordinary session-tab settings.
 
 ## 0.1.0 — 2026-08-10
 

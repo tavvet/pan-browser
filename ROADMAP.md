@@ -8,6 +8,8 @@ may be unstable.
 
 ### Browser polish
 
+- [x] Add compact pinned tabs with a left-side group, constrained reordering,
+  context-menu controls, and startup-independent session restoration.
 - [x] Add opt-in developer tools that default to disabled and expose both
   Inspect Element and keyboard shortcuts only while enabled.
 - [ ] Complete favicon support: persist icons received from WebEngine and show

@@ -7,6 +7,7 @@
 struct SessionTab {
     QUrl url;
     QString title;
+    bool pinned = false;
 };
 
 struct BrowserSession {
