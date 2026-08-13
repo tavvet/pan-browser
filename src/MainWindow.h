@@ -14,6 +14,7 @@
 #include <QList>
 #include <QMainWindow>
 #include <QPointer>
+#include <QSize>
 #include <QString>
 
 #include <memory>
@@ -101,6 +102,7 @@ private:
         qint64 videoPopoutRequestDeadlineMs = 0;
         quint64 videoPopoutRequestSerial = 0;
         QUrl videoPopoutRequestOrigin;
+        QSize videoPopoutRequestSize = QSize(16, 9);
         QUrl topLevelUrl;
         QUrl pendingUrl;
         HistoryTransition pendingHistoryTransition = HistoryTransition::Other;
@@ -171,7 +173,11 @@ private:
         QWebEngineFullScreenRequest request
     );
     void exitBrowserFullScreen(QWebEngineView *webView);
-    void detachVideo(QWebEngineView *webView, const QUrl &origin);
+    void detachVideo(
+        QWebEngineView *webView,
+        const QUrl &origin,
+        const QSize &videoSize
+    );
     void requestDetachedVideoReturn(QWebEngineView *webView);
     void restoreDetachedVideo(QWebEngineView *webView);
     void restoreAllDetachedVideos();

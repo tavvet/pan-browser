@@ -2,6 +2,7 @@
 
 #include "WebAppStore.h"
 
+#include <QSize>
 #include <QWebEnginePage>
 
 #include <optional>
@@ -24,7 +25,7 @@ signals:
     void externalUrlRequested(const QUrl &url);
     void outOfScopeNavigationRequested(const QUrl &url, int navigationType);
     void mainFrameNavigationRequested(const QUrl &url, int navigationType);
-    void videoPopoutRequested(const QUrl &frameUrl);
+    void videoPopoutRequested(const QUrl &frameUrl, const QSize &videoSize);
     void webAppManifestFetched(
         const QString &requestId,
         const QByteArray &contents,

@@ -18,7 +18,8 @@ portable web-app integration, and safe transfer of trust configuration.
 - Separated normal page fullscreen from the explicit video pop-out action;
   videos can now be opened in a frameless, resizable, always-on-top window from
   a browser-provided overlay button. The window exposes a hover close control
-  and can be dragged from its content.
+  and can be dragged from its content; its initial size and subsequent resizing
+  preserve the selected video's intrinsic aspect ratio.
 
 ## 0.1.0 — 2026-08-10
 

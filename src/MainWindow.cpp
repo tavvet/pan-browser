@@ -1741,6 +1741,7 @@ void MainWindow::connectBrowserSignals(QWebEngineView *webView)
         ++state.videoPopoutRequestSerial;
         state.videoPopoutRequestDeadlineMs = 0;
         state.videoPopoutRequestOrigin = QUrl();
+        state.videoPopoutRequestSize = QSize(16, 9);
         state.previousTrustStatus = state.trustStatus;
         state.previousTrustError = state.trustError;
         state.previousAcceptedRule = state.lastAcceptedRule;
@@ -1892,7 +1893,7 @@ void MainWindow::connectBrowserSignals(QWebEngineView *webView)
         static_cast<BrowserPage *>(page),
         &BrowserPage::videoPopoutRequested,
         this,
-        [this, webView](const QUrl &frameUrl) {
+        [this, webView](const QUrl &frameUrl, const QSize &videoSize) {
             auto state = m_tabStates.find(webView);
             if (state == m_tabStates.end()
                 || !isTabInteractionActive(webView)
@@ -1905,6 +1906,7 @@ void MainWindow::connectBrowserSignals(QWebEngineView *webView)
             state->videoPopoutRequestDeadlineMs =
                 QDateTime::currentMSecsSinceEpoch() + 2500;
             state->videoPopoutRequestOrigin = frameUrl;
+            state->videoPopoutRequestSize = videoSize;
             const QPointer<MainWindow> window(this);
             const QPointer<QWebEngineView> target(webView);
             QTimer::singleShot(2600, this, [window, target, requestSerial] {
@@ -1918,6 +1920,7 @@ void MainWindow::connectBrowserSignals(QWebEngineView *webView)
                 }
                 state->videoPopoutRequestDeadlineMs = 0;
                 state->videoPopoutRequestOrigin = QUrl();
+                state->videoPopoutRequestSize = QSize(16, 9);
                 window->statusBar()->showMessage(
                     QCoreApplication::translate(
                         "MainWindow",
@@ -2034,9 +2037,11 @@ void MainWindow::handleFullScreenRequest(
     const bool videoPopoutRequested = request.toggleOn()
         && state->videoPopoutRequestDeadlineMs >= now
         && isSameWebOrigin(state->videoPopoutRequestOrigin, request.origin());
+    const QSize requestedVideoSize = state->videoPopoutRequestSize;
     if (request.toggleOn() && state->videoPopoutRequestDeadlineMs != 0) {
         state->videoPopoutRequestDeadlineMs = 0;
         state->videoPopoutRequestOrigin = QUrl();
+        state->videoPopoutRequestSize = QSize(16, 9);
     }
     const bool browserFullScreenActive = m_fullScreenController
         && m_fullScreenController->isActive();
@@ -2064,7 +2069,7 @@ void MainWindow::handleFullScreenRequest(
         return;
     case FullScreenRequestAction::DetachVideo:
         request.accept();
-        detachVideo(webView, decision.origin);
+        detachVideo(webView, decision.origin, requestedVideoSize);
         return;
     case FullScreenRequestAction::RestoreBrowserFullScreen:
         request.accept();
@@ -2089,7 +2094,11 @@ void MainWindow::exitBrowserFullScreen(QWebEngineView *webView)
         webView->setFocus(Qt::OtherFocusReason);
 }
 
-void MainWindow::detachVideo(QWebEngineView *webView, const QUrl &origin)
+void MainWindow::detachVideo(
+    QWebEngineView *webView,
+    const QUrl &origin,
+    const QSize &videoSize
+)
 {
     if (!webView || !m_tabStates.contains(webView))
         return;
@@ -2108,7 +2117,8 @@ void MainWindow::detachVideo(QWebEngineView *webView, const QUrl &origin)
 
     auto *window = new DetachedVideoWindow(
         webView,
-        tr("Video — %1").arg(originText)
+        tr("Video — %1").arg(originText),
+        videoSize
     );
     auto *placeholder = new DetachedVideoPlaceholder(
         webView,

@@ -168,9 +168,20 @@ QString overlayScript(
         }
         event.preventDefault();
         event.stopPropagation();
+        const videoRect = currentVideo.getBoundingClientRect();
+        const intrinsicWidth = Number(currentVideo.videoWidth);
+        const intrinsicHeight = Number(currentVideo.videoHeight);
+        const videoWidth = Number.isFinite(intrinsicWidth) && intrinsicWidth > 0
+            ? Math.round(intrinsicWidth)
+            : Math.max(1, Math.round(videoRect.width));
+        const videoHeight = Number.isFinite(intrinsicHeight) && intrinsicHeight > 0
+            ? Math.round(intrinsicHeight)
+            : Math.max(1, Math.round(videoRect.height));
         console.info(messagePrefix + JSON.stringify({
             token,
-            url: location.href
+            url: location.href,
+            videoWidth,
+            videoHeight
         }));
         try {
             const result = currentVideo.requestFullscreen();

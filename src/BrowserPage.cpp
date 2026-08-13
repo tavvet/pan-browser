@@ -16,6 +16,7 @@ const QString videoPopoutMessagePrefix = QStringLiteral(
     "__PANBROWSER_VIDEO_POPOUT_REQUEST__"
 );
 constexpr qsizetype maximumVideoPopoutMessageLength = 2048;
+constexpr int maximumVideoDimension = 32768;
 
 QString javaScriptString(const QString &value)
 {
@@ -202,7 +203,16 @@ void BrowserPage::javaScriptConsoleMessage(
             || (scheme != QStringLiteral("http") && scheme != QStringLiteral("https"))) {
             return;
         }
-        emit videoPopoutRequested(frameUrl);
+        const int videoWidth = object.value(QStringLiteral("videoWidth")).toInt();
+        const int videoHeight = object.value(QStringLiteral("videoHeight")).toInt();
+        const QSize videoSize(
+            qBound(1, videoWidth, maximumVideoDimension),
+            qBound(1, videoHeight, maximumVideoDimension)
+        );
+        emit videoPopoutRequested(
+            frameUrl,
+            videoWidth > 0 && videoHeight > 0 ? videoSize : QSize(16, 9)
+        );
         return;
     }
 

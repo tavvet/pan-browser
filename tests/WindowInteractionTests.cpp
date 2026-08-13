@@ -24,6 +24,7 @@ private slots:
     void browserFullScreenRestoresWindowChrome();
     void detachedVideoSessionCoordinatesReturnAndFallback();
     void detachedVideoWindowMovesAndRestoresPage();
+    void detachedVideoWindowPreservesAspectRatioWhenResized();
     void detachedVideoWindowCloseRequestsReturn();
     void popupGeometryIsVisibleAndUsable();
     void crossDomainPromptRoutesOnlyMatchingPageIdentities();
@@ -1013,12 +1014,15 @@ void WindowInteractionTests::videoElementBridgeUsesTrustedOverlayClick()
 
     QStringList eventOrder;
     QUrl requestedFrameUrl;
+    QSize requestedVideoSize;
     connect(page, &BrowserPage::videoPopoutRequested, &view, [
         &eventOrder,
-        &requestedFrameUrl
-    ](const QUrl &frameUrl) {
+        &requestedFrameUrl,
+        &requestedVideoSize
+    ](const QUrl &frameUrl, const QSize &videoSize) {
         eventOrder.append(QStringLiteral("bridge"));
         requestedFrameUrl = frameUrl;
+        requestedVideoSize = videoSize;
     });
     connect(
         page,
@@ -1155,6 +1159,7 @@ globalThis.__panBrowserVideoPopoutController.showFor(
         QStringList({QStringLiteral("bridge"), QStringLiteral("fullscreen")})
     );
     QCOMPARE(requestedFrameUrl.host(), QStringLiteral("video.example"));
+    QCOMPARE(requestedVideoSize, QSize(320, 180));
 }
 
 void WindowInteractionTests::detachedVideoSessionCoordinatesReturnAndFallback()
@@ -1331,6 +1336,55 @@ void WindowInteractionTests::detachedVideoWindowCloseRequestsReturn()
 
     detachedWindow.restorePage();
     QCOMPARE(sourceView.page(), originalPage);
+}
+
+void WindowInteractionTests::detachedVideoWindowPreservesAspectRatioWhenResized()
+{
+    QWebEngineView sourceView;
+    DetachedVideoWindow detachedWindow(
+        &sourceView,
+        QStringLiteral("Video — https://example.com"),
+        QSize(4, 3)
+    );
+    detachedWindow.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&detachedWindow, 3000));
+    QCOMPARE(detachedWindow.width() * 3, detachedWindow.height() * 4);
+
+    QWebEngineView *webView = detachedWindow.webView();
+    const QPoint localPress(webView->width() - 1, webView->height() / 2);
+    const QPoint globalPress = webView->mapToGlobal(localPress);
+    const QPoint resizeDelta(120, 0);
+    QMouseEvent pressEvent(
+        QEvent::MouseButtonPress,
+        QPointF(localPress),
+        QPointF(localPress),
+        QPointF(globalPress),
+        Qt::LeftButton,
+        Qt::LeftButton,
+        Qt::NoModifier
+    );
+    QApplication::sendEvent(webView, &pressEvent);
+    QMouseEvent moveEvent(
+        QEvent::MouseMove,
+        QPointF(localPress + resizeDelta),
+        QPointF(localPress + resizeDelta),
+        QPointF(globalPress + resizeDelta),
+        Qt::NoButton,
+        Qt::LeftButton,
+        Qt::NoModifier
+    );
+    QApplication::sendEvent(webView, &moveEvent);
+    QCOMPARE(detachedWindow.width() * 3, detachedWindow.height() * 4);
+    QMouseEvent releaseEvent(
+        QEvent::MouseButtonRelease,
+        QPointF(localPress + resizeDelta),
+        QPointF(localPress + resizeDelta),
+        QPointF(globalPress + resizeDelta),
+        Qt::LeftButton,
+        Qt::NoButton,
+        Qt::NoModifier
+    );
+    QApplication::sendEvent(webView, &releaseEvent);
 }
 
 void WindowInteractionTests::popupGeometryIsVisibleAndUsable()

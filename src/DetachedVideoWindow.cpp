@@ -1,5 +1,7 @@
 #include "DetachedVideoWindow.h"
 
+#include "WindowChromePlatform.h"
+
 #include <QApplication>
 #include <QCloseEvent>
 #include <QEvent>
@@ -14,13 +16,14 @@
 #include <QToolButton>
 #include <QVBoxLayout>
 #include <QWebEngineView>
-#include <QWindow>
 
 namespace {
 
 constexpr int closeButtonSize = 36;
 constexpr int closeButtonMargin = 8;
 constexpr int resizeBorderWidth = 6;
+constexpr int minimumVideoLongSide = 240;
+constexpr int minimumVideoShortSide = 135;
 
 } // namespace
 
@@ -83,6 +86,7 @@ bool DetachedVideoPlaceholder::eventFilter(QObject *watched, QEvent *event)
 DetachedVideoWindow::DetachedVideoWindow(
     QWebEngineView *sourceView,
     const QString &windowTitle,
+    const QSize &videoSize,
     QWidget *parent
 )
     : QMainWindow(
@@ -91,9 +95,31 @@ DetachedVideoWindow::DetachedVideoWindow(
       )
     , m_sourceView(sourceView)
 {
+    if (videoSize.width() > 0 && videoSize.height() > 0)
+        m_videoAspectRatio = static_cast<double>(videoSize.width()) / videoSize.height();
     setObjectName(QStringLiteral("detachedVideoWindow"));
     setAttribute(Qt::WA_DeleteOnClose, false);
-    setMinimumSize(240, 135);
+    QSize minimumSize;
+    if (m_videoAspectRatio >= 1.0) {
+        const int minimumWidth = qMax(
+            minimumVideoLongSide,
+            qRound(minimumVideoShortSide * m_videoAspectRatio)
+        );
+        minimumSize = QSize(
+            minimumWidth,
+            qRound(minimumWidth / m_videoAspectRatio)
+        );
+    } else {
+        const int minimumHeight = qMax(
+            minimumVideoLongSide,
+            qRound(minimumVideoShortSide / m_videoAspectRatio)
+        );
+        minimumSize = QSize(
+            qRound(minimumHeight * m_videoAspectRatio),
+            minimumHeight
+        );
+    }
+    setMinimumSize(minimumSize);
     setWindowTitle(windowTitle);
     if (sourceView)
         setWindowIcon(sourceView->window()->windowIcon());
@@ -136,7 +162,7 @@ DetachedVideoWindow::DetachedVideoWindow(
     const QRect available = targetScreen
         ? targetScreen->availableGeometry()
         : QRect(0, 0, 1280, 720);
-    QSize initialSize(960, 540);
+    QSize initialSize = constrainedSize(960, 540, m_videoAspectRatio >= 16.0 / 9.0);
     const QSize availableSize(
         qMax(1, available.width() * 4 / 5),
         qMax(1, available.height() * 4 / 5)
@@ -163,6 +189,10 @@ DetachedVideoWindow::DetachedVideoWindow(
         ));
     }
     setGeometry(initialGeometry);
+    configurePlatformWindowAspectRatio(
+        this,
+        videoSize.isValid() ? videoSize : QSize(16, 9)
+    );
     updateCloseButtonGeometry();
 
     qApp->installEventFilter(this);
@@ -251,11 +281,6 @@ bool DetachedVideoWindow::eventFilter(QObject *watched, QEvent *event)
         else if (localPosition.y() >= height() - resizeBorderWidth)
             resizeEdges |= Qt::BottomEdge;
         if (resizeEdges != Qt::Edges()) {
-            QWindow *handle = windowHandle();
-            if (handle && handle->startSystemResize(resizeEdges)) {
-                mouseEvent->accept();
-                return true;
-            }
             m_resizing = true;
             m_resizeEdges = resizeEdges;
             m_dragPressGlobal = globalPosition;
@@ -272,31 +297,7 @@ bool DetachedVideoWindow::eventFilter(QObject *watched, QEvent *event)
 
     if (type == QEvent::MouseMove) {
         if (m_resizing && (mouseEvent->buttons() & Qt::LeftButton)) {
-            const QPoint delta = globalPosition - m_dragPressGlobal;
-            QRect resized = m_resizeStartGeometry;
-            if (m_resizeEdges.testFlag(Qt::LeftEdge)) {
-                resized.setLeft(qMin(
-                    resized.right() - minimumWidth() + 1,
-                    m_resizeStartGeometry.left() + delta.x()
-                ));
-            } else if (m_resizeEdges.testFlag(Qt::RightEdge)) {
-                resized.setRight(qMax(
-                    resized.left() + minimumWidth() - 1,
-                    m_resizeStartGeometry.right() + delta.x()
-                ));
-            }
-            if (m_resizeEdges.testFlag(Qt::TopEdge)) {
-                resized.setTop(qMin(
-                    resized.bottom() - minimumHeight() + 1,
-                    m_resizeStartGeometry.top() + delta.y()
-                ));
-            } else if (m_resizeEdges.testFlag(Qt::BottomEdge)) {
-                resized.setBottom(qMax(
-                    resized.top() + minimumHeight() - 1,
-                    m_resizeStartGeometry.bottom() + delta.y()
-                ));
-            }
-            setGeometry(resized);
+            setGeometry(constrainedResizeGeometry(globalPosition));
             mouseEvent->accept();
             return true;
         }
@@ -334,6 +335,97 @@ bool DetachedVideoWindow::eventFilter(QObject *watched, QEvent *event)
         return true;
     }
     return QMainWindow::eventFilter(watched, event);
+}
+
+QRect DetachedVideoWindow::constrainedResizeGeometry(const QPoint &globalPosition) const
+{
+    const QPoint delta = globalPosition - m_dragPressGlobal;
+    const bool horizontal = m_resizeEdges.testFlag(Qt::LeftEdge)
+        || m_resizeEdges.testFlag(Qt::RightEdge);
+    const bool vertical = m_resizeEdges.testFlag(Qt::TopEdge)
+        || m_resizeEdges.testFlag(Qt::BottomEdge);
+
+    int requestedWidth = m_resizeStartGeometry.width();
+    int requestedHeight = m_resizeStartGeometry.height();
+    if (m_resizeEdges.testFlag(Qt::LeftEdge))
+        requestedWidth -= delta.x();
+    else if (m_resizeEdges.testFlag(Qt::RightEdge))
+        requestedWidth += delta.x();
+    if (m_resizeEdges.testFlag(Qt::TopEdge))
+        requestedHeight -= delta.y();
+    else if (m_resizeEdges.testFlag(Qt::BottomEdge))
+        requestedHeight += delta.y();
+
+    bool widthDriven = horizontal && !vertical;
+    if (horizontal && vertical) {
+        const double relativeWidthChange = qAbs(
+            static_cast<double>(requestedWidth - m_resizeStartGeometry.width())
+            / qMax(1, m_resizeStartGeometry.width())
+        );
+        const double relativeHeightChange = qAbs(
+            static_cast<double>(requestedHeight - m_resizeStartGeometry.height())
+            / qMax(1, m_resizeStartGeometry.height())
+        );
+        widthDriven = relativeWidthChange >= relativeHeightChange;
+    }
+
+    const QSize resizedSize = constrainedSize(
+        requestedWidth,
+        requestedHeight,
+        widthDriven
+    );
+    QPoint topLeft = m_resizeStartGeometry.topLeft();
+    if (m_resizeEdges.testFlag(Qt::LeftEdge)) {
+        topLeft.setX(
+            m_resizeStartGeometry.x()
+            + m_resizeStartGeometry.width()
+            - resizedSize.width()
+        );
+    } else if (!m_resizeEdges.testFlag(Qt::RightEdge)) {
+        topLeft.setX(
+            m_resizeStartGeometry.x()
+            + (m_resizeStartGeometry.width() - resizedSize.width()) / 2
+        );
+    }
+    if (m_resizeEdges.testFlag(Qt::TopEdge)) {
+        topLeft.setY(
+            m_resizeStartGeometry.y()
+            + m_resizeStartGeometry.height()
+            - resizedSize.height()
+        );
+    } else if (!m_resizeEdges.testFlag(Qt::BottomEdge)) {
+        topLeft.setY(
+            m_resizeStartGeometry.y()
+            + (m_resizeStartGeometry.height() - resizedSize.height()) / 2
+        );
+    }
+    return QRect(topLeft, resizedSize);
+}
+
+QSize DetachedVideoWindow::constrainedSize(
+    int width,
+    int height,
+    bool widthDriven
+) const
+{
+    int constrainedWidth = width;
+    int constrainedHeight = height;
+    if (widthDriven) {
+        constrainedWidth = qMax(minimumWidth(), constrainedWidth);
+        constrainedHeight = qRound(constrainedWidth / m_videoAspectRatio);
+        if (constrainedHeight < minimumHeight()) {
+            constrainedHeight = minimumHeight();
+            constrainedWidth = qRound(constrainedHeight * m_videoAspectRatio);
+        }
+    } else {
+        constrainedHeight = qMax(minimumHeight(), constrainedHeight);
+        constrainedWidth = qRound(constrainedHeight * m_videoAspectRatio);
+        if (constrainedWidth < minimumWidth()) {
+            constrainedWidth = minimumWidth();
+            constrainedHeight = qRound(constrainedWidth / m_videoAspectRatio);
+        }
+    }
+    return QSize(qMax(1, constrainedWidth), qMax(1, constrainedHeight));
 }
 
 void DetachedVideoWindow::updateCloseButtonGeometry()

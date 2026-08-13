@@ -3,6 +3,7 @@
 #include <QFrame>
 #include <QMainWindow>
 #include <QPointer>
+#include <QSize>
 
 class QCloseEvent;
 class QEvent;
@@ -38,6 +39,7 @@ public:
     DetachedVideoWindow(
         QWebEngineView *sourceView,
         const QString &windowTitle,
+        const QSize &videoSize = QSize(16, 9),
         QWidget *parent = nullptr
     );
     ~DetachedVideoWindow() override;
@@ -57,6 +59,8 @@ protected:
 private:
     void updateCloseButtonGeometry();
     void setCloseButtonVisible(bool visible);
+    [[nodiscard]] QRect constrainedResizeGeometry(const QPoint &globalPosition) const;
+    [[nodiscard]] QSize constrainedSize(int width, int height, bool widthDriven) const;
 
     QPointer<QWebEngineView> m_sourceView;
     QWebEngineView *m_webView = nullptr;
@@ -65,6 +69,7 @@ private:
     QPoint m_dragStartPosition;
     QRect m_resizeStartGeometry;
     Qt::Edges m_resizeEdges;
+    double m_videoAspectRatio = 16.0 / 9.0;
     bool m_pageRestored = false;
     bool m_dragCandidate = false;
     bool m_dragging = false;

@@ -113,8 +113,12 @@ video pop-out an always-on-top surface by default on every supported platform.
 It is frameless and contains only the WebEngine view plus a native close button
 shown while the pointer is inside the window. Dragging beyond the platform drag
 threshold moves the window from any content point, while a short click remains
-available to the video's own controls; edge presses delegate native resizing to
-`QWindow::startSystemResize()`.
+available to the video's own controls. The bridge reports intrinsic video
+dimensions with the trusted request, falling back to the rendered element size
+and then 16:9. `DetachedVideoWindow` uses that ratio for its initial geometry
+and its Qt-controlled edge or corner resize path. On macOS the platform layer
+also applies `NSWindow.contentAspectRatio`, because AppKit can intercept a live
+window-edge resize before Qt receives content mouse events.
 
 `MainWindow.cpp` is intentionally the orchestration layer. Parsing, policy,
 storage, and geometry calculations live in smaller classes so they can be unit

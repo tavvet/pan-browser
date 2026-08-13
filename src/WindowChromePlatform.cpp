@@ -4,6 +4,10 @@ void configurePlatformIntegratedTitleBar(QWidget *)
 {
 }
 
+void configurePlatformWindowAspectRatio(QWidget *, const QSize &)
+{
+}
+
 QMargins platformTitleBarControlMargins(QWidget *)
 {
     return {};

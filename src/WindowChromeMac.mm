@@ -30,6 +30,20 @@ void configurePlatformIntegratedTitleBar(QWidget *widget)
     [window setStyleMask:[window styleMask] | NSWindowStyleMaskFullSizeContentView];
 }
 
+void configurePlatformWindowAspectRatio(QWidget *widget, const QSize &aspectRatio)
+{
+    if (aspectRatio.width() <= 0 || aspectRatio.height() <= 0)
+        return;
+
+    NSWindow *window = nativeWindow(widget);
+    if (!window)
+        return;
+    [window setContentAspectRatio:NSMakeSize(
+        static_cast<CGFloat>(aspectRatio.width()),
+        static_cast<CGFloat>(aspectRatio.height())
+    )];
+}
+
 QMargins platformTitleBarControlMargins(QWidget *widget)
 {
     NSWindow *window = nativeWindow(widget);
