@@ -294,6 +294,11 @@ bool DetachedVideoWindow::eventFilter(QObject *watched, QEvent *event)
     }
 
     const QEvent::Type type = event->type();
+    if (watched == this
+        && (type == QEvent::Leave || type == QEvent::WindowDeactivate)) {
+        setCloseButtonVisible(false);
+        return QMainWindow::eventFilter(watched, event);
+    }
     if (type != QEvent::MouseMove
         && type != QEvent::MouseButtonPress
         && type != QEvent::MouseButtonRelease) {

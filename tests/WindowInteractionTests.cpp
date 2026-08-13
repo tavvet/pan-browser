@@ -1325,6 +1325,18 @@ void WindowInteractionTests::detachedVideoWindowMovesAndRestoresPage()
         QApplication::sendEvent(detachedWindow.webView(), &hoverEvent);
         QVERIFY(closeButton->isVisible());
 
+        QEvent leaveEvent(QEvent::Leave);
+        QApplication::sendEvent(&detachedWindow, &leaveEvent);
+        QVERIFY(closeButton->isHidden());
+        QApplication::sendEvent(detachedWindow.webView(), &hoverEvent);
+        QVERIFY(closeButton->isVisible());
+
+        QEvent deactivateEvent(QEvent::WindowDeactivate);
+        QApplication::sendEvent(&detachedWindow, &deactivateEvent);
+        QVERIFY(closeButton->isHidden());
+        QApplication::sendEvent(detachedWindow.webView(), &hoverEvent);
+        QVERIFY(closeButton->isVisible());
+
         const QPoint dragStartPosition = detachedWindow.pos();
         const QPoint localPress = detachedWindow.webView()->rect().center();
         const QPoint globalPress = detachedWindow.webView()->mapToGlobal(localPress);
