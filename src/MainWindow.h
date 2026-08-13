@@ -173,6 +173,7 @@ private:
         QWebEngineFullScreenRequest request
     );
     void exitBrowserFullScreen(QWebEngineView *webView);
+    void requestBrowserFullScreenExit(QWebEngineView *webView);
     void detachVideo(
         QWebEngineView *webView,
         const QUrl &origin,
@@ -272,6 +273,8 @@ private:
     QPointer<QWebEngineView> m_findView;
     QPointer<QWebEngineView> m_lastInteractionWebView;
     std::unique_ptr<BrowserFullScreenController> m_fullScreenController;
+    QHash<QWebEngineView *, quint64> m_expectedBrowserFullScreenExits;
+    quint64 m_browserFullScreenExitSerial = 0;
     BrowserTabBar *m_tabBar = nullptr;
     QStackedWidget *m_tabStack = nullptr;
     AddressLineEdit *m_address = nullptr;

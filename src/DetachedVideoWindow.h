@@ -69,6 +69,7 @@ private:
     QPoint m_dragStartPosition;
     QRect m_resizeStartGeometry;
     Qt::Edges m_resizeEdges;
+    QSize m_videoAspectSize = QSize(16, 9);
     double m_videoAspectRatio = 16.0 / 9.0;
     bool m_pageRestored = false;
     bool m_dragCandidate = false;

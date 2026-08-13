@@ -101,10 +101,14 @@ boundary; `MainWindow` mirrors every accepted tab move in the page stack.
 Normal Fullscreen API requests and video pop-out are deliberately separate.
 `BrowserFullScreenController` keeps the page in its original view, hides only
 the browser chrome, and restores the previous visibility and window state on
-exit. `VideoElementBridge` injects an isolated, browser-provided button over a
-video while the pointer is on it. A trusted click carries a per-page random
-capability through `BrowserPage` and issues a short-lived, tab-bound fullscreen
-request for that video. Only this marked request is routed through the existing
+exit. Browser-initiated exits retain ownership until WebEngine acknowledges the
+`toggleOff` request; a timeout restores the window without rejecting a late
+acknowledgement. The controller also observes native window-state changes so a
+platform fullscreen control follows the same exit path. `VideoElementBridge`
+injects an isolated, browser-provided button over a video while the pointer is
+on it. A trusted click carries a per-page random capability through
+`BrowserPage` and issues a short-lived, tab-bound fullscreen request for that
+video. Only this marked request is routed through the existing
 `DetachedVideoSession` and `DetachedVideoWindow` page-transfer path. Navigation,
 tab closure, expiry, or a mismatched request clears the capability, so page
 scripts and ordinary site fullscreen requests cannot be mistaken for a pop-out
@@ -115,10 +119,12 @@ shown while the pointer is inside the window. Dragging beyond the platform drag
 threshold moves the window from any content point, while a short click remains
 available to the video's own controls. The bridge reports intrinsic video
 dimensions with the trusted request, falling back to the rendered element size
-and then 16:9. `DetachedVideoWindow` uses that ratio for its initial geometry
-and its Qt-controlled edge or corner resize path. On macOS the platform layer
-also applies `NSWindow.contentAspectRatio`, because AppKit can intercept a live
-window-edge resize before Qt receives content mouse events.
+and then 16:9. Ratios are bounded to 1:4 through 4:1 at both the message and
+window boundaries to prevent hostile or malformed media metadata from creating
+an unusable surface. `DetachedVideoWindow` uses the resulting ratio for its
+initial geometry and its Qt-controlled edge or corner resize path. On macOS the
+platform layer also applies `NSWindow.contentAspectRatio`, because AppKit can
+intercept a live window-edge resize before Qt receives content mouse events.
 
 `MainWindow.cpp` is intentionally the orchestration layer. Parsing, policy,
 storage, and geometry calculations live in smaller classes so they can be unit

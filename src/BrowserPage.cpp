@@ -17,11 +17,34 @@ const QString videoPopoutMessagePrefix = QStringLiteral(
 );
 constexpr qsizetype maximumVideoPopoutMessageLength = 2048;
 constexpr int maximumVideoDimension = 32768;
+constexpr double minimumVideoAspectRatio = 1.0 / 4.0;
+constexpr double maximumVideoAspectRatio = 4.0;
 
 QString javaScriptString(const QString &value)
 {
     const QByteArray array = QJsonDocument(QJsonArray{value}).toJson(QJsonDocument::Compact);
     return QString::fromUtf8(array.mid(1, array.size() - 2));
+}
+
+QSize sanitizedVideoSize(int width, int height)
+{
+    if (width <= 0 || height <= 0)
+        return QSize(16, 9);
+
+    const double aspectRatio = static_cast<double>(width) / height;
+    if (aspectRatio < minimumVideoAspectRatio)
+        return QSize(1, 4);
+    if (aspectRatio > maximumVideoAspectRatio)
+        return QSize(4, 1);
+
+    const double scale = qMin(
+        1.0,
+        static_cast<double>(maximumVideoDimension) / qMax(width, height)
+    );
+    return QSize(
+        qMax(1, qRound(width * scale)),
+        qMax(1, qRound(height * scale))
+    );
 }
 
 } // namespace
@@ -205,13 +228,9 @@ void BrowserPage::javaScriptConsoleMessage(
         }
         const int videoWidth = object.value(QStringLiteral("videoWidth")).toInt();
         const int videoHeight = object.value(QStringLiteral("videoHeight")).toInt();
-        const QSize videoSize(
-            qBound(1, videoWidth, maximumVideoDimension),
-            qBound(1, videoHeight, maximumVideoDimension)
-        );
         emit videoPopoutRequested(
             frameUrl,
-            videoWidth > 0 && videoHeight > 0 ? videoSize : QSize(16, 9)
+            sanitizedVideoSize(videoWidth, videoHeight)
         );
         return;
     }

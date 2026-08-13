@@ -938,7 +938,7 @@ void WindowInteractionTests::fullScreenRequestPolicyValidatesOriginAndState()
         FullScreenRequestAction::RestoreDetachedVideo
     );
     QCOMPARE(
-        decideFullScreenRequest(false, false, false, false, true, true, QUrl()).action,
+        decideFullScreenRequest(false, false, false, false, false, true, QUrl()).action,
         FullScreenRequestAction::RestoreBrowserFullScreen
     );
     QCOMPARE(
@@ -991,6 +991,26 @@ void WindowInteractionTests::browserFullScreenRestoresWindowChrome()
     QVERIFY(window.statusBar()->isVisible());
     QCOMPARE(menuBar->isVisible(), menuBarWasVisible);
 
+    int nativeExitRequestCount = 0;
+    connect(
+        &controller,
+        &BrowserFullScreenController::nativeExitRequested,
+        &window,
+        [&controller, &nativeExitRequestCount](QWebEngineView *requestedView) {
+            ++nativeExitRequestCount;
+            QCOMPARE(requestedView, controller.webView());
+            controller.exit();
+        }
+    );
+    QVERIFY(controller.enter(view));
+    QTRY_VERIFY_WITH_TIMEOUT(window.isFullScreen(), 3000);
+    window.showNormal();
+    QTRY_COMPARE_WITH_TIMEOUT(nativeExitRequestCount, 1, 3000);
+    QVERIFY(!controller.isActive());
+    QVERIFY(visibleToolBar->isVisible());
+    QVERIFY(hiddenToolBar->isHidden());
+    QVERIFY(window.statusBar()->isVisible());
+    QCOMPARE(menuBar->isVisible(), menuBarWasVisible);
 }
 
 void WindowInteractionTests::videoElementBridgeUsesTrustedOverlayClick()
@@ -1160,6 +1180,25 @@ globalThis.__panBrowserVideoPopoutController.showFor(
     );
     QCOMPARE(requestedFrameUrl.host(), QStringLiteral("video.example"));
     QCOMPARE(requestedVideoSize, QSize(320, 180));
+
+    bool extremeAspectMessageSent = false;
+    page->runJavaScript(
+        QStringLiteral(R"JS(
+console.info("__PANBROWSER_VIDEO_POPOUT_REQUEST__" + JSON.stringify({
+    token: "%1",
+    url: "https://video.example/player",
+    videoWidth: 32768,
+    videoHeight: 1
+}));
+true
+)JS").arg(page->videoPopoutToken()),
+        QWebEngineScript::ApplicationWorld,
+        [&extremeAspectMessageSent](const QVariant &result) {
+            extremeAspectMessageSent = result.toBool();
+        }
+    );
+    QTRY_VERIFY_WITH_TIMEOUT(extremeAspectMessageSent, 3000);
+    QTRY_COMPARE_WITH_TIMEOUT(requestedVideoSize, QSize(4, 1), 3000);
 }
 
 void WindowInteractionTests::detachedVideoSessionCoordinatesReturnAndFallback()
@@ -1385,6 +1424,15 @@ void WindowInteractionTests::detachedVideoWindowPreservesAspectRatioWhenResized(
         Qt::NoModifier
     );
     QApplication::sendEvent(webView, &releaseEvent);
+
+    QWebEngineView extremeSourceView;
+    DetachedVideoWindow extremeWindow(
+        &extremeSourceView,
+        QStringLiteral("Video — https://example.com"),
+        QSize(32768, 1)
+    );
+    QCOMPARE(extremeWindow.minimumSize(), QSize(540, 135));
+    QCOMPARE(extremeWindow.width(), extremeWindow.height() * 4);
 }
 
 void WindowInteractionTests::popupGeometryIsVisibleAndUsable()

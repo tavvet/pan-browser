@@ -24,6 +24,8 @@ constexpr int closeButtonMargin = 8;
 constexpr int resizeBorderWidth = 6;
 constexpr int minimumVideoLongSide = 240;
 constexpr int minimumVideoShortSide = 135;
+constexpr double minimumVideoAspectRatio = 1.0 / 4.0;
+constexpr double maximumVideoAspectRatio = 4.0;
 
 } // namespace
 
@@ -95,8 +97,18 @@ DetachedVideoWindow::DetachedVideoWindow(
       )
     , m_sourceView(sourceView)
 {
-    if (videoSize.width() > 0 && videoSize.height() > 0)
-        m_videoAspectRatio = static_cast<double>(videoSize.width()) / videoSize.height();
+    if (videoSize.width() > 0 && videoSize.height() > 0) {
+        const double requestedAspectRatio =
+            static_cast<double>(videoSize.width()) / videoSize.height();
+        if (requestedAspectRatio < minimumVideoAspectRatio)
+            m_videoAspectSize = QSize(1, 4);
+        else if (requestedAspectRatio > maximumVideoAspectRatio)
+            m_videoAspectSize = QSize(4, 1);
+        else
+            m_videoAspectSize = videoSize;
+        m_videoAspectRatio =
+            static_cast<double>(m_videoAspectSize.width()) / m_videoAspectSize.height();
+    }
     setObjectName(QStringLiteral("detachedVideoWindow"));
     setAttribute(Qt::WA_DeleteOnClose, false);
     QSize minimumSize;
@@ -191,7 +203,7 @@ DetachedVideoWindow::DetachedVideoWindow(
     setGeometry(initialGeometry);
     configurePlatformWindowAspectRatio(
         this,
-        videoSize.isValid() ? videoSize : QSize(16, 9)
+        m_videoAspectSize
     );
     updateCloseButtonGeometry();
 

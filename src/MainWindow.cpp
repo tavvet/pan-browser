@@ -277,6 +277,12 @@ MainWindow::MainWindow(
 
     createInterface();
     m_fullScreenController = std::make_unique<BrowserFullScreenController>(this);
+    connect(
+        m_fullScreenController.get(),
+        &BrowserFullScreenController::nativeExitRequested,
+        this,
+        &MainWindow::requestBrowserFullScreenExit
+    );
     if (!m_historyError.isEmpty())
         setTrustStatus(tr("History unavailable: %1").arg(m_historyError), true);
     m_permissionController = new PermissionController(m_permissionPrompt, this);
@@ -422,6 +428,7 @@ MainWindow::~MainWindow()
 {
     if (qApp)
         qApp->removeEventFilter(this);
+    m_expectedBrowserFullScreenExits.clear();
     if (m_fullScreenController)
         m_fullScreenController->exit();
     restoreAllDetachedVideos();
@@ -463,6 +470,7 @@ QString MainWindow::startupError() const
 
 void MainWindow::closeEvent(QCloseEvent *event)
 {
+    m_expectedBrowserFullScreenExits.clear();
     if (m_fullScreenController)
         m_fullScreenController->exit();
     restoreAllDetachedVideos();
@@ -513,13 +521,7 @@ bool MainWindow::eventFilter(QObject *watched, QEvent *event)
             && m_fullScreenController->webView() == webView
             && keyEvent->key() == Qt::Key_Escape
             && keyEvent->modifiers() == Qt::NoModifier) {
-            if (page)
-                page->triggerAction(QWebEnginePage::ExitFullScreen);
-            const QPointer<QWebEngineView> target(webView);
-            QTimer::singleShot(250, this, [this, target] {
-                if (target)
-                    exitBrowserFullScreen(target);
-            });
+            requestBrowserFullScreenExit(webView);
             keyEvent->accept();
             return true;
         }
@@ -799,11 +801,8 @@ void MainWindow::createInterface()
                 ? qobject_cast<QWebEngineView *>(m_tabStack->widget(index))
                 : nullptr;
             QWebEngineView *fullScreenView = m_fullScreenController->webView();
-            if (fullScreenView && requestedView != fullScreenView) {
-                if (QWebEnginePage *page = pageForTab(fullScreenView))
-                    page->triggerAction(QWebEnginePage::ExitFullScreen);
-                exitBrowserFullScreen(fullScreenView);
-            }
+            if (fullScreenView && requestedView != fullScreenView)
+                requestBrowserFullScreenExit(fullScreenView);
         }
         m_zoomAngleRemainder = 0;
         m_zoomPixelRemainder = 0;
@@ -1350,6 +1349,7 @@ void MainWindow::closeTab(int index)
         return;
 
     restoreDetachedVideo(webView);
+    m_expectedBrowserFullScreenExits.remove(webView);
     exitBrowserFullScreen(webView);
     m_permissionController->cancelForView(webView);
     cancelCrossDomainPromptsForView(webView);
@@ -1479,9 +1479,7 @@ bool MainWindow::isTabInteractionActive(QWebEngineView *webView) const
 void MainWindow::returnDetachedVideoForPermissionPrompt(QWebEngineView *webView)
 {
     if (m_fullScreenController && m_fullScreenController->webView() == webView) {
-        if (QWebEnginePage *page = pageForTab(webView))
-            page->triggerAction(QWebEnginePage::ExitFullScreen);
-        exitBrowserFullScreen(webView);
+        requestBrowserFullScreenExit(webView);
     }
 
     const auto state = m_tabStates.constFind(webView);
@@ -1733,9 +1731,7 @@ void MainWindow::connectBrowserSignals(QWebEngineView *webView)
         cancelCrossDomainPromptsForView(webView);
         cancelExternalUrlPrompt(webView);
         if (m_fullScreenController && m_fullScreenController->webView() == webView) {
-            if (QWebEnginePage *page = pageForTab(webView))
-                page->triggerAction(QWebEnginePage::ExitFullScreen);
-            exitBrowserFullScreen(webView);
+            requestBrowserFullScreenExit(webView);
         }
         BrowserTabState &state = m_tabStates[webView];
         ++state.videoPopoutRequestSerial;
@@ -2034,6 +2030,8 @@ void MainWindow::handleFullScreenRequest(
     }
 
     const qint64 now = QDateTime::currentMSecsSinceEpoch();
+    if (request.toggleOn())
+        m_expectedBrowserFullScreenExits.remove(webView);
     const bool videoPopoutRequested = request.toggleOn()
         && state->videoPopoutRequestDeadlineMs >= now
         && isSameWebOrigin(state->videoPopoutRequestOrigin, request.origin());
@@ -2047,13 +2045,15 @@ void MainWindow::handleFullScreenRequest(
         && m_fullScreenController->isActive();
     const bool browserFullScreenOwnsRequest = m_fullScreenController
         && m_fullScreenController->webView() == webView;
+    const bool browserFullScreenExitExpected = !request.toggleOn()
+        && m_expectedBrowserFullScreenExits.contains(webView);
     const FullScreenRequestDecision decision = decideFullScreenRequest(
         request.toggleOn(),
         isTabInteractionActive(webView),
         videoPopoutRequested,
         state->detachedVideoSession && state->detachedVideoSession->isDetached(),
         browserFullScreenActive,
-        browserFullScreenOwnsRequest,
+        browserFullScreenOwnsRequest || browserFullScreenExitExpected,
         request.origin()
     );
     switch (decision.action) {
@@ -2073,6 +2073,7 @@ void MainWindow::handleFullScreenRequest(
         return;
     case FullScreenRequestAction::RestoreBrowserFullScreen:
         request.accept();
+        m_expectedBrowserFullScreenExits.remove(webView);
         exitBrowserFullScreen(webView);
         return;
     case FullScreenRequestAction::RestoreDetachedVideo:
@@ -2092,6 +2093,39 @@ void MainWindow::exitBrowserFullScreen(QWebEngineView *webView)
     m_fullScreenController->exit();
     if (webView)
         webView->setFocus(Qt::OtherFocusReason);
+}
+
+void MainWindow::requestBrowserFullScreenExit(QWebEngineView *webView)
+{
+    if (!webView
+        || !m_fullScreenController
+        || m_fullScreenController->webView() != webView
+        || m_expectedBrowserFullScreenExits.contains(webView)) {
+        return;
+    }
+
+    QWebEnginePage *page = pageForTab(webView);
+    if (!page) {
+        exitBrowserFullScreen(webView);
+        return;
+    }
+
+    const quint64 requestSerial = ++m_browserFullScreenExitSerial;
+    m_expectedBrowserFullScreenExits.insert(webView, requestSerial);
+    page->triggerAction(QWebEnginePage::ExitFullScreen);
+
+    const QPointer<MainWindow> window(this);
+    const QPointer<QWebEngineView> target(webView);
+    QTimer::singleShot(500, this, [window, target, requestSerial] {
+        if (!window || !target)
+            return;
+        const auto expected = window->m_expectedBrowserFullScreenExits.constFind(target);
+        if (expected == window->m_expectedBrowserFullScreenExits.cend()
+            || *expected != requestSerial) {
+            return;
+        }
+        window->exitBrowserFullScreen(target);
+    });
 }
 
 void MainWindow::detachVideo(

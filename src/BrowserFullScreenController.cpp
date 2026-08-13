@@ -1,16 +1,27 @@
 #include "BrowserFullScreenController.h"
 
+#include <QEvent>
 #include <QMainWindow>
 #include <QMenuBar>
 #include <QStatusBar>
+#include <QTimer>
 #include <QToolBar>
 #include <QWebEngineView>
 
 #include <utility>
 
 BrowserFullScreenController::BrowserFullScreenController(QMainWindow *window)
-    : m_window(window)
+    : QObject(nullptr)
+    , m_window(window)
 {
+    if (m_window)
+        m_window->installEventFilter(this);
+}
+
+BrowserFullScreenController::~BrowserFullScreenController()
+{
+    if (m_window)
+        m_window->removeEventFilter(this);
 }
 
 bool BrowserFullScreenController::enter(QWebEngineView *webView)
@@ -22,6 +33,7 @@ bool BrowserFullScreenController::enter(QWebEngineView *webView)
     m_webView = webView;
     m_previousWindowState = m_window->windowState();
     m_chromeVisibility.clear();
+    m_nativeExitCheckPending = false;
 
     const QList<QToolBar *> toolBars = m_window->findChildren<QToolBar *>(
         QString(),
@@ -59,6 +71,7 @@ void BrowserFullScreenController::exit()
 
     m_active = false;
     m_webView.clear();
+    m_nativeExitCheckPending = false;
     if (m_previousWindowState.testFlag(Qt::WindowFullScreen))
         m_window->showFullScreen();
     else if (m_previousWindowState.testFlag(Qt::WindowMaximized))
@@ -82,4 +95,20 @@ bool BrowserFullScreenController::isActive() const
 QWebEngineView *BrowserFullScreenController::webView() const
 {
     return m_webView;
+}
+
+bool BrowserFullScreenController::eventFilter(QObject *watched, QEvent *event)
+{
+    if (watched == m_window
+        && event->type() == QEvent::WindowStateChange
+        && m_active
+        && !m_nativeExitCheckPending) {
+        m_nativeExitCheckPending = true;
+        QTimer::singleShot(0, this, [this] {
+            m_nativeExitCheckPending = false;
+            if (m_active && m_window && !m_window->isFullScreen() && m_webView)
+                emit nativeExitRequested(m_webView);
+        });
+    }
+    return QObject::eventFilter(watched, event);
 }
