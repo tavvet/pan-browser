@@ -27,5 +27,6 @@
         <file>assets/icons/layout-grid.svg</file>
         <file>assets/icons/network.svg</file>
         <file>assets/icons/proxy.svg</file>
+        <file>assets/icons/languages.svg</file>
     </qresource>
 </RCC>

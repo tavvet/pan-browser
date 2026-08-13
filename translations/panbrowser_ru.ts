@@ -257,11 +257,11 @@
     </message>
     <message numerus="yes">
         <location filename="../src/BookmarksDialog.cpp" line="154"/>
-        <location filename="../tests/PersistenceAndPolicyTests.cpp" line="879"/>
-        <location filename="../tests/PersistenceAndPolicyTests.cpp" line="883"/>
-        <location filename="../tests/PersistenceAndPolicyTests.cpp" line="887"/>
-        <location filename="../tests/PersistenceAndPolicyTests.cpp" line="896"/>
-        <location filename="../tests/PersistenceAndPolicyTests.cpp" line="900"/>
+        <location filename="../tests/PersistenceAndPolicyTests.cpp" line="1280"/>
+        <location filename="../tests/PersistenceAndPolicyTests.cpp" line="1284"/>
+        <location filename="../tests/PersistenceAndPolicyTests.cpp" line="1288"/>
+        <location filename="../tests/PersistenceAndPolicyTests.cpp" line="1297"/>
+        <location filename="../tests/PersistenceAndPolicyTests.cpp" line="1301"/>
         <source>%n bookmark(s)</source>
         <translation>
             <numerusform>%n закладка</numerusform>
@@ -603,68 +603,68 @@
         <translation>Заблокирован запрос типа «%1». После разрешения подключения страница будет перезагружена.</translation>
     </message>
     <message>
-        <location filename="../src/CrossDomainRequestInterceptor.cpp" line="430"/>
+        <location filename="../src/CrossDomainRequestInterceptor.cpp" line="443"/>
         <source>embedded frame</source>
         <translation>встроенный фрейм</translation>
     </message>
     <message>
-        <location filename="../src/CrossDomainRequestInterceptor.cpp" line="432"/>
+        <location filename="../src/CrossDomainRequestInterceptor.cpp" line="445"/>
         <source>stylesheet</source>
         <translation>таблица стилей</translation>
     </message>
     <message>
-        <location filename="../src/CrossDomainRequestInterceptor.cpp" line="434"/>
+        <location filename="../src/CrossDomainRequestInterceptor.cpp" line="447"/>
         <source>script</source>
         <translation>скрипт</translation>
     </message>
     <message>
-        <location filename="../src/CrossDomainRequestInterceptor.cpp" line="437"/>
+        <location filename="../src/CrossDomainRequestInterceptor.cpp" line="450"/>
         <source>image</source>
         <translation>изображение</translation>
     </message>
     <message>
-        <location filename="../src/CrossDomainRequestInterceptor.cpp" line="439"/>
+        <location filename="../src/CrossDomainRequestInterceptor.cpp" line="452"/>
         <source>font</source>
         <translation>шрифт</translation>
     </message>
     <message>
-        <location filename="../src/CrossDomainRequestInterceptor.cpp" line="441"/>
+        <location filename="../src/CrossDomainRequestInterceptor.cpp" line="454"/>
         <source>media</source>
         <translation>медиафайл</translation>
     </message>
     <message>
-        <location filename="../src/CrossDomainRequestInterceptor.cpp" line="445"/>
+        <location filename="../src/CrossDomainRequestInterceptor.cpp" line="458"/>
         <source>web worker</source>
         <translation>веб-воркер</translation>
     </message>
     <message>
-        <location filename="../src/CrossDomainRequestInterceptor.cpp" line="448"/>
+        <location filename="../src/CrossDomainRequestInterceptor.cpp" line="461"/>
         <source>data request</source>
         <translation>запрос данных</translation>
     </message>
     <message>
-        <location filename="../src/CrossDomainRequestInterceptor.cpp" line="450"/>
+        <location filename="../src/CrossDomainRequestInterceptor.cpp" line="463"/>
         <source>WebSocket</source>
         <translation>WebSocket</translation>
     </message>
     <message>
-        <location filename="../src/CrossDomainRequestInterceptor.cpp" line="452"/>
+        <location filename="../src/CrossDomainRequestInterceptor.cpp" line="465"/>
         <source>tracking ping</source>
         <translation>отслеживающий ping-запрос</translation>
     </message>
     <message>
-        <location filename="../src/CrossDomainRequestInterceptor.cpp" line="454"/>
+        <location filename="../src/CrossDomainRequestInterceptor.cpp" line="467"/>
         <source>prefetch request</source>
         <translation>запрос предварительной загрузки</translation>
     </message>
     <message>
-        <location filename="../src/CrossDomainRequestInterceptor.cpp" line="456"/>
+        <location filename="../src/CrossDomainRequestInterceptor.cpp" line="469"/>
         <source>security report</source>
         <translation>отчёт безопасности</translation>
     </message>
     <message>
-        <location filename="../src/CrossDomainRequestInterceptor.cpp" line="464"/>
-        <location filename="../src/CrossDomainRequestInterceptor.cpp" line="466"/>
+        <location filename="../src/CrossDomainRequestInterceptor.cpp" line="477"/>
+        <location filename="../src/CrossDomainRequestInterceptor.cpp" line="479"/>
         <source>network request</source>
         <translation>сетевой запрос</translation>
     </message>
@@ -821,7 +821,7 @@
     <name>CrossDomainSettingsPage</name>
     <message>
         <location filename="../src/CrossDomainSettingsPage.cpp" line="74"/>
-        <location filename="../tests/PersistenceAndPolicyTests.cpp" line="867"/>
+        <location filename="../tests/PersistenceAndPolicyTests.cpp" line="1268"/>
         <source>Site Connections</source>
         <translation>Подключения сайтов</translation>
     </message>
@@ -851,7 +851,7 @@
     </message>
     <message>
         <location filename="../src/CrossDomainSettingsPage.cpp" line="29"/>
-        <location filename="../tests/PersistenceAndPolicyTests.cpp" line="871"/>
+        <location filename="../tests/PersistenceAndPolicyTests.cpp" line="1272"/>
         <source>Common trackers</source>
         <translation>Распространённые трекеры</translation>
     </message>
@@ -1046,8 +1046,8 @@ Decision: %3</source>
         <translation type="vanished">Копировать адрес источника</translation>
     </message>
     <message>
-        <location filename="../src/DetachedVideoWindow.cpp" line="116"/>
-        <location filename="../src/DetachedVideoWindow.cpp" line="117"/>
+        <location filename="../src/DetachedVideoWindow.cpp" line="164"/>
+        <location filename="../src/DetachedVideoWindow.cpp" line="165"/>
         <source>Close Video Window</source>
         <translation>Закрыть окно с видео</translation>
     </message>
@@ -1545,7 +1545,7 @@ Decision: %3</source>
     </message>
     <message>
         <location filename="../src/DnsSettingsPage.cpp" line="145"/>
-        <location filename="../tests/PersistenceAndPolicyTests.cpp" line="859"/>
+        <location filename="../tests/PersistenceAndPolicyTests.cpp" line="1260"/>
         <source>Secure DNS only</source>
         <translation>Только защищённый DNS</translation>
     </message>
@@ -2095,254 +2095,254 @@ Decision: %3</source>
 <context>
     <name>MainWindow</name>
     <message>
-        <location filename="../src/MainWindow.cpp" line="281"/>
+        <location filename="../src/MainWindow.cpp" line="348"/>
         <source>History unavailable: %1</source>
         <translation>История недоступна: %1</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="295"/>
+        <location filename="../src/MainWindow.cpp" line="362"/>
         <source>Cannot save site connection decision</source>
         <translation>Не удалось сохранить решение о подключении сайта</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="632"/>
+        <location filename="../src/MainWindow.cpp" line="698"/>
         <source>Tabs</source>
         <translation>Вкладки</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="662"/>
+        <location filename="../src/MainWindow.cpp" line="728"/>
         <source>New Tab (⌘T)</source>
         <translation>Новая вкладка (⌘T)</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="679"/>
+        <location filename="../src/MainWindow.cpp" line="745"/>
         <source>Navigation</source>
         <translation>Навигация</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="688"/>
+        <location filename="../src/MainWindow.cpp" line="754"/>
         <source>Back</source>
         <translation>Назад</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="692"/>
+        <location filename="../src/MainWindow.cpp" line="758"/>
         <source>Forward</source>
         <translation>Вперёд</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="696"/>
+        <location filename="../src/MainWindow.cpp" line="762"/>
         <source>Reload</source>
         <translation>Обновить</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="715"/>
-        <location filename="../src/MainWindow.cpp" line="2337"/>
+        <location filename="../src/MainWindow.cpp" line="781"/>
+        <location filename="../src/MainWindow.cpp" line="2482"/>
         <source>Add Bookmark (⌘D)</source>
         <translation>Добавить закладку (⌘D)</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="723"/>
+        <location filename="../src/MainWindow.cpp" line="789"/>
         <source>Go</source>
         <translation>Перейти</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="728"/>
+        <location filename="../src/MainWindow.cpp" line="794"/>
         <source>Downloads</source>
         <translation>Загрузки</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="733"/>
+        <location filename="../src/MainWindow.cpp" line="799"/>
         <source>Find in page</source>
         <translation>Поиск на странице</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="743"/>
+        <location filename="../src/MainWindow.cpp" line="809"/>
         <source>Permission request</source>
         <translation>Запрос разрешения</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="753"/>
+        <location filename="../src/MainWindow.cpp" line="819"/>
         <source>Site connection request</source>
         <translation>Запрос подключения сайта</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="889"/>
+        <location filename="../src/MainWindow.cpp" line="952"/>
         <source>Browser</source>
         <translation>Браузер</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="891"/>
+        <location filename="../src/MainWindow.cpp" line="954"/>
         <source>PanBrowser</source>
         <translation>PanBrowser</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="895"/>
-        <location filename="../src/MainWindow.cpp" line="1200"/>
-        <location filename="../src/MainWindow.cpp" line="1316"/>
-        <location filename="../src/MainWindow.cpp" line="1686"/>
-        <location filename="../src/MainWindow.cpp" line="1708"/>
+        <location filename="../src/MainWindow.cpp" line="958"/>
+        <location filename="../src/MainWindow.cpp" line="1265"/>
+        <location filename="../src/MainWindow.cpp" line="1383"/>
+        <location filename="../src/MainWindow.cpp" line="1766"/>
+        <location filename="../src/MainWindow.cpp" line="1788"/>
         <source>New Tab</source>
         <translation>Новая вкладка</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="902"/>
-        <location filename="../src/MainWindow.cpp" line="1273"/>
+        <location filename="../src/MainWindow.cpp" line="965"/>
+        <location filename="../src/MainWindow.cpp" line="1340"/>
         <source>Close Tab</source>
         <translation>Закрыть вкладку</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="911"/>
+        <location filename="../src/MainWindow.cpp" line="974"/>
         <source>Add Bookmark…</source>
         <translation>Добавить закладку…</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="917"/>
+        <location filename="../src/MainWindow.cpp" line="980"/>
         <source>Bookmarks…</source>
         <translation>Закладки…</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="924"/>
-        <location filename="../src/MainWindow.cpp" line="2724"/>
+        <location filename="../src/MainWindow.cpp" line="987"/>
+        <location filename="../src/MainWindow.cpp" line="2869"/>
         <source>Install Web App…</source>
         <translation>Установить веб-приложение…</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="935"/>
+        <location filename="../src/MainWindow.cpp" line="998"/>
         <source>Web Apps</source>
         <translation>Веб-приложения</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="942"/>
+        <location filename="../src/MainWindow.cpp" line="1005"/>
         <source>Find in Page…</source>
         <translation>Найти на странице…</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="946"/>
+        <location filename="../src/MainWindow.cpp" line="1009"/>
         <source>Find Next</source>
         <translation>Найти следующее</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="954"/>
+        <location filename="../src/MainWindow.cpp" line="1017"/>
         <source>Find Previous</source>
         <translation>Найти предыдущее</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="964"/>
+        <location filename="../src/MainWindow.cpp" line="1027"/>
         <source>Zoom</source>
         <translation>Масштаб</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="968"/>
+        <location filename="../src/MainWindow.cpp" line="1031"/>
         <source>Zoom In</source>
         <translation>Увеличить масштаб</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="975"/>
+        <location filename="../src/MainWindow.cpp" line="1038"/>
         <source>Zoom Out</source>
         <translation>Уменьшить масштаб</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="982"/>
+        <location filename="../src/MainWindow.cpp" line="1045"/>
         <source>Actual Size</source>
         <translation>Фактический размер</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="992"/>
+        <location filename="../src/MainWindow.cpp" line="1055"/>
         <source>Developer Tools</source>
         <translation>Инструменты разработчика</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1012"/>
+        <location filename="../src/MainWindow.cpp" line="1075"/>
         <source>Settings…</source>
         <translation>Настройки…</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1021"/>
+        <location filename="../src/MainWindow.cpp" line="1084"/>
         <source>Reload Trust Rules</source>
         <translation>Перезагрузить правила доверия</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1028"/>
+        <location filename="../src/MainWindow.cpp" line="1091"/>
         <source>Show Configuration Folder</source>
         <translation>Показать папку конфигурации</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1050"/>
+        <location filename="../src/MainWindow.cpp" line="1113"/>
         <source>Ready</source>
         <translation>Готово</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1052"/>
+        <location filename="../src/MainWindow.cpp" line="1115"/>
         <source>No rules loaded</source>
         <translation>Правила не загружены</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1084"/>
+        <location filename="../src/MainWindow.cpp" line="1147"/>
         <source>Close Window</source>
         <translation>Закрыть окно</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1268"/>
+        <location filename="../src/MainWindow.cpp" line="1335"/>
         <source>Unpin Tab</source>
         <translation>Открепить вкладку</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1268"/>
+        <location filename="../src/MainWindow.cpp" line="1335"/>
         <source>Pin Tab</source>
         <translation>Закрепить вкладку</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1517"/>
+        <location filename="../src/MainWindow.cpp" line="1597"/>
         <source>Untitled page</source>
         <translation>Страница без названия</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1518"/>
+        <location filename="../src/MainWindow.cpp" line="1598"/>
         <source>Developer Tools — %1</source>
         <translation>Инструменты разработчика — %1</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1194"/>
+        <location filename="../src/MainWindow.cpp" line="1257"/>
         <source>Open Video in Separate Window</source>
         <translation>Открыть видео в отдельном окне</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1543"/>
+        <location filename="../src/MainWindow.cpp" line="1623"/>
         <source>Inspect Element</source>
         <translation>Исследовать элемент</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1762"/>
+        <location filename="../src/MainWindow.cpp" line="1841"/>
         <source>Loading…</source>
         <translation>Загрузка…</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1817"/>
+        <location filename="../src/MainWindow.cpp" line="1896"/>
         <source>Secure · Chromium system trust</source>
         <translation>Безопасно · системное доверие Chromium</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1820"/>
+        <location filename="../src/MainWindow.cpp" line="1899"/>
         <source>Not secure · HTTP connection</source>
         <translation>Небезопасно · соединение HTTP</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1822"/>
+        <location filename="../src/MainWindow.cpp" line="1901"/>
         <source>No HTTPS security information</source>
         <translation>Нет сведений о безопасности HTTPS</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1827"/>
+        <location filename="../src/MainWindow.cpp" line="1906"/>
         <source>Page loading failed</source>
         <translation>Не удалось загрузить страницу</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1880"/>
+        <location filename="../src/MainWindow.cpp" line="1959"/>
         <source>Blocked a form submission outside this web app&apos;s scope</source>
         <translation>Отправка формы за пределы области веб-приложения заблокирована</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1886"/>
+        <location filename="../src/MainWindow.cpp" line="1965"/>
         <source>Blocked automatic navigation outside this web app&apos;s scope</source>
         <translation>Автоматический переход за пределы области веб-приложения заблокирован</translation>
     </message>
@@ -2351,12 +2351,12 @@ Decision: %3</source>
         <translation type="vanished">Не удалось открыть это видео в отдельном окне.</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1922"/>
+        <location filename="../src/MainWindow.cpp" line="2003"/>
         <source>The page did not allow this video to open separately.</source>
         <translation>Страница не разрешила открыть это видео отдельно.</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2111"/>
+        <location filename="../src/MainWindow.cpp" line="2255"/>
         <source>Video — %1</source>
         <translation>Видео — %1</translation>
     </message>
@@ -2365,32 +2365,32 @@ Decision: %3</source>
         <translation type="vanished">Источник: %1</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2115"/>
+        <location filename="../src/MainWindow.cpp" line="2260"/>
         <source>Video is playing in a separate window.</source>
         <translation>Видео воспроизводится в отдельном окне.</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2116"/>
+        <location filename="../src/MainWindow.cpp" line="2261"/>
         <source>Return Video</source>
         <translation>Вернуть видео</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2206"/>
+        <location filename="../src/MainWindow.cpp" line="2351"/>
         <source>The current page</source>
         <translation>Текущая страница</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2214"/>
+        <location filename="../src/MainWindow.cpp" line="2359"/>
         <source>Open external application?</source>
         <translation>Открыть внешнее приложение?</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2217"/>
+        <location filename="../src/MainWindow.cpp" line="2362"/>
         <source>Open this link in another application?</source>
         <translation>Открыть эту ссылку в другом приложении?</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2219"/>
+        <location filename="../src/MainWindow.cpp" line="2364"/>
         <source>%1 wants to open:
 
 %2</source>
@@ -2399,111 +2399,111 @@ Decision: %3</source>
 %2</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2222"/>
+        <location filename="../src/MainWindow.cpp" line="2367"/>
         <source>Open application</source>
         <translation>Открыть приложение</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2225"/>
-        <location filename="../src/MainWindow.cpp" line="2850"/>
+        <location filename="../src/MainWindow.cpp" line="2370"/>
+        <location filename="../src/MainWindow.cpp" line="2995"/>
         <source>Cancel</source>
         <translation>Отмена</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2251"/>
+        <location filename="../src/MainWindow.cpp" line="2396"/>
         <source>No application is available for the %1 link</source>
         <translation>Нет приложения для открытия ссылки %1</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2323"/>
-        <location filename="../src/MainWindow.cpp" line="2625"/>
+        <location filename="../src/MainWindow.cpp" line="2468"/>
+        <location filename="../src/MainWindow.cpp" line="2770"/>
         <source>Only web pages can be bookmarked</source>
         <translation>В закладки можно добавлять только веб-страницы</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2336"/>
+        <location filename="../src/MainWindow.cpp" line="2481"/>
         <source>Edit Bookmark (⌘D)</source>
         <translation>Изменить закладку (⌘D)</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2347"/>
+        <location filename="../src/MainWindow.cpp" line="2492"/>
         <source>Search with %1 or enter an address</source>
         <translation>Искать через %1 или ввести адрес</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2348"/>
+        <location filename="../src/MainWindow.cpp" line="2493"/>
         <source>Enter an address</source>
         <translation>Введите адрес</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2576"/>
+        <location filename="../src/MainWindow.cpp" line="2721"/>
         <source>Zoom: %1%</source>
         <translation>Масштаб: %1%</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2578"/>
+        <location filename="../src/MainWindow.cpp" line="2723"/>
         <source> · saved for this site</source>
         <translation> · сохранено для этого сайта</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2579"/>
+        <location filename="../src/MainWindow.cpp" line="2724"/>
         <source> · could not save this site setting</source>
         <translation> · не удалось сохранить настройку сайта</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2617"/>
+        <location filename="../src/MainWindow.cpp" line="2762"/>
         <source>Bookmarks are unavailable</source>
         <translation>Закладки недоступны</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2632"/>
+        <location filename="../src/MainWindow.cpp" line="2777"/>
         <source>Bookmarks unavailable</source>
         <translation>Закладки недоступны</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2730"/>
+        <location filename="../src/MainWindow.cpp" line="2875"/>
         <source>Open “%1”</source>
         <translation>Открыть «%1»</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2737"/>
+        <location filename="../src/MainWindow.cpp" line="2882"/>
         <source>Install “%1”…</source>
         <translation>Установить «%1»…</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2765"/>
+        <location filename="../src/MainWindow.cpp" line="2910"/>
         <source>Reading web app manifest…</source>
         <translation>Чтение манифеста веб-приложения…</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2781"/>
+        <location filename="../src/MainWindow.cpp" line="2926"/>
         <source>Timed out while reading the web app manifest</source>
         <translation>Истекло время ожидания при чтении манифеста веб-приложения</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2805"/>
-        <location filename="../src/MainWindow.cpp" line="2820"/>
-        <location filename="../src/MainWindow.cpp" line="2857"/>
+        <location filename="../src/MainWindow.cpp" line="2950"/>
+        <location filename="../src/MainWindow.cpp" line="2965"/>
+        <location filename="../src/MainWindow.cpp" line="3002"/>
         <source>Cannot install web app</source>
         <translation>Не удалось установить веб-приложение</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2806"/>
+        <location filename="../src/MainWindow.cpp" line="2951"/>
         <source>PanBrowser could not read the web app manifest: %1</source>
         <translation>PanBrowser не удалось прочитать манифест веб-приложения: %1</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2837"/>
+        <location filename="../src/MainWindow.cpp" line="2982"/>
         <source>Install web app</source>
         <translation>Установка веб-приложения</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2841"/>
+        <location filename="../src/MainWindow.cpp" line="2986"/>
         <source>Install “%1”?</source>
         <translation>Установить «%1»?</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2843"/>
+        <location filename="../src/MainWindow.cpp" line="2988"/>
         <source>The app will open in its own window and share PanBrowser cookies, site data, permissions, and trust rules.
 
 Start page: %1
@@ -2514,103 +2514,103 @@ Allowed scope: %2</source>
 Область действия: %2</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2849"/>
+        <location filename="../src/MainWindow.cpp" line="2994"/>
         <source>Install</source>
         <translation>Установить</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2866"/>
+        <location filename="../src/MainWindow.cpp" line="3011"/>
         <source>Web app installed without a system shortcut</source>
         <translation>Веб-приложение установлено без системного ярлыка</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2867"/>
+        <location filename="../src/MainWindow.cpp" line="3012"/>
         <source>PanBrowser installed the web app, but could not create its system shortcut: %1</source>
         <translation>PanBrowser установил веб-приложение, но не смог создать системный ярлык: %1</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2872"/>
+        <location filename="../src/MainWindow.cpp" line="3017"/>
         <source>“%1” installed</source>
         <translation>«%1» установлено</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2893"/>
+        <location filename="../src/MainWindow.cpp" line="3038"/>
         <source>No web apps installed</source>
         <translation>Нет установленных веб-приложений</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2899"/>
+        <location filename="../src/MainWindow.cpp" line="3044"/>
         <source>Manage Web Apps…</source>
         <translation>Управление веб-приложениями…</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="2935"/>
+        <location filename="../src/MainWindow.cpp" line="3080"/>
         <source>The web app is no longer installed</source>
         <translation>Веб-приложение больше не установлено</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="3051"/>
-        <location filename="../src/MainWindow.cpp" line="3243"/>
+        <location filename="../src/MainWindow.cpp" line="3200"/>
+        <location filename="../src/MainWindow.cpp" line="3412"/>
         <source>Rules error: %1</source>
         <translation>Ошибка правил: %1</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="3075"/>
+        <location filename="../src/MainWindow.cpp" line="3225"/>
         <source>Cannot apply site connection settings</source>
         <translation>Не удалось применить настройки подключений сайтов</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="3110"/>
+        <location filename="../src/MainWindow.cpp" line="3279"/>
         <source>Restart PanBrowser to apply the new interface language and proxy settings.</source>
         <translation>Перезапустите PanBrowser, чтобы применить новый язык интерфейса и настройки прокси.</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="3118"/>
+        <location filename="../src/MainWindow.cpp" line="3287"/>
         <source>Restart PanBrowser to apply the new proxy settings.</source>
         <translation>Перезапустите PanBrowser, чтобы применить новые настройки прокси.</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="3122"/>
+        <location filename="../src/MainWindow.cpp" line="3291"/>
         <source>Restart required</source>
         <translation>Требуется перезапуск</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="3734"/>
+        <location filename="../src/MainWindow.cpp" line="3936"/>
         <source>PanBrowser could not load the primary site connection settings and recovered the previous backup. Review Site Connections and save the settings to repair the primary file.</source>
         <translation>PanBrowser не удалось загрузить основные настройки подключений сайтов, поэтому была восстановлена предыдущая резервная копия. Проверьте раздел «Подключения сайтов» и сохраните настройки, чтобы исправить основной файл.</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="3737"/>
+        <location filename="../src/MainWindow.cpp" line="3939"/>
         <source>PanBrowser could not load the site connection settings. Unknown third-party connections are being blocked until you save a valid configuration in Site Connections.</source>
         <translation>PanBrowser не удалось загрузить настройки подключений сайтов. Неизвестные сторонние подключения блокируются, пока вы не сохраните корректную конфигурацию в разделе «Подключения сайтов».</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="3743"/>
+        <location filename="../src/MainWindow.cpp" line="3945"/>
         <source>Site connection settings recovered</source>
         <translation>Настройки подключений сайтов восстановлены</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="3744"/>
+        <location filename="../src/MainWindow.cpp" line="3946"/>
         <source>Site connection settings unavailable</source>
         <translation>Настройки подключений сайтов недоступны</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="3757"/>
+        <location filename="../src/MainWindow.cpp" line="3959"/>
         <source>Network blocked because proxy settings are invalid.</source>
         <translation>Сеть заблокирована из-за некорректных настроек прокси.</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="3762"/>
+        <location filename="../src/MainWindow.cpp" line="3964"/>
         <source>Network blocked</source>
         <translation>Сеть заблокирована</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="3764"/>
+        <location filename="../src/MainWindow.cpp" line="3966"/>
         <source>PanBrowser blocked network access because the proxy settings could not be loaded.</source>
         <translation>PanBrowser заблокировал доступ к сети, поскольку не удалось загрузить настройки прокси.</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="3767"/>
+        <location filename="../src/MainWindow.cpp" line="3969"/>
         <source>%1
 
 Open Proxy settings, save a valid configuration, and restart PanBrowser.</source>
@@ -2619,12 +2619,12 @@ Open Proxy settings, save a valid configuration, and restart PanBrowser.</source
 Откройте настройки прокси, сохраните корректную конфигурацию и перезапустите PanBrowser.</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="3771"/>
+        <location filename="../src/MainWindow.cpp" line="3973"/>
         <source>Open Proxy settings</source>
         <translation>Открыть настройки прокси</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="3114"/>
+        <location filename="../src/MainWindow.cpp" line="3283"/>
         <source>Restart PanBrowser to apply the new interface language.</source>
         <translation>Перезапустите PanBrowser, чтобы применить новый язык интерфейса.</translation>
     </message>
@@ -2633,12 +2633,12 @@ Open Proxy settings, save a valid configuration, and restart PanBrowser.</source
         <translation type="vanished">Источник:</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="3242"/>
+        <location filename="../src/MainWindow.cpp" line="3411"/>
         <source>Rules unavailable</source>
         <translation>Правила недоступны</translation>
     </message>
     <message numerus="yes">
-        <location filename="../src/MainWindow.cpp" line="3249"/>
+        <location filename="../src/MainWindow.cpp" line="3418"/>
         <source>%n custom rule(s)</source>
         <translation>
             <numerusform>%n пользовательское правило</numerusform>
@@ -2647,42 +2647,42 @@ Open Proxy settings, save a valid configuration, and restart PanBrowser.</source
         </translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="3251"/>
+        <location filename="../src/MainWindow.cpp" line="3420"/>
         <source>Trust rules loaded</source>
         <translation>Правила доверия загружены</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="3268"/>
+        <location filename="../src/MainWindow.cpp" line="3437"/>
         <source>Blocked %1: no matching trust rule</source>
         <translation>%1 заблокирован: подходящее правило доверия не найдено</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="3277"/>
+        <location filename="../src/MainWindow.cpp" line="3446"/>
         <source>Blocked %1: non-overridable certificate error</source>
         <translation>%1 заблокирован: эту ошибку сертификата нельзя переопределить</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="3286"/>
+        <location filename="../src/MainWindow.cpp" line="3455"/>
         <source>Blocked %1: only an unknown CA may be overridden</source>
         <translation>%1 заблокирован: переопределить можно только ошибку неизвестного центра сертификации</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="3295"/>
+        <location filename="../src/MainWindow.cpp" line="3464"/>
         <source>Blocked %1: system validation failed</source>
         <translation>%1 заблокирован: системная проверка не пройдена</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="3315"/>
+        <location filename="../src/MainWindow.cpp" line="3484"/>
         <source>Secure · %1 · %2</source>
         <translation>Безопасно · %1 · %2</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="3322"/>
+        <location filename="../src/MainWindow.cpp" line="3491"/>
         <source>Blocked %1: %2</source>
         <translation>%1 заблокирован: %2</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="3343"/>
+        <location filename="../src/MainWindow.cpp" line="3512"/>
         <source>Secure</source>
         <translation>Безопасно</translation>
     </message>
@@ -3048,7 +3048,7 @@ Open Proxy settings, save a valid configuration, and restart PanBrowser.</source
     </message>
     <message>
         <location filename="../src/ProxySettingsPage.cpp" line="44"/>
-        <location filename="../tests/PersistenceAndPolicyTests.cpp" line="863"/>
+        <location filename="../tests/PersistenceAndPolicyTests.cpp" line="1264"/>
         <source>Manual proxy</source>
         <translation>Ручной прокси</translation>
     </message>
@@ -3151,7 +3151,7 @@ Open Proxy settings, save a valid configuration, and restart PanBrowser.</source
     </message>
     <message>
         <location filename="../src/Localization.cpp" line="14"/>
-        <location filename="../tests/PersistenceAndPolicyTests.cpp" line="875"/>
+        <location filename="../tests/PersistenceAndPolicyTests.cpp" line="1276"/>
         <source>Cancel</source>
         <translation>Отмена</translation>
     </message>
@@ -3495,55 +3495,55 @@ Warning: searches sent through HTTP are not encrypted.</source>
         <translation>Не удалось восстановить %1: %2</translation>
     </message>
     <message>
-        <location filename="../src/SettingsDialog.cpp" line="145"/>
-        <location filename="../tests/PersistenceAndPolicyTests.cpp" line="855"/>
+        <location filename="../src/SettingsDialog.cpp" line="154"/>
+        <location filename="../tests/PersistenceAndPolicyTests.cpp" line="1256"/>
         <source>Settings</source>
         <translation>Настройки</translation>
     </message>
     <message>
         <location filename="../src/GeneralSettingsPage.cpp" line="26"/>
-        <location filename="../src/SettingsDialog.cpp" line="175"/>
+        <location filename="../src/SettingsDialog.cpp" line="184"/>
         <source>General</source>
         <translation>Основные</translation>
     </message>
     <message>
-        <location filename="../src/SettingsDialog.cpp" line="183"/>
+        <location filename="../src/SettingsDialog.cpp" line="192"/>
         <source>Search</source>
         <translation>Поиск</translation>
     </message>
     <message>
-        <location filename="../src/SettingsDialog.cpp" line="195"/>
+        <location filename="../src/SettingsDialog.cpp" line="204"/>
         <source>History</source>
         <translation>История</translation>
     </message>
     <message>
-        <location filename="../src/SettingsDialog.cpp" line="203"/>
+        <location filename="../src/SettingsDialog.cpp" line="212"/>
         <source>Web Apps</source>
         <translation>Веб-приложения</translation>
     </message>
     <message>
         <location filename="../src/PrivacyDataSettingsPage.cpp" line="24"/>
-        <location filename="../src/SettingsDialog.cpp" line="221"/>
+        <location filename="../src/SettingsDialog.cpp" line="242"/>
         <source>Privacy &amp; Data</source>
         <translation>Конфиденциальность и данные</translation>
     </message>
     <message>
-        <location filename="../src/SettingsDialog.cpp" line="229"/>
+        <location filename="../src/SettingsDialog.cpp" line="250"/>
         <source>DNS</source>
         <translation>DNS</translation>
     </message>
     <message>
-        <location filename="../src/SettingsDialog.cpp" line="237"/>
+        <location filename="../src/SettingsDialog.cpp" line="258"/>
         <source>Proxy</source>
         <translation>Прокси</translation>
     </message>
     <message>
-        <location filename="../src/SettingsDialog.cpp" line="262"/>
+        <location filename="../src/SettingsDialog.cpp" line="283"/>
         <source>Trust Rules</source>
         <translation>Правила доверия</translation>
     </message>
     <message>
-        <location filename="../src/SettingsDialog.cpp" line="277"/>
+        <location filename="../src/SettingsDialog.cpp" line="298"/>
         <source>Diagnostics</source>
         <translation>Диагностика</translation>
     </message>
@@ -3698,7 +3698,7 @@ Warning: searches sent through HTTP are not encrypted.</source>
         <translation>При следующем запуске удалить файлы cookie, локальное хранилище, IndexedDB, сервис-воркеры и кэш. Настройки, история, правила доверия, сертификаты и сохранённые вкладки останутся.</translation>
     </message>
     <message>
-        <location filename="../src/SettingsDialog.cpp" line="294"/>
+        <location filename="../src/SettingsDialog.cpp" line="315"/>
         <source>Save settings</source>
         <translation>Сохранить настройки</translation>
     </message>
@@ -3763,66 +3763,78 @@ Warning: searches sent through HTTP are not encrypted.</source>
         <translation>Не удалось запланировать сброс</translation>
     </message>
     <message>
-        <location filename="../src/SettingsDialog.cpp" line="128"/>
+        <location filename="../src/SettingsDialog.cpp" line="137"/>
         <source>Certificate cleanup incomplete</source>
         <translation>Очистка сертификатов завершена не полностью</translation>
     </message>
     <message>
-        <location filename="../src/SettingsDialog.cpp" line="129"/>
+        <location filename="../src/SettingsDialog.cpp" line="138"/>
         <source>Some imported certificate files could not be removed:
 %1</source>
         <translation>Не удалось удалить некоторые импортированные файлы сертификатов:
 %1</translation>
     </message>
     <message>
-        <location filename="../src/SettingsDialog.cpp" line="254"/>
+        <location filename="../src/SettingsDialog.cpp" line="234"/>
+        <source>Video Translation</source>
+        <translation>Перевод видео</translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsDialog.cpp" line="275"/>
         <source>Site Connections</source>
         <translation>Подключения сайтов</translation>
     </message>
     <message>
-        <location filename="../src/SettingsDialog.cpp" line="346"/>
-        <location filename="../src/SettingsDialog.cpp" line="390"/>
-        <location filename="../src/SettingsDialog.cpp" line="400"/>
+        <location filename="../src/SettingsDialog.cpp" line="367"/>
+        <location filename="../src/SettingsDialog.cpp" line="418"/>
+        <location filename="../src/SettingsDialog.cpp" line="430"/>
         <source>Cannot save settings</source>
         <translation>Не удалось сохранить настройки</translation>
     </message>
     <message>
-        <location filename="../src/SettingsDialog.cpp" line="351"/>
-        <location filename="../src/SettingsDialog.cpp" line="440"/>
+        <location filename="../src/SettingsDialog.cpp" line="372"/>
+        <location filename="../src/SettingsDialog.cpp" line="485"/>
         <source>Cannot save trust rules</source>
         <translation>Не удалось сохранить правила доверия</translation>
     </message>
     <message>
-        <location filename="../src/SettingsDialog.cpp" line="356"/>
-        <location filename="../src/SettingsDialog.cpp" line="408"/>
+        <location filename="../src/SettingsDialog.cpp" line="377"/>
+        <location filename="../src/SettingsDialog.cpp" line="438"/>
         <source>Cannot save search settings</source>
         <translation>Не удалось сохранить настройки поиска</translation>
     </message>
     <message>
-        <location filename="../src/SettingsDialog.cpp" line="361"/>
-        <location filename="../src/SettingsDialog.cpp" line="416"/>
+        <location filename="../src/SettingsDialog.cpp" line="382"/>
+        <location filename="../src/SettingsDialog.cpp" line="446"/>
         <source>Cannot save DNS settings</source>
         <translation>Не удалось сохранить настройки DNS</translation>
     </message>
     <message>
-        <location filename="../src/SettingsDialog.cpp" line="366"/>
-        <location filename="../src/SettingsDialog.cpp" line="424"/>
+        <location filename="../src/SettingsDialog.cpp" line="387"/>
+        <location filename="../src/SettingsDialog.cpp" line="454"/>
         <source>Cannot save proxy settings</source>
         <translation>Не удалось сохранить настройки прокси</translation>
     </message>
     <message>
-        <location filename="../src/SettingsDialog.cpp" line="371"/>
-        <location filename="../src/SettingsDialog.cpp" line="432"/>
+        <location filename="../src/SettingsDialog.cpp" line="392"/>
+        <location filename="../src/SettingsDialog.cpp" line="462"/>
         <source>Cannot save site connection settings</source>
         <translation>Не удалось сохранить настройки подключений сайтов</translation>
     </message>
     <message>
-        <location filename="../src/SettingsDialog.cpp" line="407"/>
-        <location filename="../src/SettingsDialog.cpp" line="415"/>
-        <location filename="../src/SettingsDialog.cpp" line="423"/>
-        <location filename="../src/SettingsDialog.cpp" line="431"/>
-        <location filename="../src/SettingsDialog.cpp" line="439"/>
-        <location filename="../src/SettingsDialog.cpp" line="447"/>
+        <location filename="../src/SettingsDialog.cpp" line="397"/>
+        <location filename="../src/SettingsDialog.cpp" line="475"/>
+        <source>Cannot save video translation settings</source>
+        <translation>Не удалось сохранить настройки перевода видео</translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsDialog.cpp" line="437"/>
+        <location filename="../src/SettingsDialog.cpp" line="445"/>
+        <location filename="../src/SettingsDialog.cpp" line="453"/>
+        <location filename="../src/SettingsDialog.cpp" line="461"/>
+        <location filename="../src/SettingsDialog.cpp" line="472"/>
+        <location filename="../src/SettingsDialog.cpp" line="484"/>
+        <location filename="../src/SettingsDialog.cpp" line="492"/>
         <source>
 
 Rollback was incomplete:
@@ -3833,17 +3845,17 @@ Rollback was incomplete:
 </translation>
     </message>
     <message>
-        <location filename="../src/SettingsDialog.cpp" line="448"/>
+        <location filename="../src/SettingsDialog.cpp" line="493"/>
         <source>Cannot apply DNS settings</source>
         <translation>Не удалось применить настройки DNS</translation>
     </message>
     <message>
-        <location filename="../src/SettingsDialog.cpp" line="461"/>
+        <location filename="../src/SettingsDialog.cpp" line="507"/>
         <source>Settings saved with a warning</source>
         <translation>Настройки сохранены с предупреждением</translation>
     </message>
     <message>
-        <location filename="../src/SettingsDialog.cpp" line="462"/>
+        <location filename="../src/SettingsDialog.cpp" line="508"/>
         <source>Settings were saved, but some unused imported certificate files could not be removed:
 %1</source>
         <translation>Настройки сохранены, но не удалось удалить некоторые неиспользуемые импортированные файлы сертификатов:
@@ -4384,6 +4396,395 @@ SHA-256: %5</translation>
         <location filename="../src/TrustSettings.cpp" line="250"/>
         <source>Cannot decode certificate %1</source>
         <translation>Не удалось декодировать сертификат %1</translation>
+    </message>
+</context>
+<context>
+    <name>VideoTranslationSettings</name>
+    <message>
+        <location filename="../src/VideoTranslationSettings.cpp" line="60"/>
+        <source>Cannot open %1: %2</source>
+        <translation>Не удалось открыть %1: %2</translation>
+    </message>
+    <message>
+        <location filename="../src/VideoTranslationSettings.cpp" line="69"/>
+        <source>Video translation settings file is too large</source>
+        <translation>Файл настроек перевода видео слишком большой</translation>
+    </message>
+    <message>
+        <location filename="../src/VideoTranslationSettings.cpp" line="81"/>
+        <source>Invalid video translation settings JSON: %1</source>
+        <translation>Некорректный JSON настроек перевода видео: %1</translation>
+    </message>
+    <message>
+        <location filename="../src/VideoTranslationSettings.cpp" line="92"/>
+        <source>Unsupported video translation settings version</source>
+        <translation>Неподдерживаемая версия настроек перевода видео</translation>
+    </message>
+    <message>
+        <location filename="../src/VideoTranslationSettings.cpp" line="102"/>
+        <source>Video translation settings contain invalid values</source>
+        <translation>Настройки перевода видео содержат некорректные значения</translation>
+    </message>
+    <message>
+        <location filename="../src/VideoTranslationSettings.cpp" line="136"/>
+        <source>Cannot write %1: %2</source>
+        <translation>Не удалось записать %1: %2</translation>
+    </message>
+    <message>
+        <location filename="../src/VideoTranslationSettings.cpp" line="146"/>
+        <source>Cannot replace %1: %2</source>
+        <translation>Не удалось заменить %1: %2</translation>
+    </message>
+    <message>
+        <location filename="../src/VideoTranslationSettings.cpp" line="162"/>
+        <source>Video translation source path is too long</source>
+        <translation>Слишком длинный путь к источнику перевода видео</translation>
+    </message>
+    <message>
+        <location filename="../src/VideoTranslationSettings.cpp" line="172"/>
+        <source>Choose the official VOT userscript</source>
+        <translation>Выберите официальный пользовательский скрипт VOT</translation>
+    </message>
+    <message>
+        <location filename="../src/VideoTranslationSettings.cpp" line="181"/>
+        <source>The VOT source must be an existing JavaScript file</source>
+        <translation>Источник VOT должен быть существующим файлом JavaScript</translation>
+    </message>
+    <message>
+        <source>Installed video translation extension ID is invalid</source>
+        <translation type="vanished">Некорректный идентификатор установленного расширения перевода видео</translation>
+    </message>
+    <message>
+        <source>Choose the official VOT Chrome extension ZIP or an unpacked extension folder</source>
+        <translation type="vanished">Выберите официальный ZIP расширения VOT для Chrome или папку распакованного расширения</translation>
+    </message>
+    <message>
+        <source>The VOT source must be an existing ZIP file or a folder containing manifest.json</source>
+        <translation type="vanished">Источник VOT должен быть существующим ZIP-файлом или папкой с manifest.json</translation>
+    </message>
+</context>
+<context>
+    <name>VideoTranslationSettingsPage</name>
+    <message>
+        <location filename="../src/VideoTranslationSettingsPage.cpp" line="30"/>
+        <source>Video Translation</source>
+        <translation>Перевод видео</translation>
+    </message>
+    <message>
+        <location filename="../src/VideoTranslationSettingsPage.cpp" line="34"/>
+        <source>Experimentally add voice-over video translation using the third-party VOT userscript.</source>
+        <translation>Экспериментально добавляет закадровый перевод видео с помощью стороннего пользовательского скрипта VOT.</translation>
+    </message>
+    <message>
+        <location filename="../src/VideoTranslationSettingsPage.cpp" line="55"/>
+        <source>After changing this setting or the userscript, reload already open video pages.</source>
+        <translation>После изменения этой настройки или замены скрипта перезагрузите уже открытые страницы с видео.</translation>
+    </message>
+    <message>
+        <location filename="../src/VideoTranslationSettingsPage.cpp" line="63"/>
+        <source>VOT USERSCRIPT</source>
+        <translation>ПОЛЬЗОВАТЕЛЬСКИЙ СКРИПТ VOT</translation>
+    </message>
+    <message>
+        <location filename="../src/VideoTranslationSettingsPage.cpp" line="85"/>
+        <source>Official vot.user.js</source>
+        <translation>Официальный vot.user.js</translation>
+    </message>
+    <message>
+        <location filename="../src/VideoTranslationSettingsPage.cpp" line="86"/>
+        <source>Choose script…</source>
+        <translation>Выбрать скрипт…</translation>
+    </message>
+    <message>
+        <location filename="../src/VideoTranslationSettingsPage.cpp" line="93"/>
+        <source>Select vot.user.js from the official VOT %1 release. PanBrowser accepts only the file with the verified SHA-256 hash.
+%2</source>
+        <translation>Выберите vot.user.js из официального релиза VOT %1. PanBrowser принимает только файл с проверенной контрольной суммой SHA-256.
+%2</translation>
+    </message>
+    <message>
+        <location filename="../src/VideoTranslationSettingsPage.cpp" line="105"/>
+        <source>VOT can read supported video pages and contact the HTTPS hosts declared by its verified @connect metadata. Its code and network behavior are maintained outside PanBrowser. Video translation currently requires System DNS because Qt Network cannot use Chromium Secure DNS.</source>
+        <translation>VOT может читать поддерживаемые страницы с видео и обращаться по HTTPS к узлам, указанным в проверенных метаданных @connect. Его код и сетевое поведение поддерживаются независимо от PanBrowser. Сейчас для перевода видео требуется системный DNS, поскольку Qt Network не может использовать защищённый DNS Chromium.</translation>
+    </message>
+    <message>
+        <source>VOT can read supported video pages and contact the HTTPS hosts declared by its verified @connect metadata. Its code and network behavior are maintained outside PanBrowser.</source>
+        <translation type="vanished">VOT может читать поддерживаемые страницы с видео и обращаться по HTTPS к узлам, указанным в проверенных метаданных @connect. Его код и сетевое поведение поддерживаются независимо от PanBrowser.</translation>
+    </message>
+    <message>
+        <location filename="../src/VideoTranslationSettingsPage.cpp" line="155"/>
+        <source>Choose the official VOT userscript</source>
+        <translation>Выберите официальный пользовательский скрипт VOT</translation>
+    </message>
+    <message>
+        <location filename="../src/VideoTranslationSettingsPage.cpp" line="157"/>
+        <source>JavaScript files (*.user.js *.js)</source>
+        <translation>Файлы JavaScript (*.user.js *.js)</translation>
+    </message>
+    <message>
+        <location filename="../src/VideoTranslationSettingsPage.cpp" line="166"/>
+        <source>Userscript manager unavailable</source>
+        <translation>Менеджер пользовательских скриптов недоступен</translation>
+    </message>
+    <message>
+        <source>Experimentally add voice-over video translation using the third-party VOT extension.</source>
+        <translation type="vanished">Экспериментально добавляет закадровый перевод видео с помощью стороннего расширения VOT.</translation>
+    </message>
+    <message>
+        <location filename="../src/VideoTranslationSettingsPage.cpp" line="41"/>
+        <source>STATUS</source>
+        <translation>СОСТОЯНИЕ</translation>
+    </message>
+    <message>
+        <source>After installation, reload an already open video page so the extension can attach to it.</source>
+        <translation type="vanished">После установки перезагрузите уже открытую страницу с видео, чтобы расширение подключилось к ней.</translation>
+    </message>
+    <message>
+        <source>VOT EXTENSION</source>
+        <translation type="vanished">РАСШИРЕНИЕ VOT</translation>
+    </message>
+    <message>
+        <location filename="../src/VideoTranslationSettingsPage.cpp" line="73"/>
+        <source>Enable VOT video translation</source>
+        <translation>Включить перевод видео VOT</translation>
+    </message>
+    <message>
+        <source>Official vot-extension-chrome.zip or unpacked folder</source>
+        <translation type="vanished">Официальный vot-extension-chrome.zip или распакованная папка</translation>
+    </message>
+    <message>
+        <source>Choose ZIP…</source>
+        <translation type="vanished">Выбрать ZIP…</translation>
+    </message>
+    <message>
+        <source>Choose folder…</source>
+        <translation type="vanished">Выбрать папку…</translation>
+    </message>
+    <message>
+        <source>Download vot-extension-chrome.zip from the official VOT GitHub release. PanBrowser verifies the extension identity before enabling it.</source>
+        <translation type="vanished">Скачайте vot-extension-chrome.zip из официального релиза VOT на GitHub. PanBrowser проверит подлинность расширения перед включением.</translation>
+    </message>
+    <message>
+        <source>VOT can read supported video pages and contact Yandex and VOT proxy services. Its code and network behavior are maintained outside PanBrowser.</source>
+        <translation type="vanished">VOT может читать поддерживаемые страницы с видео и обращаться к Яндексу и прокси-сервисам VOT. Его код и сетевое поведение поддерживаются независимо от PanBrowser.</translation>
+    </message>
+    <message>
+        <source>Choose the official VOT Chrome extension</source>
+        <translation type="vanished">Выберите официальное расширение VOT для Chrome</translation>
+    </message>
+    <message>
+        <source>ZIP archives (*.zip)</source>
+        <translation type="vanished">Архивы ZIP (*.zip)</translation>
+    </message>
+    <message>
+        <source>Choose an unpacked VOT extension folder</source>
+        <translation type="vanished">Выберите папку распакованного расширения VOT</translation>
+    </message>
+    <message>
+        <source>Extension manager unavailable</source>
+        <translation type="vanished">Менеджер расширений недоступен</translation>
+    </message>
+</context>
+<context>
+    <name>VotExtensionManager</name>
+    <message>
+        <source>Replacing the installed VOT extension…</source>
+        <translation type="vanished">Замена установленного расширения VOT…</translation>
+    </message>
+    <message>
+        <source>Disabled</source>
+        <translation type="vanished">Отключено</translation>
+    </message>
+    <message>
+        <source>Not installed</source>
+        <translation type="vanished">Не установлено</translation>
+    </message>
+    <message>
+        <source>Loading the installed extension…</source>
+        <translation type="vanished">Загрузка установленного расширения…</translation>
+    </message>
+    <message>
+        <source>Installing the extension…</source>
+        <translation type="vanished">Установка расширения…</translation>
+    </message>
+    <message>
+        <source>Installed and enabled</source>
+        <translation type="vanished">Установлено и включено</translation>
+    </message>
+    <message>
+        <source>Extension error</source>
+        <translation type="vanished">Ошибка расширения</translation>
+    </message>
+    <message>
+        <source>The installed extension identity is not VOT.</source>
+        <translation type="vanished">Идентификатор установленного расширения не соответствует VOT.</translation>
+    </message>
+    <message>
+        <source>The installed VOT extension was not found and its source package is unavailable.</source>
+        <translation type="vanished">Установленное расширение VOT не найдено, а его исходный пакет недоступен.</translation>
+    </message>
+    <message>
+        <source>Cannot save VOT settings: %1</source>
+        <translation type="vanished">Не удалось сохранить настройки VOT: %1</translation>
+    </message>
+    <message>
+        <source>VOT installation failed: %1</source>
+        <translation type="vanished">Не удалось установить VOT: %1</translation>
+    </message>
+    <message>
+        <source>unknown error</source>
+        <translation type="vanished">неизвестная ошибка</translation>
+    </message>
+    <message>
+        <source>The selected package is not the expected official VOT extension.</source>
+        <translation type="vanished">Выбранный пакет не является ожидаемым официальным расширением VOT.</translation>
+    </message>
+    <message>
+        <source>VOT could not be loaded: %1</source>
+        <translation type="vanished">Не удалось загрузить VOT: %1</translation>
+    </message>
+    <message>
+        <source>The previous VOT installation could not be removed: %1</source>
+        <translation type="vanished">Не удалось удалить предыдущую установку VOT: %1</translation>
+    </message>
+</context>
+<context>
+    <name>VotUserscriptManager</name>
+    <message>
+        <location filename="../src/VotUserscriptManager.cpp" line="51"/>
+        <source>Video translation is unavailable while Secure DNS is enabled</source>
+        <translation>Перевод видео недоступен, пока включён защищённый DNS</translation>
+    </message>
+    <message>
+        <location filename="../src/VotUserscriptManager.cpp" line="116"/>
+        <source>Disabled</source>
+        <translation>Отключено</translation>
+    </message>
+    <message>
+        <location filename="../src/VotUserscriptManager.cpp" line="118"/>
+        <source>Choose the verified VOT userscript</source>
+        <translation>Выберите проверенный пользовательский скрипт VOT</translation>
+    </message>
+    <message>
+        <location filename="../src/VotUserscriptManager.cpp" line="120"/>
+        <source>Ready — reload open video pages to apply</source>
+        <translation>Готово — перезагрузите открытые страницы с видео</translation>
+    </message>
+    <message>
+        <location filename="../src/VotUserscriptManager.cpp" line="122"/>
+        <source>Userscript error</source>
+        <translation>Ошибка пользовательского скрипта</translation>
+    </message>
+</context>
+<context>
+    <name>VotUserscriptPackage</name>
+    <message>
+        <location filename="../src/VotUserscriptPackage.cpp" line="76"/>
+        <source>The VOT userscript destination is unavailable</source>
+        <translation>Недоступен объект для загрузки пользовательского скрипта VOT</translation>
+    </message>
+    <message>
+        <location filename="../src/VotUserscriptPackage.cpp" line="83"/>
+        <source>The selected VOT userscript does not exist</source>
+        <translation>Выбранный пользовательский скрипт VOT не существует</translation>
+    </message>
+    <message>
+        <location filename="../src/VotUserscriptPackage.cpp" line="88"/>
+        <source>The selected VOT userscript has an invalid size</source>
+        <translation>Недопустимый размер выбранного пользовательского скрипта VOT</translation>
+    </message>
+    <message>
+        <location filename="../src/VotUserscriptPackage.cpp" line="97"/>
+        <source>Cannot read the selected VOT userscript: %1</source>
+        <translation>Не удалось прочитать выбранный пользовательский скрипт VOT: %1</translation>
+    </message>
+    <message>
+        <location filename="../src/VotUserscriptPackage.cpp" line="111"/>
+        <source>The selected file is not the verified official VOT %1 userscript</source>
+        <translation>Выбранный файл не является проверенным официальным пользовательским скриптом VOT %1</translation>
+    </message>
+    <message>
+        <location filename="../src/VotUserscriptPackage.cpp" line="122"/>
+        <source>The selected VOT userscript is not valid UTF-8</source>
+        <translation>Выбранный пользовательский скрипт VOT имеет некорректную кодировку UTF-8</translation>
+    </message>
+    <message>
+        <location filename="../src/VotUserscriptPackage.cpp" line="130"/>
+        <source>The selected VOT userscript has invalid metadata</source>
+        <translation>Выбранный пользовательский скрипт VOT содержит некорректные метаданные</translation>
+    </message>
+    <message>
+        <location filename="../src/VotUserscriptPackage.cpp" line="165"/>
+        <source>The selected VOT userscript metadata is not supported</source>
+        <translation>Метаданные выбранного пользовательского скрипта VOT не поддерживаются</translation>
+    </message>
+    <message>
+        <location filename="../src/VotUserscriptPackage.cpp" line="173"/>
+        <source>The selected VOT userscript contains an invalid network host</source>
+        <translation>Выбранный пользовательский скрипт VOT содержит недопустимый сетевой узел</translation>
+    </message>
+</context>
+<context>
+    <name>VotUserscriptStore</name>
+    <message>
+        <location filename="../src/VotUserscriptStore.cpp" line="60"/>
+        <source>The VOT storage path is unavailable</source>
+        <translation>Путь к хранилищу VOT недоступен</translation>
+    </message>
+    <message>
+        <location filename="../src/VotUserscriptStore.cpp" line="72"/>
+        <source>Cannot open VOT storage: %1</source>
+        <translation>Не удалось открыть хранилище VOT: %1</translation>
+    </message>
+    <message>
+        <location filename="../src/VotUserscriptStore.cpp" line="79"/>
+        <source>The VOT storage file has an invalid size</source>
+        <translation>Недопустимый размер файла хранилища VOT</translation>
+    </message>
+    <message>
+        <location filename="../src/VotUserscriptStore.cpp" line="90"/>
+        <source>Invalid VOT storage JSON: %1</source>
+        <translation>Некорректный JSON хранилища VOT: %1</translation>
+    </message>
+    <message>
+        <location filename="../src/VotUserscriptStore.cpp" line="99"/>
+        <source>Unsupported VOT storage format</source>
+        <translation>Неподдерживаемый формат хранилища VOT</translation>
+    </message>
+    <message>
+        <location filename="../src/VotUserscriptStore.cpp" line="106"/>
+        <source>The VOT storage contains too many values</source>
+        <translation>Хранилище VOT содержит слишком много значений</translation>
+    </message>
+    <message>
+        <location filename="../src/VotUserscriptStore.cpp" line="113"/>
+        <source>The VOT storage contains an invalid key</source>
+        <translation>Хранилище VOT содержит недопустимый ключ</translation>
+    </message>
+    <message>
+        <location filename="../src/VotUserscriptStore.cpp" line="132"/>
+        <source>The VOT storage update is invalid</source>
+        <translation>Недопустимое изменение хранилища VOT</translation>
+    </message>
+    <message>
+        <location filename="../src/VotUserscriptStore.cpp" line="140"/>
+        <source>The VOT storage limit has been reached</source>
+        <translation>Достигнут лимит хранилища VOT</translation>
+    </message>
+    <message>
+        <location filename="../src/VotUserscriptStore.cpp" line="157"/>
+        <source>The VOT storage key is invalid</source>
+        <translation>Недопустимый ключ хранилища VOT</translation>
+    </message>
+    <message>
+        <location filename="../src/VotUserscriptStore.cpp" line="192"/>
+        <source>Cannot write VOT storage: %1</source>
+        <translation>Не удалось записать хранилище VOT: %1</translation>
+    </message>
+    <message>
+        <location filename="../src/VotUserscriptStore.cpp" line="201"/>
+        <source>Cannot replace VOT storage: %1</source>
+        <translation>Не удалось заменить хранилище VOT: %1</translation>
     </message>
 </context>
 <context>

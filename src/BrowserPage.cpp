@@ -1,6 +1,7 @@
 #include "BrowserPage.h"
 
 #include "ExternalNavigationPolicy.h"
+#include "VotUserscriptBridge.h"
 
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -52,6 +53,7 @@ QSize sanitizedVideoSize(int width, int height)
 BrowserPage::BrowserPage(QWebEngineProfile *profile, QObject *parent)
     : QWebEnginePage(profile, parent)
     , m_videoPopoutToken(QUuid::createUuid().toString(QUuid::WithoutBraces))
+    , m_votNetworkToken(QUuid::createUuid().toString(QUuid::WithoutBraces))
 {
     settings()->setUnknownUrlSchemePolicy(
         QWebEngineSettings::UnknownUrlSchemePolicy::AllowUnknownUrlSchemesFromUserInteraction
@@ -61,6 +63,11 @@ BrowserPage::BrowserPage(QWebEngineProfile *profile, QObject *parent)
 QString BrowserPage::videoPopoutToken() const
 {
     return m_videoPopoutToken;
+}
+
+QString BrowserPage::votNetworkToken() const
+{
+    return m_votNetworkToken;
 }
 
 void BrowserPage::setWebApp(const WebApp &app)
@@ -205,6 +212,24 @@ void BrowserPage::javaScriptConsoleMessage(
     const QString &sourceId
 )
 {
+    const QString votPrefix = VotUserscriptBridge::messagePrefix();
+    if (message.startsWith(votPrefix)) {
+        if (message.size() > VotUserscriptBridge::maximumMessageLength())
+            return;
+        QJsonParseError parseError;
+        const QJsonDocument document = QJsonDocument::fromJson(
+            message.mid(votPrefix.size()).toUtf8(),
+            &parseError
+        );
+        if (parseError.error != QJsonParseError::NoError || !document.isObject())
+            return;
+        const QJsonObject object = document.object();
+        if (object.value(QStringLiteral("token")).toString() != m_votNetworkToken)
+            return;
+        emit votNetworkMessage(object);
+        return;
+    }
+
     if (message.startsWith(videoPopoutMessagePrefix)) {
         if (message.size() > maximumVideoPopoutMessageLength)
             return;

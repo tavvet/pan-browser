@@ -32,6 +32,12 @@ public:
         const CrossDomainSettings &settings,
         QString *error = nullptr
     );
+    [[nodiscard]] bool allowCrossDomainRequest(
+        const QUrl &sourceUrl,
+        const QUrl &targetUrl,
+        int resourceType,
+        bool sourceUrlIsOriginOnly = false
+    );
     bool resolveCrossDomainRequest(
         const QString &sourceSite,
         const QString &targetHost,

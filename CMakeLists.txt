@@ -103,6 +103,18 @@ set(PANBROWSER_APP_SOURCES
     src/DetachedVideoWindow.h
     src/VideoElementBridge.cpp
     src/VideoElementBridge.h
+    src/VideoTranslationSettings.cpp
+    src/VideoTranslationSettings.h
+    src/VideoTranslationSettingsPage.cpp
+    src/VideoTranslationSettingsPage.h
+    src/VotUserscriptBridge.cpp
+    src/VotUserscriptBridge.h
+    src/VotUserscriptManager.cpp
+    src/VotUserscriptManager.h
+    src/VotUserscriptPackage.cpp
+    src/VotUserscriptPackage.h
+    src/VotUserscriptStore.cpp
+    src/VotUserscriptStore.h
     src/DnsSettings.cpp
     src/DnsSettings.h
     src/DnsSettingsPage.cpp
@@ -389,6 +401,18 @@ qt_add_executable(PanBrowserTests
     src/DetachedVideoWindow.h
     src/VideoElementBridge.cpp
     src/VideoElementBridge.h
+    src/VideoTranslationSettings.cpp
+    src/VideoTranslationSettings.h
+    src/VideoTranslationSettingsPage.cpp
+    src/VideoTranslationSettingsPage.h
+    src/VotUserscriptBridge.cpp
+    src/VotUserscriptBridge.h
+    src/VotUserscriptManager.cpp
+    src/VotUserscriptManager.h
+    src/VotUserscriptPackage.cpp
+    src/VotUserscriptPackage.h
+    src/VotUserscriptStore.cpp
+    src/VotUserscriptStore.h
     src/DnsSettings.cpp
     src/DnsSettings.h
     src/DnsSettingsPage.cpp

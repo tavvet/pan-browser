@@ -8,6 +8,7 @@
 #include "SessionStore.h"
 #include "SearchSettings.h"
 #include "TrustConfiguration.h"
+#include "VideoTranslationSettings.h"
 #include "WebAppStore.h"
 
 #include <QHash>
@@ -32,6 +33,7 @@ class QAction;
 class QPoint;
 class BookmarkStore;
 class BrowserFullScreenController;
+class BrowserPage;
 class BrowserTabBar;
 class BrowserProfile;
 class DownloadButton;
@@ -55,6 +57,7 @@ class QWebEngineNewWindowRequest;
 class QWebEnginePage;
 class QWebEngineView;
 class WindowChromeController;
+class VotUserscriptManager;
 
 class MainWindow final : public QMainWindow {
     Q_OBJECT
@@ -159,6 +162,7 @@ private:
     [[nodiscard]] bool hasPinnedTabs() const;
     QWebEngineView *currentWebView() const;
     QWebEnginePage *pageForTab(QWebEngineView *webView) const;
+    QWebEngineView *webViewForPage(const BrowserPage *page) const;
     QUrl urlForTab(QWebEngineView *webView) const;
     QString titleForTab(QWebEngineView *webView) const;
     QWebEngineView *activeInteractionWebView() const;
@@ -241,6 +245,7 @@ private:
     void initializeDnsSettings();
     void initializeProxySettings();
     void initializeCrossDomainSettings();
+    void initializeVideoTranslationSettings();
     void cancelCrossDomainPromptsForView(QWebEngineView *webView);
     void routeCrossDomainRequest(
         const QUrl &sourceUrl,
@@ -254,6 +259,7 @@ private:
     void showProxyConfigurationError();
 
     BrowserProfile *m_profile = nullptr;
+    VotUserscriptManager *m_votUserscriptManager = nullptr;
     DownloadManager *m_downloadManager = nullptr;
     HistoryStore *m_historyStore = nullptr;
     BookmarkStore *m_bookmarkStore = nullptr;
@@ -309,6 +315,7 @@ private:
     ProxySettings m_proxySettings;
     ProxySettings m_activeProxySettings;
     CrossDomainSettings m_crossDomainSettings;
+    VideoTranslationSettings m_videoTranslationSettings;
     SessionStore m_sessionStore;
     TrustPolicy m_trustPolicy;
     QString m_configurationPath;
@@ -316,6 +323,7 @@ private:
     QString m_dnsConfigurationPath;
     QString m_proxyConfigurationPath;
     QString m_crossDomainConfigurationPath;
+    QString m_videoTranslationConfigurationPath;
     QString m_proxyConfigurationError;
     QString m_crossDomainConfigurationError;
     QString m_historyError;

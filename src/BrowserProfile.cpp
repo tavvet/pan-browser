@@ -209,6 +209,22 @@ bool BrowserProfile::resolveCrossDomainRequest(
     return true;
 }
 
+bool BrowserProfile::allowCrossDomainRequest(
+    const QUrl &sourceUrl,
+    const QUrl &targetUrl,
+    int resourceType,
+    bool sourceUrlIsOriginOnly
+)
+{
+    return m_requestInterceptor
+        && m_requestInterceptor->allowRequest(
+            sourceUrl,
+            targetUrl,
+            resourceType,
+            sourceUrlIsOriginOnly
+        );
+}
+
 void BrowserProfile::dismissCrossDomainRequest(
     const QString &sourceSite,
     const QString &targetHost

@@ -235,8 +235,27 @@ void CrossDomainRequestInterceptor::interceptRequest(QWebEngineUrlRequestInfo &i
         info.firstPartyUrl(),
         info.initiator()
     );
-    const QUrl &sourceUrl = source.url;
-    const QUrl targetUrl = info.requestUrl();
+    if (!allowRequest(
+            source.url,
+            info.requestUrl(),
+            static_cast<int>(info.resourceType()),
+            source.originOnly
+        )) {
+        info.block(true);
+    }
+}
+
+bool CrossDomainRequestInterceptor::allowRequest(
+    const QUrl &sourceUrl,
+    const QUrl &targetUrl,
+    int resourceType,
+    bool sourceUrlIsOriginOnly
+)
+{
+    if (m_blockNetwork
+        && BrowserProfile::shouldBlockForProxyConfigurationError(targetUrl)) {
+        return false;
+    }
 
     CrossDomainPolicySnapshot policy;
     {
@@ -248,35 +267,29 @@ void CrossDomainRequestInterceptor::interceptRequest(QWebEngineUrlRequestInfo &i
         targetUrl
     );
     if (configured.decision == CrossDomainEvaluation::Allow)
-        return;
-    if (configured.decision == CrossDomainEvaluation::Block) {
-        info.block(true);
-        return;
-    }
+        return true;
+    if (configured.decision == CrossDomainEvaluation::Block)
+        return false;
 
     const QString &sourceSite = configured.sourceSite;
     const QString &targetHost = configured.targetHost;
     if (sourceSite.isEmpty() || targetHost.isEmpty())
-        return;
+        return true;
     const QString key = requestKey(sourceSite, targetHost);
 
     {
         QReadLocker locker(&m_lock);
         const auto session = m_sessionDecisions.constFind(key);
         if (session != m_sessionDecisions.cend()) {
-            if (*session == CrossDomainRuleDecision::Block)
-                info.block(true);
-            return;
+            return *session == CrossDomainRuleDecision::Allow;
         }
     }
 
     const CrossDomainEvaluation preset = policy.evaluatePresetPolicy(targetHost);
     if (preset == CrossDomainEvaluation::Allow)
-        return;
-    if (preset == CrossDomainEvaluation::Block) {
-        info.block(true);
-        return;
-    }
+        return true;
+    if (preset == CrossDomainEvaluation::Block)
+        return false;
 
     CrossDomainEvaluation finalDecision = CrossDomainEvaluation::Ask;
     QUrl pendingSourceUrl;
@@ -314,7 +327,7 @@ void CrossDomainRequestInterceptor::interceptRequest(QWebEngineUrlRequestInfo &i
                             sourceUrl,
                             &pendingSourceUrl,
                             &pendingSourceUrlIsOriginOnly,
-                            source.originOnly
+                            sourceUrlIsOriginOnly
                         );
                     }
                 }
@@ -322,18 +335,18 @@ void CrossDomainRequestInterceptor::interceptRequest(QWebEngineUrlRequestInfo &i
         }
     }
     if (finalDecision == CrossDomainEvaluation::Allow)
-        return;
+        return true;
 
-    info.block(true);
     if (notify) {
         emit requestBlocked(
             pendingSourceUrl,
             pendingSourceSite,
             pendingTargetHost,
-            static_cast<int>(info.resourceType()),
+            resourceType,
             pendingSourceUrlIsOriginOnly
         );
     }
+    return false;
 }
 
 void CrossDomainRequestInterceptor::setSettings(const CrossDomainSettings &settings)

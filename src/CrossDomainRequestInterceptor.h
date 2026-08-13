@@ -60,6 +60,12 @@ public:
     );
 
     void interceptRequest(QWebEngineUrlRequestInfo &info) override;
+    [[nodiscard]] bool allowRequest(
+        const QUrl &sourceUrl,
+        const QUrl &targetUrl,
+        int resourceType,
+        bool sourceUrlIsOriginOnly = false
+    );
     void setSettings(const CrossDomainSettings &settings);
     void setSettingsResolvingPendingRequest(
         const CrossDomainSettings &settings,

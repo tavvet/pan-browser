@@ -29,6 +29,7 @@
 #include "SettingsDialog.h"
 #include "SiteDomain.h"
 #include "VideoElementBridge.h"
+#include "VotUserscriptManager.h"
 #include "WindowPlacement.h"
 #include "WindowChrome.h"
 #include "WebAppStore.h"
@@ -200,6 +201,7 @@ MainWindow::MainWindow(
         initializeDnsSettings();
         initializeProxySettings();
         initializeCrossDomainSettings();
+        initializeVideoTranslationSettings();
         QString dataResetError;
         if (!BrowserProfile::applyPendingDataReset(&dataResetError))
             qWarning().noquote() << "[PanBrowser data reset]" << dataResetError;
@@ -210,6 +212,34 @@ MainWindow::MainWindow(
             m_crossDomainSettings,
             m_crossDomainConfigurationPath
         );
+        m_votUserscriptManager = new VotUserscriptManager(
+            QDir(QStandardPaths::writableLocation(QStandardPaths::AppDataLocation))
+                .filePath(QStringLiteral("vot-storage.json")),
+            m_dnsSettings.mode(),
+            m_profile
+        );
+        connect(
+            m_votUserscriptManager,
+            &VotUserscriptManager::settingsChanged,
+            this,
+            [this](const VideoTranslationSettings &settings) {
+                m_videoTranslationSettings = settings;
+            }
+        );
+        connect(
+            m_votUserscriptManager,
+            &VotUserscriptManager::stateChanged,
+            this,
+            [this] {
+                if (m_votUserscriptManager
+                    && m_votUserscriptManager->state() == VotUserscriptState::Error) {
+                    qWarning().noquote()
+                        << "[PanBrowser VOT]"
+                        << m_votUserscriptManager->statusText();
+                }
+            }
+        );
+        m_votUserscriptManager->applySettings(m_videoTranslationSettings);
         m_downloadManager = new DownloadManager(
             m_profile,
             this,
@@ -261,6 +291,8 @@ MainWindow::MainWindow(
         m_dnsConfigurationPath = primaryWindow->m_dnsConfigurationPath;
         m_proxyConfigurationPath = primaryWindow->m_proxyConfigurationPath;
         m_crossDomainConfigurationPath = primaryWindow->m_crossDomainConfigurationPath;
+        m_videoTranslationConfigurationPath =
+            primaryWindow->m_videoTranslationConfigurationPath;
         m_trustPolicy = primaryWindow->m_trustPolicy;
         m_preferences = primaryWindow->m_preferences;
         m_searchSettings = primaryWindow->m_searchSettings;
@@ -268,6 +300,8 @@ MainWindow::MainWindow(
         m_proxySettings = primaryWindow->m_proxySettings;
         m_activeProxySettings = primaryWindow->m_activeProxySettings;
         m_crossDomainSettings = primaryWindow->m_crossDomainSettings;
+        m_videoTranslationSettings = primaryWindow->m_videoTranslationSettings;
+        m_votUserscriptManager = primaryWindow->m_votUserscriptManager;
         m_proxyConfigurationError = primaryWindow->m_proxyConfigurationError;
         m_networkBlockedByProxyError = primaryWindow->m_networkBlockedByProxyError;
         m_proxyAuthenticationController = primaryWindow->m_proxyAuthenticationController;
@@ -276,6 +310,33 @@ MainWindow::MainWindow(
     }
 
     createInterface();
+    if (m_votUserscriptManager) {
+        connect(
+            m_votUserscriptManager,
+            &VotUserscriptManager::proxyAuthenticationRequired,
+            this,
+            [this](
+                BrowserPage *page,
+                const QUrl &requestUrl,
+                QAuthenticator *authenticator,
+                const QString &proxyHost
+            ) {
+                QWebEngineView *webView = webViewForPage(page);
+                if (!webView)
+                    return;
+                if (m_proxyAuthenticationController) {
+                    m_proxyAuthenticationController->requestAuthentication(
+                        interactionParentForTab(webView),
+                        requestUrl,
+                        authenticator,
+                        proxyHost
+                    );
+                } else if (authenticator) {
+                    *authenticator = QAuthenticator();
+                }
+            }
+        );
+    }
     m_fullScreenController = std::make_unique<BrowserFullScreenController>(this);
     connect(
         m_fullScreenController.get(),
@@ -462,6 +523,7 @@ MainWindow::~MainWindow()
     m_bookmarkStore = nullptr;
     m_webAppStore = nullptr;
     m_profile = nullptr;
+    m_votUserscriptManager = nullptr;
 }
 
 QString MainWindow::startupError() const
@@ -1194,6 +1256,8 @@ QWebEngineView *MainWindow::createTab(
         page->videoPopoutToken(),
         tr("Open Video in Separate Window")
     );
+    if (m_votUserscriptManager)
+        m_votUserscriptManager->configurePage(page);
     page->settings()->setAttribute(QWebEngineSettings::FullScreenSupportEnabled, true);
     webView->setPage(page);
     BrowserTabState state;
@@ -1401,6 +1465,17 @@ QWebEnginePage *MainWindow::pageForTab(QWebEngineView *webView) const
     if (state != m_tabStates.cend() && state->page)
         return state->page;
     return webView->page();
+}
+
+QWebEngineView *MainWindow::webViewForPage(const BrowserPage *page) const
+{
+    if (!page)
+        return nullptr;
+    for (auto iterator = m_tabStates.cbegin(); iterator != m_tabStates.cend(); ++iterator) {
+        if (iterator->page == page)
+            return iterator.key();
+    }
+    return nullptr;
 }
 
 QUrl MainWindow::urlForTab(QWebEngineView *webView) const
@@ -3096,16 +3171,20 @@ void MainWindow::openSettingsPage(int page)
     settingsContext.dnsConfigurationPath = m_dnsConfigurationPath;
     settingsContext.proxyConfigurationPath = m_proxyConfigurationPath;
     settingsContext.crossDomainConfigurationPath = m_crossDomainConfigurationPath;
+    settingsContext.videoTranslationConfigurationPath =
+        m_videoTranslationConfigurationPath;
     settingsContext.preferences = m_preferences;
     settingsContext.searchSettings = m_searchSettings;
     settingsContext.dnsSettings = m_dnsSettings;
     settingsContext.proxySettings = m_proxySettings;
     settingsContext.activeProxySettings = m_activeProxySettings;
     settingsContext.crossDomainSettings = m_profile->crossDomainSettings();
+    settingsContext.videoTranslationSettings = m_videoTranslationSettings;
     settingsContext.networkBlockedByProxyError = m_networkBlockedByProxyError;
     settingsContext.profile = m_profile;
     settingsContext.historyStore = m_historyStore;
     settingsContext.webAppStore = m_webAppStore;
+    settingsContext.votUserscriptManager = m_votUserscriptManager;
     SettingsDialog dialog(
         settingsContext,
         urlForTab(currentWebView()),
@@ -3135,6 +3214,7 @@ void MainWindow::openSettingsPage(int page)
         m_dnsSettings = dialog.dnsSettings();
         m_proxySettings = dialog.proxySettings();
         m_crossDomainSettings = dialog.crossDomainSettings();
+        m_videoTranslationSettings = dialog.videoTranslationSettings();
         QString crossDomainError;
         if (!m_profile->setCrossDomainSettings(
                 m_crossDomainSettings,
@@ -3147,6 +3227,15 @@ void MainWindow::openSettingsPage(int page)
             );
         }
         m_crossDomainPromptController->reset();
+        if (m_votUserscriptManager) {
+            m_votUserscriptManager->setDnsResolutionMode(m_dnsSettings.mode());
+            m_votUserscriptManager->applySettings(m_videoTranslationSettings);
+            for (auto iterator = m_tabStates.cbegin(); iterator != m_tabStates.cend(); ++iterator) {
+                m_votUserscriptManager->configurePage(
+                    qobject_cast<BrowserPage *>(iterator->page.data())
+                );
+            }
+        }
         applyDeveloperToolsPreference();
         if (!m_preferences.saveBrowsingHistory() && m_addressCompletionPopup)
             m_addressCompletionPopup->hide();
@@ -3163,6 +3252,16 @@ void MainWindow::openSettingsPage(int page)
                 popup->m_dnsSettings = m_dnsSettings;
                 popup->m_proxySettings = m_proxySettings;
                 popup->m_crossDomainSettings = m_crossDomainSettings;
+                popup->m_videoTranslationSettings = m_videoTranslationSettings;
+                if (m_votUserscriptManager) {
+                    for (auto iterator = popup->m_tabStates.cbegin();
+                        iterator != popup->m_tabStates.cend();
+                         ++iterator) {
+                        m_votUserscriptManager->configurePage(
+                            qobject_cast<BrowserPage *>(iterator->page.data())
+                        );
+                    }
+                }
                 popup->m_crossDomainPromptController->reset();
                 popup->applyDeveloperToolsPreference();
                 popup->updateAddressPlaceholder();
@@ -3623,6 +3722,39 @@ void MainWindow::initializeCrossDomainSettings()
 
     if (!m_crossDomainSettings.save(m_crossDomainConfigurationPath, &error))
         qWarning().noquote() << "[PanBrowser site connections]" << error;
+}
+
+void MainWindow::initializeVideoTranslationSettings()
+{
+    const QString directory = QStandardPaths::writableLocation(
+        QStandardPaths::AppDataLocation
+    );
+    QString directoryError;
+    if (!PrivateData::ensureDirectory(directory, &directoryError))
+        qWarning().noquote() << "[PanBrowser VOT settings]" << directoryError;
+    m_videoTranslationConfigurationPath = QDir(directory).filePath(
+        QStringLiteral("video-translation.json")
+    );
+    m_videoTranslationSettings = VideoTranslationSettings::defaults();
+
+    QString error;
+    if (QFile::exists(m_videoTranslationConfigurationPath)) {
+        VideoTranslationSettings loaded;
+        if (loaded.load(m_videoTranslationConfigurationPath, &error)) {
+            m_videoTranslationSettings = loaded;
+        } else {
+            qWarning().noquote() << "[PanBrowser VOT settings]" << error
+                                 << "Disabling VOT in memory; the file was not overwritten.";
+        }
+        return;
+    }
+
+    if (!m_videoTranslationSettings.save(
+            m_videoTranslationConfigurationPath,
+            &error
+        )) {
+        qWarning().noquote() << "[PanBrowser VOT settings]" << error;
+    }
 }
 
 void MainWindow::cancelCrossDomainPromptsForView(QWebEngineView *webView)

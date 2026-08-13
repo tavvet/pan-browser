@@ -547,6 +547,9 @@ void WindowInteractionTests::settingsDialogRegistersEveryPageAndSelectsInitialPa
     context.crossDomainConfigurationPath = directory.filePath(
         QStringLiteral("site-connections.json")
     );
+    context.videoTranslationConfigurationPath = directory.filePath(
+        QStringLiteral("video-translation.json")
+    );
     context.crossDomainSettings.setEnabledPresetIds({QStringLiteral("public-cdns")});
     context.profile = &profile;
     context.historyStore = &historyStore;
@@ -561,8 +564,8 @@ void WindowInteractionTests::settingsDialogRegistersEveryPageAndSelectsInitialPa
     auto *pages = dialog.findChild<QStackedWidget *>(QStringLiteral("settingsPages"));
     QVERIFY(sidebar);
     QVERIFY(pages);
-    QCOMPARE(sidebar->count(), 10);
-    QCOMPARE(pages->count(), 10);
+    QCOMPARE(sidebar->count(), 11);
+    QCOMPARE(pages->count(), 11);
     QCOMPARE(
         sidebar->currentItem()->data(Qt::UserRole).toInt(),
         static_cast<int>(SettingsDialog::Page::WebApps)
@@ -580,6 +583,7 @@ void WindowInteractionTests::settingsDialogRegistersEveryPageAndSelectsInitialPa
         SettingsDialog::Page::Search,
         SettingsDialog::Page::History,
         SettingsDialog::Page::WebApps,
+        SettingsDialog::Page::VideoTranslation,
         SettingsDialog::Page::PrivacyData,
         SettingsDialog::Page::Dns,
         SettingsDialog::Page::Proxy,
@@ -592,6 +596,7 @@ void WindowInteractionTests::settingsDialogRegistersEveryPageAndSelectsInitialPa
         QStringLiteral("searchSettingsPage"),
         QStringLiteral("historySettingsPage"),
         QStringLiteral("webAppsSettingsPage"),
+        QStringLiteral("videoTranslationSettingsPage"),
         QStringLiteral("privacyDataSettingsPage"),
         QStringLiteral("dnsSettingsPage"),
         QStringLiteral("proxySettingsPage"),

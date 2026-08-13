@@ -11,6 +11,7 @@
 #include "SearchSettingsPage.h"
 #include "SettingsSaveTransaction.h"
 #include "TrustRulesSettingsPage.h"
+#include "VideoTranslationSettingsPage.h"
 #include "WebAppsSettingsPage.h"
 
 #include <QDialogButtonBox>
@@ -77,14 +78,17 @@ SettingsDialog::SettingsDialog(
     , m_dnsConfigurationPath(context.dnsConfigurationPath)
     , m_proxyConfigurationPath(context.proxyConfigurationPath)
     , m_crossDomainConfigurationPath(context.crossDomainConfigurationPath)
+    , m_videoTranslationConfigurationPath(context.videoTranslationConfigurationPath)
     , m_preferences(context.preferences)
     , m_searchSettings(context.searchSettings)
     , m_dnsSettings(context.dnsSettings)
     , m_proxySettings(context.proxySettings)
     , m_activeProxySettings(context.activeProxySettings)
     , m_crossDomainSettings(context.crossDomainSettings)
+    , m_videoTranslationSettings(context.videoTranslationSettings)
     , m_networkBlockedByProxyError(context.networkBlockedByProxyError)
     , m_profile(context.profile)
+    , m_votUserscriptManager(context.votUserscriptManager)
 {
     createInterface(currentUrl, initialPage, context.historyStore, context.webAppStore);
 }
@@ -117,6 +121,11 @@ ProxySettings SettingsDialog::proxySettings() const
 CrossDomainSettings SettingsDialog::crossDomainSettings() const
 {
     return m_crossDomainSettings;
+}
+
+VideoTranslationSettings SettingsDialog::videoTranslationSettings() const
+{
+    return m_videoTranslationSettings;
 }
 
 void SettingsDialog::reject()
@@ -212,6 +221,18 @@ void SettingsDialog::createInterface(
             if (result() == QDialog::Accepted)
                 emit webAppOpenRequested(id);
         }
+    );
+
+    m_videoTranslationPage = new VideoTranslationSettingsPage(
+        m_videoTranslationSettings,
+        m_votUserscriptManager,
+        m_pages
+    );
+    registerPage(
+        Page::VideoTranslation,
+        QIcon(QStringLiteral(":/assets/icons/languages.svg")),
+        tr("Video Translation"),
+        m_videoTranslationPage
     );
 
     m_privacyDataPage = new PrivacyDataSettingsPage(m_profile, m_pages);
@@ -371,6 +392,11 @@ void SettingsDialog::saveAndClose()
         QMessageBox::warning(this, tr("Cannot save site connection settings"), error);
         return;
     }
+    if (!m_videoTranslationPage->validate(&error)) {
+        selectPage(Page::VideoTranslation);
+        QMessageBox::warning(this, tr("Cannot save video translation settings"), error);
+        return;
+    }
     SettingsSaveTransaction transaction;
     if (!transaction.capture(
             {
@@ -382,6 +408,8 @@ void SettingsDialog::saveAndClose()
                 m_proxyConfigurationPath + QStringLiteral(".backup"),
                 m_crossDomainConfigurationPath,
                 m_crossDomainConfigurationPath + QStringLiteral(".backup"),
+                m_videoTranslationConfigurationPath,
+                m_videoTranslationConfigurationPath + QStringLiteral(".backup"),
                 m_configurationPath,
                 m_configurationPath + QStringLiteral(".backup"),
             },
@@ -395,6 +423,8 @@ void SettingsDialog::saveAndClose()
     DnsSettings dnsSettings = m_dnsPage->settings();
     ProxySettings proxySettings = m_proxyPage->settings();
     CrossDomainSettings crossDomainSettings = m_crossDomainPage->settings();
+    VideoTranslationSettings videoTranslationSettings =
+        m_videoTranslationPage->settings();
     if (!preferences.save(&error)) {
         selectPage(Page::General);
         QMessageBox::warning(this, tr("Cannot save settings"), error);
@@ -432,6 +462,21 @@ void SettingsDialog::saveAndClose()
         QMessageBox::warning(this, tr("Cannot save site connection settings"), error);
         return;
     }
+    if (!videoTranslationSettings.save(
+            m_videoTranslationConfigurationPath,
+            &error
+        )) {
+        const QString rollbackError = rollbackSettings(m_preferences, transaction);
+        selectPage(Page::VideoTranslation);
+        if (!rollbackError.isEmpty())
+            error += tr("\n\nRollback was incomplete:\n") + rollbackError;
+        QMessageBox::warning(
+            this,
+            tr("Cannot save video translation settings"),
+            error
+        );
+        return;
+    }
     if (!m_trustRules->save(&error)) {
         const QString rollbackError = rollbackSettings(m_preferences, transaction);
         selectPage(Page::TrustRules);
@@ -455,6 +500,7 @@ void SettingsDialog::saveAndClose()
     m_dnsSettings = dnsSettings;
     m_proxySettings = proxySettings;
     m_crossDomainSettings = crossDomainSettings;
+    m_videoTranslationSettings = videoTranslationSettings;
     if (!certificateCleanupFailures.isEmpty()) {
         QMessageBox::warning(
             this,

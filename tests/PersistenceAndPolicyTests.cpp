@@ -3,6 +3,10 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QHostAddress>
+#include <QTcpServer>
+#include <QTcpSocket>
+#include <QWebEngineScriptCollection>
 
 class PersistenceAndPolicyTests final : public QObject {
     Q_OBJECT
@@ -17,6 +21,16 @@ private slots:
     void compiledCrossDomainPolicyPreservesPrecedence();
     void crossDomainSourceResolutionFailsClosed();
     void crossDomainSettingsRoundTripAndRejectCorruption();
+    void videoTranslationSettingsRoundTripAndValidateSource();
+    void votUserscriptPackageRejectsUnverifiedFilesAndMatchesUrls();
+    void votUserscriptPackageLoadsOfficialFileWhenProvided();
+    void votUserscriptStorageIsScriptScopedAndPersistent();
+    void votNativeNetworkingRequiresSystemDns();
+    void votNetworkDestinationsRequireHttpsAndDeclaredHosts();
+    void votRedirectsDoNotForwardCredentialsAcrossOrigins();
+    void nativeRequestsUseCrossDomainAndFailClosedPolicies();
+    void votUserscriptBridgeInjectsOnlyOnMatchingPages();
+    void votUserscriptBridgeInjectsIntoMatchingSubframes();
     void crossDomainPendingRequestsAreBoundedAndDeduplicated();
     void interfaceLanguagePreferenceRoundTrips();
     void interfaceLanguageSettingsParsing();
@@ -382,6 +396,7 @@ void PersistenceAndPolicyTests::crossDomainSourceResolutionFailsClosed()
     );
     QVERIFY(opaqueSource.url.isEmpty());
     QVERIFY(!opaqueSource.originOnly);
+
     QVERIFY(crossDomainRequestSource(
         QUrl(QStringLiteral("https:///missing-host")),
         QUrl()
@@ -424,6 +439,394 @@ void PersistenceAndPolicyTests::crossDomainSourceResolutionFailsClosed()
         settings.evaluate(QUrl(QStringLiteral("about:blank")), target),
         CrossDomainEvaluation::Allow
     );
+}
+
+void PersistenceAndPolicyTests::videoTranslationSettingsRoundTripAndValidateSource()
+{
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+    const QString scriptPath = directory.filePath(QStringLiteral("vot.user.js"));
+    QFile script(scriptPath);
+    QVERIFY(script.open(QIODevice::WriteOnly));
+    QCOMPARE(script.write("// test"), qint64(7));
+    script.close();
+
+    VideoTranslationSettings settings;
+    QVERIFY(!settings.enabled());
+    settings.setSourcePath(scriptPath);
+    settings.setEnabled(true);
+    QString error;
+    QVERIFY2(settings.validate(&error), qPrintable(error));
+
+    const QString settingsPath = directory.filePath(
+        QStringLiteral("video-translation.json")
+    );
+    QVERIFY2(settings.save(settingsPath, &error), qPrintable(error));
+    VideoTranslationSettings loaded;
+    QVERIFY2(loaded.load(settingsPath, &error), qPrintable(error));
+    QVERIFY(loaded.enabled());
+    QCOMPARE(loaded.sourcePath(), QFileInfo(scriptPath).absoluteFilePath());
+    loaded.setSourcePath(directory.filePath(QStringLiteral("replacement.user.js")));
+    QVERIFY(!loaded.validate(&error));
+
+    VideoTranslationSettings disabled;
+    disabled.setSourcePath(directory.filePath(QStringLiteral("missing.user.js")));
+    QVERIFY(disabled.validate(&error));
+}
+
+void PersistenceAndPolicyTests::votUserscriptPackageRejectsUnverifiedFilesAndMatchesUrls()
+{
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+    const QString scriptPath = directory.filePath(QStringLiteral("vot.user.js"));
+    QFile script(scriptPath);
+    QVERIFY(script.open(QIODevice::WriteOnly));
+    QVERIFY(script.write(
+        "// ==UserScript==\n// @version 1.11.8\n// ==/UserScript==\n"
+    ) > 0);
+    script.close();
+
+    VotUserscript userscript;
+    QString error;
+    QVERIFY(!VotUserscriptPackage::load(scriptPath, &userscript, &error));
+    QVERIFY(error.contains(QStringLiteral("verified"), Qt::CaseInsensitive));
+
+    QVERIFY(VotUserscriptPackage::matchesUrlPattern(
+        QStringLiteral("*://*.youtube.com/*"),
+        QUrl(QStringLiteral("https://www.youtube.com/watch?v=1"))
+    ));
+    QVERIFY(VotUserscriptPackage::matchesUrlPattern(
+        QStringLiteral("*://*.youtube.com/*"),
+        QUrl(QStringLiteral("https://youtube.com/"))
+    ));
+    QVERIFY(!VotUserscriptPackage::matchesUrlPattern(
+        QStringLiteral("*://*.youtube.com/*"),
+        QUrl(QStringLiteral("https://notyoutube.com/"))
+    ));
+    QVERIFY(VotUserscriptPackage::matchesUrlPattern(
+        QStringLiteral("*://*/*.mp4*"),
+        QUrl(QStringLiteral("https://media.example/video.mp4?token=1"))
+    ));
+}
+
+void PersistenceAndPolicyTests::votUserscriptPackageLoadsOfficialFileWhenProvided()
+{
+    const QString scriptPath = qEnvironmentVariable(
+        "PANBROWSER_VOT_USERSCRIPT_TEST_PATH"
+    );
+    if (scriptPath.isEmpty())
+        QSKIP("PANBROWSER_VOT_USERSCRIPT_TEST_PATH is not set");
+
+    VotUserscript userscript;
+    QString error;
+    QVERIFY2(
+        VotUserscriptPackage::load(scriptPath, &userscript, &error),
+        qPrintable(error)
+    );
+    QCOMPARE(userscript.version, VotUserscriptPackage::supportedVersion());
+    QCOMPARE(userscript.sha256, VotUserscriptPackage::expectedSha256Hex());
+    QVERIFY(!userscript.matchPatterns.isEmpty());
+    QVERIFY(userscript.connectHosts.contains(QStringLiteral("yandex.ru")));
+    const QString injected = VotUserscriptBridge::injectedSource(
+        userscript,
+        QStringLiteral("test-token"),
+        {{QStringLiteral("seed"), QStringLiteral("value")}}
+    );
+    QVERIFY(injected.contains(userscript.sourceCode));
+    const qsizetype userscriptOffset = injected.lastIndexOf(userscript.sourceCode);
+    QVERIFY(userscriptOffset >= 0);
+    QVERIFY(!injected.left(userscriptOffset).contains(QStringLiteral("localStorage")));
+    QVERIFY(injected.contains(QStringLiteral("\"seed\":\"value\"")));
+}
+
+void PersistenceAndPolicyTests::votUserscriptStorageIsScriptScopedAndPersistent()
+{
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+    const QString path = directory.filePath(QStringLiteral("vot-storage.json"));
+
+    VotUserscriptStore store(path);
+    QString error;
+    QVERIFY2(store.load(&error), qPrintable(error));
+    QVERIFY2(store.setValue(
+        QStringLiteral("account"),
+        QJsonObject{
+            {QStringLiteral("token"), QStringLiteral("secret")},
+            {QStringLiteral("expires"), 12345},
+        },
+        &error
+    ), qPrintable(error));
+
+    VotUserscriptStore restored(path);
+    QVERIFY2(restored.load(&error), qPrintable(error));
+    QCOMPARE(
+        restored.values().value(QStringLiteral("account")).toObject()
+            .value(QStringLiteral("token")).toString(),
+        QStringLiteral("secret")
+    );
+    QVERIFY2(restored.removeValue(QStringLiteral("account"), &error), qPrintable(error));
+    QVERIFY(!restored.values().contains(QStringLiteral("account")));
+}
+
+void PersistenceAndPolicyTests::votNativeNetworkingRequiresSystemDns()
+{
+    QVERIFY(VotUserscriptManager::supportsDnsResolutionMode(
+        DnsResolutionMode::System
+    ));
+    QVERIFY(!VotUserscriptManager::supportsDnsResolutionMode(
+        DnsResolutionMode::SecureWithFallback
+    ));
+    QVERIFY(!VotUserscriptManager::supportsDnsResolutionMode(
+        DnsResolutionMode::SecureOnly
+    ));
+}
+
+void PersistenceAndPolicyTests::votNetworkDestinationsRequireHttpsAndDeclaredHosts()
+{
+    const QStringList hosts{
+        QStringLiteral("yandex.ru"),
+        QStringLiteral("googlevideo.com"),
+    };
+    QVERIFY(VotUserscriptPackage::isAllowedConnectUrl(
+        hosts,
+        QUrl(QStringLiteral("https://api.browser.yandex.ru/video"))
+    ));
+    QVERIFY(VotUserscriptPackage::isAllowedConnectUrl(
+        hosts,
+        QUrl(QStringLiteral("https://rr1.googlevideo.com/audio"))
+    ));
+    QVERIFY(!VotUserscriptPackage::isAllowedConnectUrl(
+        hosts,
+        QUrl(QStringLiteral("http://api.browser.yandex.ru/video"))
+    ));
+    QVERIFY(!VotUserscriptPackage::isAllowedConnectUrl(
+        hosts,
+        QUrl(QStringLiteral("https://yandex.ru@example.test/video"))
+    ));
+    QVERIFY(!VotUserscriptPackage::isAllowedConnectUrl(
+        hosts,
+        QUrl(QStringLiteral("https://notyandex.ru/video"))
+    ));
+}
+
+void PersistenceAndPolicyTests::nativeRequestsUseCrossDomainAndFailClosedPolicies()
+{
+    CrossDomainSettings settings;
+    settings.setEnabled(true);
+    settings.setGlobalBlockPatterns({QStringLiteral("blocked.example")});
+    settings.setGlobalAllowPatterns({QStringLiteral("allowed.example")});
+    CrossDomainRequestInterceptor interceptor(false, settings);
+    QSignalSpy blockedSpy(
+        &interceptor,
+        &CrossDomainRequestInterceptor::requestBlocked
+    );
+    const QUrl source(QStringLiteral("https://video.example/watch"));
+
+    QVERIFY(interceptor.allowRequest(
+        source,
+        QUrl(QStringLiteral("https://allowed.example/audio")),
+        static_cast<int>(QWebEngineUrlRequestInfo::ResourceTypeXhr)
+    ));
+    QVERIFY(!interceptor.allowRequest(
+        source,
+        QUrl(QStringLiteral("https://blocked.example/collect")),
+        static_cast<int>(QWebEngineUrlRequestInfo::ResourceTypeXhr)
+    ));
+    QCOMPARE(blockedSpy.size(), 0);
+    QVERIFY(!interceptor.allowRequest(
+        source,
+        QUrl(QStringLiteral("https://unknown.example/audio")),
+        static_cast<int>(QWebEngineUrlRequestInfo::ResourceTypeXhr)
+    ));
+    QCOMPARE(blockedSpy.size(), 1);
+
+    CrossDomainRequestInterceptor failClosed(true, CrossDomainSettings::defaults());
+    QVERIFY(!failClosed.allowRequest(
+        source,
+        QUrl(QStringLiteral("https://allowed.example/audio")),
+        static_cast<int>(QWebEngineUrlRequestInfo::ResourceTypeXhr)
+    ));
+}
+
+void PersistenceAndPolicyTests::votRedirectsDoNotForwardCredentialsAcrossOrigins()
+{
+    const QByteArray authorization = QByteArrayLiteral("Authorization");
+    const QByteArray contentType = QByteArrayLiteral("Content-Type");
+    const QUrl source(QStringLiteral("https://api.yandex.ru/request"));
+
+    QVERIFY(VotNetworkPolicy::mayForwardHeaderAcrossRedirect(
+        authorization,
+        source,
+        QUrl(QStringLiteral("https://api.yandex.ru/result"))
+    ));
+    QVERIFY(!VotNetworkPolicy::mayForwardHeaderAcrossRedirect(
+        authorization,
+        source,
+        QUrl(QStringLiteral("https://worker.example/result"))
+    ));
+    QVERIFY(!VotNetworkPolicy::mayForwardHeaderAcrossRedirect(
+        authorization,
+        source,
+        QUrl(QStringLiteral("https://api.yandex.ru:8443/result"))
+    ));
+    QVERIFY(VotNetworkPolicy::mayForwardHeaderAcrossRedirect(
+        contentType,
+        source,
+        QUrl(QStringLiteral("https://worker.example/result"))
+    ));
+}
+
+void PersistenceAndPolicyTests::votUserscriptBridgeInjectsOnlyOnMatchingPages()
+{
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+    QWebEngineProfile profile(QStringLiteral("PanBrowserVotBridgeTest"));
+    profile.setPersistentStoragePath(directory.filePath(QStringLiteral("profile")));
+    profile.setCachePath(directory.filePath(QStringLiteral("cache")));
+    BrowserPage page(&profile);
+
+    VotUserscript userscript;
+    userscript.version = VotUserscriptPackage::supportedVersion();
+    userscript.matchPatterns = {QStringLiteral("*://*.youtube.com/*")};
+    userscript.connectHosts = {QStringLiteral("yandex.ru")};
+    userscript.sourceCode = QStringLiteral(
+        "globalThis.__panBrowserVotProbe = {"
+        "handler: GM_info.scriptHandler,"
+        "xhr: typeof GM_xmlhttpRequest,"
+        "storage: typeof GM_getValue"
+        "};"
+    );
+    VotUserscriptStore store(directory.filePath(QStringLiteral("vot-storage.json")));
+    QString storageError;
+    QVERIFY2(store.load(&storageError), qPrintable(storageError));
+    VotUserscriptBridge bridge(&page, userscript, &store, &page);
+    const QList<QWebEngineScript> installedScripts = page.scripts().find(
+        VotUserscriptBridge::scriptName()
+    );
+    QCOMPARE(installedScripts.size(), 1);
+    QVERIFY(installedScripts.constFirst().runsOnSubFrames());
+
+    QSignalSpy loadSpy(&page, &QWebEnginePage::loadFinished);
+    page.setHtml(
+        QStringLiteral("<html><body>matching page</body></html>"),
+        QUrl(QStringLiteral("https://www.youtube.com/watch?v=1"))
+    );
+    QVERIFY(loadSpy.wait(15'000));
+
+    bool callbackFinished = false;
+    QVariant result;
+    page.runJavaScript(
+        QStringLiteral("JSON.stringify(globalThis.__panBrowserVotProbe)"),
+        QWebEngineScript::ApplicationWorld,
+        [&](const QVariant &value) {
+            result = value;
+            callbackFinished = true;
+        }
+    );
+    QTRY_VERIFY_WITH_TIMEOUT(callbackFinished, 15'000);
+    QCOMPARE(
+        result.toString(),
+        QStringLiteral(
+            R"({"handler":"PanBrowser","xhr":"function","storage":"function"})"
+        )
+    );
+
+    QVERIFY2(store.setValue(
+        QStringLiteral("live-update"),
+        QStringLiteral("shared"),
+        &storageError
+    ), qPrintable(storageError));
+    callbackFinished = false;
+    result.clear();
+    page.runJavaScript(
+        QStringLiteral("GM_getValue('live-update', 'missing')"),
+        QWebEngineScript::ApplicationWorld,
+        [&](const QVariant &value) {
+            result = value;
+            callbackFinished = true;
+        }
+    );
+    QTRY_VERIFY_WITH_TIMEOUT(callbackFinished, 15'000);
+    QCOMPARE(result.toString(), QStringLiteral("shared"));
+
+    loadSpy.clear();
+    page.setHtml(
+        QStringLiteral("<html><body>unmatched page</body></html>"),
+        QUrl(QStringLiteral("https://example.com/"))
+    );
+    QVERIFY(loadSpy.wait(15'000));
+    callbackFinished = false;
+    result.clear();
+    page.runJavaScript(
+        QStringLiteral("typeof globalThis.__panBrowserVotProbe"),
+        QWebEngineScript::ApplicationWorld,
+        [&](const QVariant &value) {
+            result = value;
+            callbackFinished = true;
+        }
+    );
+    QTRY_VERIFY_WITH_TIMEOUT(callbackFinished, 15'000);
+    QCOMPARE(result.toString(), QStringLiteral("undefined"));
+}
+
+void PersistenceAndPolicyTests::votUserscriptBridgeInjectsIntoMatchingSubframes()
+{
+    QTcpServer server;
+    connect(&server, &QTcpServer::newConnection, &server, [&server] {
+        while (QTcpSocket *socket = server.nextPendingConnection()) {
+            socket->setParent(&server);
+            connect(socket, &QTcpSocket::readyRead, socket, [socket] {
+                if (!socket->canReadLine())
+                    return;
+                const QByteArray requestLine = socket->readLine();
+                const QByteArray body = requestLine.contains(" /frame ")
+                    ? QByteArrayLiteral("<html><body>frame</body></html>")
+                    : QByteArrayLiteral(
+                        "<html><body><iframe src=\"/frame\"></iframe></body></html>"
+                    );
+                const QByteArray response = QByteArrayLiteral(
+                    "HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\n"
+                    "Connection: close\r\nContent-Length: "
+                ) + QByteArray::number(body.size()) + QByteArrayLiteral("\r\n\r\n") + body;
+                socket->write(response);
+                socket->disconnectFromHost();
+            });
+        }
+    });
+    QVERIFY(server.listen(QHostAddress::LocalHost));
+
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+    QWebEngineProfile profile(QStringLiteral("PanBrowserVotFrameTest"));
+    profile.setPersistentStoragePath(directory.filePath(QStringLiteral("profile")));
+    profile.setCachePath(directory.filePath(QStringLiteral("cache")));
+    BrowserPage page(&profile);
+    VotUserscript userscript;
+    userscript.version = VotUserscriptPackage::supportedVersion();
+    userscript.matchPatterns = {QStringLiteral("http://127.0.0.1/*")};
+    userscript.connectHosts = {QStringLiteral("yandex.ru")};
+    userscript.sourceCode = QStringLiteral(
+        "globalThis.__panBrowserVotFrameProbe = location.pathname;"
+    );
+    VotUserscriptBridge bridge(&page, userscript, nullptr, &page);
+
+    QSignalSpy loadSpy(&page, &QWebEnginePage::loadFinished);
+    page.setUrl(QUrl(QStringLiteral("http://127.0.0.1:%1/").arg(server.serverPort())));
+    QVERIFY(loadSpy.wait(15'000));
+    QTRY_COMPARE_WITH_TIMEOUT(page.mainFrame().children().size(), 1, 15'000);
+    QWebEngineFrame child = page.mainFrame().children().constFirst();
+    bool callbackFinished = false;
+    QVariant result;
+    child.runJavaScript(
+        QStringLiteral("globalThis.__panBrowserVotFrameProbe"),
+        QWebEngineScript::ApplicationWorld,
+        [&](const QVariant &value) {
+            result = value;
+            callbackFinished = true;
+        }
+    );
+    QTRY_VERIFY_WITH_TIMEOUT(callbackFinished, 15'000);
+    QCOMPARE(result.toString(), QStringLiteral("/frame"));
 }
 
 void PersistenceAndPolicyTests::crossDomainSettingsRoundTripAndRejectCorruption()
