@@ -108,7 +108,8 @@ request for that video. Only this marked request is routed through the existing
 `DetachedVideoSession` and `DetachedVideoWindow` page-transfer path. Navigation,
 tab closure, expiry, or a mismatched request clears the capability, so page
 scripts and ordinary site fullscreen requests cannot be mistaken for a pop-out
-request.
+request. The detached window is created with `Qt::WindowStaysOnTopHint`, making
+video pop-out an always-on-top surface by default on every supported platform.
 
 `MainWindow.cpp` is intentionally the orchestration layer. Parsing, policy,
 storage, and geometry calculations live in smaller classes so they can be unit

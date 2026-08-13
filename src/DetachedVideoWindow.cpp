@@ -217,7 +217,7 @@ DetachedVideoWindow::DetachedVideoWindow(
     QWidget *parent,
     CopyTextHandler copyTextHandler
 )
-    : QMainWindow(parent, Qt::Window)
+    : QMainWindow(parent, Qt::Window | Qt::WindowStaysOnTopHint)
     , m_sourceView(sourceView)
     , m_sourceOriginText(sourceOrigin)
 {

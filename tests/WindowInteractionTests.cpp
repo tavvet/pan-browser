@@ -1211,6 +1211,7 @@ void WindowInteractionTests::detachedVideoWindowMovesAndRestoresPage()
             QStringLiteral("https://example.com")
         );
         QCOMPARE(detachedWindow.windowTitle(), QStringLiteral("Video — https://example.com"));
+        QVERIFY(detachedWindow.windowFlags().testFlag(Qt::WindowStaysOnTopHint));
         QCOMPARE(
             detachedWindow.sourceOriginText(),
             QStringLiteral("https://example.com")
