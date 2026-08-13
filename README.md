@@ -320,8 +320,11 @@ boundary.
   failures remain blocked.
 - History, bookmarks, address suggestions, downloads, and search-engine
   settings are local. PanBrowser does not request online search suggestions.
-- HTTP Basic and proxy passwords are kept only for the current process and are
-  not written to PanBrowser settings or diagnostics.
+- Realm-based HTTP Basic/Digest and manual HTTP-proxy passwords remain
+  session-only unless the user explicitly asks PanBrowser to save them. On
+  macOS, saved credentials are kept in the login Keychain and are never written
+  to PanBrowser settings or diagnostics. Windows and Linux password-manager
+  backends are still pending.
 - Permission and external-application prompts require a direct action in the
   active tab. Background and cross-origin authentication prompts are rejected.
 - Invalid trust or proxy configuration fails closed. Invalid DNS configuration

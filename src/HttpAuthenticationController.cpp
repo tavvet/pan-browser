@@ -4,6 +4,9 @@
 
 #include <QAuthenticator>
 #include <QCoreApplication>
+#include <QCryptographicHash>
+#include <QMessageBox>
+#include <QScopedValueRollback>
 #include <QUrl>
 
 namespace {
@@ -45,13 +48,31 @@ QString displayOrigin(const QUrl &url)
 
 QString challengeKey(const QUrl &url, const QString &realm)
 {
+    const QString realmDigest = QString::fromLatin1(
+        QCryptographicHash::hash(realm.toUtf8(), QCryptographicHash::Sha256).toHex()
+    );
     return QStringLiteral("%1\n%2\n%3\n%4")
         .arg(
             url.scheme().toCaseFolded(),
             url.host().toCaseFolded(),
             QString::number(effectivePort(url)),
-            realm
+            realmDigest
         );
+}
+
+void rememberChallenge(QSet<QString> &challenges, const QString &key)
+{
+    if (challenges.size() >= maximumRememberedChallenges
+        && !challenges.contains(key)) {
+        challenges.clear();
+    }
+    challenges.insert(key);
+}
+
+bool realmPasswordPersistenceSupported(const QAuthenticator &authenticator)
+{
+    return !authenticator.realm().isEmpty()
+        || authenticator.options().contains(QStringLiteral("realm"));
 }
 
 } // namespace
@@ -106,9 +127,18 @@ QString realmForDisplay(const QString &realm)
 
 } // namespace HttpAuthenticationPolicy
 
-HttpAuthenticationController::HttpAuthenticationController(QObject *parent)
+HttpAuthenticationController::HttpAuthenticationController(
+    QObject *parent,
+    CredentialStore *credentialStore
+)
     : QObject(parent)
 {
+    if (credentialStore) {
+        m_credentialStore = credentialStore;
+    } else {
+        m_ownedCredentialStore = createSystemCredentialStore();
+        m_credentialStore = m_ownedCredentialStore.get();
+    }
 }
 
 void HttpAuthenticationController::requestAuthentication(
@@ -123,11 +153,51 @@ void HttpAuthenticationController::requestAuthentication(
         *authenticator = QAuthenticator();
         return;
     }
+    const QScopedValueRollback promptGuard(m_promptActive, true);
 
     const QString origin = displayOrigin(requestUrl);
     const QString realm = authenticator->realm();
     const QString displayedRealm = HttpAuthenticationPolicy::realmForDisplay(realm);
     const QString key = challengeKey(requestUrl, realm);
+    const auto credentialTarget = realmPasswordPersistenceSupported(*authenticator)
+        ? CredentialTarget::forHttpServer(requestUrl, realm)
+        : std::nullopt;
+    const bool persistentCredentialsAvailable = credentialTarget
+        && m_credentialStore
+        && m_credentialStore->isAvailable();
+    bool savedCredentialRejected = false;
+    bool savedCredentialRemoved = false;
+    if (persistentCredentialsAvailable) {
+        if (m_persistedCredentialAttempts.remove(key)) {
+            rememberChallenge(m_suppressedStoredChallenges, key);
+            savedCredentialRejected = true;
+            QString removeError;
+            savedCredentialRemoved = m_credentialStore->remove(
+                *credentialTarget,
+                &removeError
+            );
+            if (!savedCredentialRemoved && !removeError.isEmpty()) {
+                qWarning().noquote()
+                    << "[PanBrowser credentials] Could not remove a rejected website credential:"
+                    << removeError;
+            }
+        } else if (!m_suppressedStoredChallenges.contains(key)
+                   && !m_submittedChallenges.contains(key)) {
+            QString readError;
+            const auto stored = m_credentialStore->read(*credentialTarget, &readError);
+            if (stored) {
+                authenticator->setUser(stored->username);
+                authenticator->setPassword(stored->password);
+                rememberChallenge(m_persistedCredentialAttempts, key);
+                return;
+            }
+            if (!readError.isEmpty()) {
+                qWarning().noquote()
+                    << "[PanBrowser credentials] Could not read a saved website credential:"
+                    << readError;
+            }
+        }
+    }
     CredentialPromptContent content;
     content.objectName = QStringLiteral("httpAuthenticationDialog");
     content.title = uiText(QT_TRANSLATE_NOOP(
@@ -149,20 +219,27 @@ void HttpAuthenticationController::requestAuthentication(
         )).arg(displayedRealm));
     }
     content.suggestedUsername = authenticator->user();
-    content.privacyHint = uiText(QT_TRANSLATE_NOOP(
-        "HttpAuthenticationController",
-        "The password is used for this browser session and is never written to PanBrowser settings."
-    ));
-    content.retry = m_submittedChallenges.contains(key);
+    content.rememberAvailable = persistentCredentialsAvailable;
+    content.rememberInitiallyChecked = savedCredentialRejected;
+    content.privacyHint = persistentCredentialsAvailable
+        ? uiText(QT_TRANSLATE_NOOP(
+            "HttpAuthenticationController",
+            "Saved passwords are stored by the operating system, not in PanBrowser settings."
+        ))
+        : uiText(QT_TRANSLATE_NOOP(
+            "HttpAuthenticationController",
+            "The password is used for this browser session and is never written to PanBrowser settings."
+        ));
+    content.retry = savedCredentialRejected || m_submittedChallenges.contains(key);
+    content.savedCredentialRejected = savedCredentialRejected;
+    content.savedCredentialRemoved = savedCredentialRemoved;
     content.insecureTransport = requestUrl.scheme().compare(
         QStringLiteral("http"),
         Qt::CaseInsensitive
     ) == 0;
 
-    m_promptActive = true;
     CredentialPromptDialog dialog(content, parent);
     const int result = dialog.exec();
-    m_promptActive = false;
     if (result != QDialog::Accepted) {
         *authenticator = QAuthenticator();
         return;
@@ -170,9 +247,31 @@ void HttpAuthenticationController::requestAuthentication(
 
     authenticator->setUser(dialog.username());
     authenticator->setPassword(dialog.password());
-    if (m_submittedChallenges.size() >= maximumRememberedChallenges
-        && !m_submittedChallenges.contains(key)) {
-        m_submittedChallenges.clear();
+    if (dialog.rememberCredential() && credentialTarget && m_credentialStore) {
+        QString writeError;
+        if (!m_credentialStore->write(
+                *credentialTarget,
+                StoredCredential{dialog.username(), dialog.password()},
+                &writeError
+            )) {
+            QMessageBox::warning(
+                parent,
+                uiText(QT_TRANSLATE_NOOP(
+                    "HttpAuthenticationController",
+                    "Password not saved"
+                )),
+                uiText(QT_TRANSLATE_NOOP(
+                    "HttpAuthenticationController",
+                    "PanBrowser could not save the password in the system password manager."
+                ))
+            );
+            qWarning().noquote()
+                << "[PanBrowser credentials] Could not save a website credential:"
+                << writeError;
+        } else {
+            m_suppressedStoredChallenges.remove(key);
+            rememberChallenge(m_persistedCredentialAttempts, key);
+        }
     }
-    m_submittedChallenges.insert(key);
+    rememberChallenge(m_submittedChallenges, key);
 }

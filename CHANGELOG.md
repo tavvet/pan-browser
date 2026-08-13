@@ -30,6 +30,10 @@ tighter page-network controls, and experimental video tooling.
   declared pages, keeps its GM values outside page storage, bounds native HTTPS
   requests, routes them through proxy and Site Connections policy, and
   requires System DNS.
+- Added opt-in persistence of realm-based HTTPS server and manual HTTP-proxy
+  credentials in the macOS login Keychain. Plain HTTP, System proxy, and
+  unselected prompts remain session-only; rejected saved credentials are
+  removed before PanBrowser falls back to its own prompt.
 
 ## 0.1.0 — 2026-08-10
 

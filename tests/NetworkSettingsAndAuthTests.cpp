@@ -1,5 +1,68 @@
 #include "PanBrowserTestCommon.h"
 
+namespace {
+
+class FakeCredentialStore final : public CredentialStore {
+public:
+    explicit FakeCredentialStore(bool available = true)
+        : m_available(available)
+    {
+    }
+
+    [[nodiscard]] bool isAvailable() const override
+    {
+        return m_available;
+    }
+
+    [[nodiscard]] std::optional<StoredCredential> read(
+        const CredentialTarget &target,
+        QString *error
+    ) override
+    {
+        if (error)
+            error->clear();
+        ++readCount;
+        lastTarget = target;
+        const auto found = credentials.constFind(target.identifier());
+        if (found == credentials.cend())
+            return std::nullopt;
+        return *found;
+    }
+
+    bool write(
+        const CredentialTarget &target,
+        const StoredCredential &credential,
+        QString *error
+    ) override
+    {
+        if (error)
+            error->clear();
+        ++writeCount;
+        lastTarget = target;
+        credentials.insert(target.identifier(), credential);
+        return true;
+    }
+
+    bool remove(const CredentialTarget &target, QString *error) override
+    {
+        if (error)
+            error->clear();
+        ++removeCount;
+        lastTarget = target;
+        credentials.remove(target.identifier());
+        return true;
+    }
+
+    bool m_available = true;
+    int readCount = 0;
+    int writeCount = 0;
+    int removeCount = 0;
+    CredentialTarget lastTarget;
+    QHash<QString, StoredCredential> credentials;
+};
+
+} // namespace
+
 class NetworkSettingsAndAuthTests final : public QObject {
     Q_OBJECT
 
@@ -13,12 +76,19 @@ private slots:
     void proxySettingsApplyGlobalModes();
     void proxySettingsCompareOnlyEffectiveConfiguration();
     void proxyFailureBlocksWebEngineNetworkSchemes();
+    void credentialTargetsAreOriginScopedAndDeterministic();
     void httpAuthenticationAcceptsCredentialsAndSanitizesDisplay();
     void httpAuthenticationCancelClearsAuthenticator();
     void httpAuthenticationRetriesAndWarnsForPlainHttp();
+    void httpAuthenticationUsesAndRejectsSavedCredentialsWithoutLooping();
+    void httpAuthenticationDoesNotPersistNonRealmSchemes();
+    void httpAuthenticationDoesNotSaveWithoutOptIn();
+    void httpAuthenticationSavesOnlyWithExplicitOptIn();
     void httpAuthenticationPolicyRejectsUnsafePromptContexts();
     void httpAuthenticationRealmDisplayRemovesControlCharacters();
     void proxyAuthenticationUsesSharedCredentialDialog();
+    void manualProxyAuthenticationUsesSavedCredentials();
+    void nativeCredentialStoreRoundTripsWhenEnabled();
 };
 
 void NetworkSettingsAndAuthTests::dnsSettingsDefaultToSystemAndIncludeBuiltIns()
@@ -314,9 +384,42 @@ void NetworkSettingsAndAuthTests::proxyFailureBlocksWebEngineNetworkSchemes()
     ));
 }
 
+void NetworkSettingsAndAuthTests::credentialTargetsAreOriginScopedAndDeterministic()
+{
+    const auto first = CredentialTarget::forHttpServer(
+        QUrl(QStringLiteral("https://EXAMPLE.com/private?token=secret")),
+        QStringLiteral("members")
+    );
+    const auto sameOrigin = CredentialTarget::forHttpServer(
+        QUrl(QStringLiteral("https://example.com:443/other")),
+        QStringLiteral("members")
+    );
+    const auto otherRealm = CredentialTarget::forHttpServer(
+        QUrl(QStringLiteral("https://example.com/")),
+        QStringLiteral("administrators")
+    );
+    const auto otherPort = CredentialTarget::forHttpServer(
+        QUrl(QStringLiteral("https://example.com:444/")),
+        QStringLiteral("members")
+    );
+    QVERIFY(first);
+    QVERIFY(sameOrigin);
+    QVERIFY(otherRealm);
+    QVERIFY(otherPort);
+    QCOMPARE(first->identifier(), sameOrigin->identifier());
+    QVERIFY(first->identifier() != otherRealm->identifier());
+    QVERIFY(first->identifier() != otherPort->identifier());
+    QVERIFY(!CredentialTarget::forHttpServer(
+        QUrl(QStringLiteral("http://example.com/")),
+        QStringLiteral("members")
+    ));
+    QVERIFY(!first->identifier().contains(QStringLiteral("example")));
+}
+
 void NetworkSettingsAndAuthTests::httpAuthenticationAcceptsCredentialsAndSanitizesDisplay()
 {
-    HttpAuthenticationController controller;
+    FakeCredentialStore store(false);
+    HttpAuthenticationController controller(nullptr, &store);
     QAuthenticator authenticator;
     authenticator.setUser(QStringLiteral("suggested-user"));
     bool handled = false;
@@ -369,7 +472,8 @@ void NetworkSettingsAndAuthTests::httpAuthenticationAcceptsCredentialsAndSanitiz
 
 void NetworkSettingsAndAuthTests::httpAuthenticationCancelClearsAuthenticator()
 {
-    HttpAuthenticationController controller;
+    FakeCredentialStore store(false);
+    HttpAuthenticationController controller(nullptr, &store);
     QAuthenticator authenticator;
     authenticator.setUser(QStringLiteral("stale-user"));
     authenticator.setPassword(QStringLiteral("stale-password"));
@@ -396,7 +500,8 @@ void NetworkSettingsAndAuthTests::httpAuthenticationCancelClearsAuthenticator()
 
 void NetworkSettingsAndAuthTests::httpAuthenticationRetriesAndWarnsForPlainHttp()
 {
-    HttpAuthenticationController controller;
+    FakeCredentialStore store(true);
+    HttpAuthenticationController controller(nullptr, &store);
     QAuthenticator firstAttempt;
     bool firstHandled = false;
     QTimer::singleShot(0, &controller, [&] {
@@ -429,6 +534,7 @@ void NetworkSettingsAndAuthTests::httpAuthenticationRetriesAndWarnsForPlainHttp(
     bool retryHandled = false;
     bool retryWasVisible = false;
     bool warningWasVisible = false;
+    bool rememberWasHidden = false;
     QTimer::singleShot(0, &controller, [&] {
         auto *dialog = qobject_cast<QDialog *>(QApplication::activeModalWidget());
         if (!dialog)
@@ -437,6 +543,9 @@ void NetworkSettingsAndAuthTests::httpAuthenticationRetriesAndWarnsForPlainHttp(
         retryWasVisible = dialog->findChild<QLabel *>(QStringLiteral("errorText"));
         warningWasVisible = dialog->findChild<QLabel *>(
             QStringLiteral("insecureTransportWarning")
+        );
+        rememberWasHidden = !dialog->findChild<QCheckBox *>(
+            QStringLiteral("rememberCredential")
         );
         dialog->reject();
     });
@@ -449,7 +558,196 @@ void NetworkSettingsAndAuthTests::httpAuthenticationRetriesAndWarnsForPlainHttp(
     QVERIFY(retryHandled);
     QVERIFY(retryWasVisible);
     QVERIFY(warningWasVisible);
+    QVERIFY(rememberWasHidden);
     QVERIFY(retryAttempt.isNull());
+    QCOMPARE(store.readCount, 0);
+    QCOMPARE(store.writeCount, 0);
+}
+
+void NetworkSettingsAndAuthTests::httpAuthenticationUsesAndRejectsSavedCredentialsWithoutLooping()
+{
+    FakeCredentialStore store;
+    const QUrl url(QStringLiteral("https://example.com/private"));
+    const QString realm = QStringLiteral("members");
+    const auto target = CredentialTarget::forHttpServer(url, realm);
+    QVERIFY(target);
+    store.credentials.insert(
+        target->identifier(),
+        StoredCredential{QStringLiteral("saved-user"), QStringLiteral("saved-password")}
+    );
+    HttpAuthenticationController controller(nullptr, &store);
+
+    QAuthenticator firstAttempt;
+    firstAttempt.setRealm(realm);
+    controller.requestAuthentication(nullptr, url, &firstAttempt);
+    QCOMPARE(firstAttempt.user(), QStringLiteral("saved-user"));
+    QCOMPARE(firstAttempt.password(), QStringLiteral("saved-password"));
+    QCOMPARE(store.readCount, 1);
+
+    bool retryHandled = false;
+    bool savedCredentialWarningVisible = false;
+    bool replacementWasSelected = false;
+    QTimer::singleShot(0, &controller, [&] {
+        auto *dialog = qobject_cast<QDialog *>(QApplication::activeModalWidget());
+        if (!dialog)
+            return;
+        retryHandled = true;
+        const QLabel *error = dialog->findChild<QLabel *>(QStringLiteral("errorText"));
+        savedCredentialWarningVisible = error
+            && error->text().contains(QStringLiteral("were removed"));
+        const auto *remember = dialog->findChild<QCheckBox *>(
+            QStringLiteral("rememberCredential")
+        );
+        replacementWasSelected = remember && remember->isChecked();
+        dialog->reject();
+    });
+    QAuthenticator retryAttempt;
+    retryAttempt.setRealm(realm);
+    controller.requestAuthentication(nullptr, url, &retryAttempt);
+    QVERIFY(retryHandled);
+    QVERIFY(savedCredentialWarningVisible);
+    QVERIFY(replacementWasSelected);
+    QVERIFY(retryAttempt.isNull());
+    QCOMPARE(store.readCount, 1);
+    QCOMPARE(store.removeCount, 1);
+    QVERIFY(!store.credentials.contains(target->identifier()));
+}
+
+void NetworkSettingsAndAuthTests::httpAuthenticationDoesNotPersistNonRealmSchemes()
+{
+    FakeCredentialStore store;
+    HttpAuthenticationController controller(nullptr, &store);
+    QAuthenticator authenticator;
+    bool rememberWasHidden = false;
+
+    QTimer::singleShot(0, &controller, [&] {
+        auto *dialog = qobject_cast<QDialog *>(QApplication::activeModalWidget());
+        if (!dialog)
+            return;
+        rememberWasHidden = !dialog->findChild<QCheckBox *>(
+            QStringLiteral("rememberCredential")
+        );
+        dialog->reject();
+    });
+    controller.requestAuthentication(
+        nullptr,
+        QUrl(QStringLiteral("https://example.com/private")),
+        &authenticator
+    );
+
+    QVERIFY(rememberWasHidden);
+    QCOMPARE(store.readCount, 0);
+    QCOMPARE(store.writeCount, 0);
+}
+
+void NetworkSettingsAndAuthTests::httpAuthenticationDoesNotSaveWithoutOptIn()
+{
+    FakeCredentialStore store;
+    HttpAuthenticationController controller(nullptr, &store);
+    QAuthenticator authenticator;
+    authenticator.setRealm(QStringLiteral("members"));
+
+    QTimer::singleShot(0, &controller, [&] {
+        auto *dialog = qobject_cast<QDialog *>(QApplication::activeModalWidget());
+        if (!dialog)
+            return;
+        auto *username = dialog->findChild<QLineEdit *>(
+            QStringLiteral("credentialUsername")
+        );
+        auto *password = dialog->findChild<QLineEdit *>(
+            QStringLiteral("credentialPassword")
+        );
+        if (!username || !password) {
+            dialog->reject();
+            return;
+        }
+        username->setText(QStringLiteral("session-user"));
+        password->setText(QStringLiteral("session-secret"));
+        dialog->accept();
+    });
+    controller.requestAuthentication(
+        nullptr,
+        QUrl(QStringLiteral("https://example.com/private")),
+        &authenticator
+    );
+
+    QCOMPARE(store.writeCount, 0);
+    QCOMPARE(authenticator.user(), QStringLiteral("session-user"));
+    QCOMPARE(authenticator.password(), QStringLiteral("session-secret"));
+}
+
+void NetworkSettingsAndAuthTests::httpAuthenticationSavesOnlyWithExplicitOptIn()
+{
+    FakeCredentialStore store;
+    HttpAuthenticationController controller(nullptr, &store);
+    QAuthenticator authenticator;
+    authenticator.setRealm(QStringLiteral("members"));
+    bool rememberWasOffByDefault = false;
+
+    QTimer::singleShot(0, &controller, [&] {
+        auto *dialog = qobject_cast<QDialog *>(QApplication::activeModalWidget());
+        if (!dialog)
+            return;
+        auto *username = dialog->findChild<QLineEdit *>(
+            QStringLiteral("credentialUsername")
+        );
+        auto *password = dialog->findChild<QLineEdit *>(
+            QStringLiteral("credentialPassword")
+        );
+        auto *remember = dialog->findChild<QCheckBox *>(
+            QStringLiteral("rememberCredential")
+        );
+        if (!username || !password || !remember) {
+            dialog->reject();
+            return;
+        }
+        rememberWasOffByDefault = !remember->isChecked();
+        username->setText(QStringLiteral("alice"));
+        password->setText(QStringLiteral("secret"));
+        remember->setChecked(true);
+        dialog->accept();
+    });
+    controller.requestAuthentication(
+        nullptr,
+        QUrl(QStringLiteral("https://example.com/private")),
+        &authenticator
+    );
+
+    QVERIFY(rememberWasOffByDefault);
+    QCOMPARE(store.writeCount, 1);
+    QCOMPARE(store.lastTarget.host, QStringLiteral("example.com"));
+    QCOMPARE(store.lastTarget.port, 443);
+    QCOMPARE(store.lastTarget.realm, QStringLiteral("members"));
+    QCOMPARE(authenticator.user(), QStringLiteral("alice"));
+    QCOMPARE(authenticator.password(), QStringLiteral("secret"));
+
+    bool rejectedSavedCredentialWasReported = false;
+    bool replacementWasSelected = false;
+    QTimer::singleShot(0, &controller, [&] {
+        auto *dialog = qobject_cast<QDialog *>(QApplication::activeModalWidget());
+        if (!dialog)
+            return;
+        const auto *error = dialog->findChild<QLabel *>(QStringLiteral("errorText"));
+        rejectedSavedCredentialWasReported = error
+            && error->text().contains(QStringLiteral("were removed"));
+        const auto *remember = dialog->findChild<QCheckBox *>(
+            QStringLiteral("rememberCredential")
+        );
+        replacementWasSelected = remember && remember->isChecked();
+        dialog->reject();
+    });
+    QAuthenticator retryAttempt;
+    retryAttempt.setRealm(QStringLiteral("members"));
+    controller.requestAuthentication(
+        nullptr,
+        QUrl(QStringLiteral("https://example.com/private")),
+        &retryAttempt
+    );
+
+    QVERIFY(rejectedSavedCredentialWasReported);
+    QVERIFY(replacementWasSelected);
+    QCOMPARE(store.removeCount, 1);
+    QVERIFY(store.credentials.isEmpty());
 }
 
 void NetworkSettingsAndAuthTests::httpAuthenticationPolicyRejectsUnsafePromptContexts()
@@ -532,7 +830,8 @@ void NetworkSettingsAndAuthTests::proxyAuthenticationUsesSharedCredentialDialog(
     settings.setHost(QStringLiteral("proxy.example.com"));
     settings.setPort(3128);
     settings.setUsername(QStringLiteral("configured-user"));
-    ProxyAuthenticationController controller(settings);
+    FakeCredentialStore store(false);
+    ProxyAuthenticationController controller(settings, nullptr, &store);
     QAuthenticator authenticator;
     bool handled = false;
     QString suggestedUsername;
@@ -567,6 +866,101 @@ void NetworkSettingsAndAuthTests::proxyAuthenticationUsesSharedCredentialDialog(
     QCOMPARE(suggestedUsername, QStringLiteral("configured-user"));
     QCOMPARE(authenticator.user(), QStringLiteral("configured-user"));
     QCOMPARE(authenticator.password(), QStringLiteral("proxy-password"));
+}
+
+void NetworkSettingsAndAuthTests::manualProxyAuthenticationUsesSavedCredentials()
+{
+    ProxySettings settings = ProxySettings::defaults();
+    settings.setMode(ProxyMode::Manual);
+    settings.setManualType(ManualProxyType::Http);
+    settings.setHost(QStringLiteral("proxy.example.com"));
+    settings.setPort(3128);
+    FakeCredentialStore store;
+    const auto target = CredentialTarget::forHttpProxy(
+        QStringLiteral("proxy.example.com"),
+        3128,
+        QStringLiteral("proxy-realm")
+    );
+    QVERIFY(target);
+    store.credentials.insert(
+        target->identifier(),
+        StoredCredential{QStringLiteral("proxy-user"), QStringLiteral("proxy-secret")}
+    );
+    ProxyAuthenticationController controller(settings, nullptr, &store);
+    QAuthenticator authenticator;
+    authenticator.setRealm(QStringLiteral("proxy-realm"));
+
+    controller.requestAuthentication(
+        nullptr,
+        QUrl(QStringLiteral("https://example.com/private")),
+        &authenticator,
+        QStringLiteral("proxy.example.com")
+    );
+
+    QCOMPARE(store.readCount, 1);
+    QCOMPARE(authenticator.user(), QStringLiteral("proxy-user"));
+    QCOMPARE(authenticator.password(), QStringLiteral("proxy-secret"));
+}
+
+void NetworkSettingsAndAuthTests::nativeCredentialStoreRoundTripsWhenEnabled()
+{
+#if !defined(Q_OS_MACOS)
+    QSKIP("The first native credential-store integration test is macOS-only");
+#else
+    if (!qEnvironmentVariableIsSet("PANBROWSER_RUN_KEYCHAIN_TESTS")) {
+        QSKIP("Set PANBROWSER_RUN_KEYCHAIN_TESTS=1 to exercise the real macOS Keychain");
+    }
+
+    std::unique_ptr<CredentialStore> store = createSystemCredentialStore();
+    QVERIFY(store);
+    QVERIFY(store->isAvailable());
+    const QString uniqueHost = QStringLiteral("keychain-test-%1.invalid").arg(
+        QUuid::createUuid().toString(QUuid::WithoutBraces)
+    );
+    const auto target = CredentialTarget::forHttpServer(
+        QUrl(QStringLiteral("https://%1/").arg(uniqueHost)),
+        QStringLiteral("PanBrowser automated Keychain test")
+    );
+    QVERIFY(target);
+
+    struct Cleanup final {
+        CredentialStore *store = nullptr;
+        CredentialTarget target;
+        bool active = true;
+        ~Cleanup()
+        {
+            if (!active || !store)
+                return;
+            QString ignoredError;
+            store->remove(target, &ignoredError);
+        }
+    } cleanup{store.get(), *target};
+
+    QString error;
+    QVERIFY2(store->write(
+        *target,
+        StoredCredential{QStringLiteral("test-user"), QStringLiteral("test-password")},
+        &error
+    ), qPrintable(error));
+    auto loaded = store->read(*target, &error);
+    QVERIFY2(loaded.has_value(), qPrintable(error));
+    QCOMPARE(loaded->username, QStringLiteral("test-user"));
+    QCOMPARE(loaded->password, QStringLiteral("test-password"));
+
+    QVERIFY2(store->write(
+        *target,
+        StoredCredential{QStringLiteral("updated-user"), QStringLiteral("updated-password")},
+        &error
+    ), qPrintable(error));
+    loaded = store->read(*target, &error);
+    QVERIFY2(loaded.has_value(), qPrintable(error));
+    QCOMPARE(loaded->username, QStringLiteral("updated-user"));
+    QCOMPARE(loaded->password, QStringLiteral("updated-password"));
+    QVERIFY2(store->remove(*target, &error), qPrintable(error));
+    cleanup.active = false;
+    loaded = store->read(*target, &error);
+    QVERIFY2(!loaded.has_value(), qPrintable(error));
+#endif
 }
 
 

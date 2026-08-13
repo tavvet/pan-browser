@@ -1127,6 +1127,12 @@ QDialog#proxyAuthenticationDialog QLineEdit:focus {
     background: #242932;
 }
 
+QDialog#httpAuthenticationDialog QCheckBox,
+QDialog#proxyAuthenticationDialog QCheckBox {
+    color: #dce1e9;
+    spacing: 8px;
+}
+
 QDialog#httpAuthenticationDialog QPushButton,
 QDialog#proxyAuthenticationDialog QPushButton {
     min-height: 30px;

@@ -173,10 +173,10 @@ The primary window owns browser-wide resources:
 - `BookmarkStore` owns a separate named Qt SQL connection on the GUI thread.
 - `WebAppStore` owns the versioned, atomically written installed-app registry.
 - `PermissionController` serializes active-tab permission prompts.
-- `HttpAuthenticationController` serializes server credential prompts and
-  never persists passwords.
-- `ProxyAuthenticationController` serializes HTTP-proxy credential prompts and
-  never persists passwords.
+- `HttpAuthenticationController` serializes server credential prompts and can
+  use the operating-system credential store after explicit user opt-in.
+- `ProxyAuthenticationController` does the same for a configured manual HTTP
+  proxy; System proxy and SOCKS5 credentials remain session-only.
 - `VotUserscriptManager` owns the verified userscript package state and one
   native script-scoped store. It creates a per-page `VotUserscriptBridge` only
   while the opt-in integration is ready.
@@ -539,10 +539,14 @@ pending, while omitting endpoints and usernames.
 Every page forwards `QWebEnginePage::proxyAuthenticationRequired` to the one
 `ProxyAuthenticationController` owned by the primary window. It asks for
 credentials in a browser-owned modal dialog, pre-fills the configured username,
-and writes the entered values only to Qt's request-scoped `QAuthenticator`.
-PanBrowser never stores the password. Chromium may cache accepted credentials
-for the remaining process lifetime; a rejection causes the next challenge to
-show a retry message.
+and writes the entered values to Qt's request-scoped `QAuthenticator`. On
+macOS, a user may explicitly save credentials for a configured manual HTTP
+proxy in the login Keychain. The opaque Keychain account is derived from the
+normalized proxy host, configured port, and authentication realm; the
+requesting-site URL is never part of that identity. System proxy endpoints do
+not expose a reliable port through Qt's authentication signal and therefore
+remain session-only. Chromium may cache accepted credentials for the remaining
+process lifetime; a rejection causes the next challenge to show a retry message.
 
 An absent configuration means the explicit System default. An existing but
 unreadable, malformed, or inapplicable configuration is different: falling
@@ -766,17 +770,31 @@ the normalized scheme, host, explicit port, and optional authentication realm.
 Path, query, fragment, and URL user information are never shown or copied into
 the prompt. Labels render untrusted server text as plain text; displayed realms
 are length-bounded and stripped of control and Unicode format characters. A
-challenge that
-returns after credentials were submitted receives retry feedback, keyed by
-normalized origin and realm. Plain HTTP is permitted for controlled intranet
-use but receives a prominent warning that credentials can be intercepted.
+challenge that returns after credentials were submitted receives retry
+feedback, keyed by normalized origin and realm. Plain HTTP is permitted for
+controlled intranet use but receives a prominent warning that credentials can
+be intercepted and cannot use persistent credentials.
 
-PanBrowser has no server-credential store and never writes these usernames or
-passwords to settings, session files, diagnostics, history, or logs. Chromium
-may cache accepted HTTP authentication credentials for the remaining process
-lifetime. Version 0.1.0 guarantees the Basic challenge flow; HTML login forms,
-OAuth pages, client certificates, and operating-system password-manager
-integration are separate mechanisms.
+`CredentialStore` maps an eligible realm-based authentication method, HTTPS
+origin or manual HTTP-proxy endpoint, and realm to a deterministic opaque
+SHA-256 identifier. It never includes a URL path, query, fragment, or embedded
+user information. Realm-less NTLM/SPNEGO challenges cannot be separated safely
+through Qt's public authentication API and therefore remain session-only. The
+macOS backend stores a versioned username/password payload as a generic password
+in the login Keychain under the `dev.panbrowser.credentials.v1` service. The
+checkbox is off by default. A stored credential is filled synchronously because
+Qt requires the `QAuthenticator` to be completed before the signal handler
+returns. If the same challenge returns, the rejected stored value is deleted and
+suppressed for the rest of the process; the replacement-save checkbox is selected
+in the normal dialog. This prevents an automatic retry loop and avoids retrying a
+known-bad value after the next launch. Windows and Linux currently use an
+unavailable backend and preserve the previous session-only behavior.
+
+Passwords are never written to settings, session files, diagnostics, history,
+or logs. Chromium may cache accepted HTTP authentication credentials for the
+remaining process lifetime. Version 0.1.0 guarantees the Basic challenge flow;
+HTML login forms, OAuth pages, and client certificates remain separate
+mechanisms.
 
 ## 7. Persistent data and privacy boundaries
 
@@ -813,6 +831,7 @@ directory.
 | `session.json` | `SessionStore` | Version 2 stores up to 30 restorable HTTP(S) tabs with title and pin state, atomically written in canonical pinned-first order. Version 1 migrates with all tabs unpinned. URL credentials are removed before persistence and again when legacy data is loaded. |
 | `downloads.json` | `DownloadHistoryStore` | Up to 200 download records; paths and source host, not complete source URLs. |
 | native `QSettings` | `BrowserPreferences`, `PageZoom`, window/download UI | Start page, startup/cookie/history/language/developer-tools choices, per-origin page zoom, window geometry, last download directory, and pending data-reset marker. |
+| macOS login Keychain | `CredentialStore` | Explicitly saved HTTPS server and manual HTTP-proxy usernames/passwords, keyed by an opaque origin/port/realm digest. No PanBrowser JSON file contains the secret. |
 
 Session cookies are discarded by default. Enabling “keep sign-ins” changes the
 profile to `ForcePersistentCookies`; otherwise only cookies explicitly marked

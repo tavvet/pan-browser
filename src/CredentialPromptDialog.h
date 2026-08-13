@@ -4,6 +4,7 @@
 #include <QStringList>
 
 class QLineEdit;
+class QCheckBox;
 
 struct CredentialPromptContent {
     QString objectName;
@@ -12,7 +13,11 @@ struct CredentialPromptContent {
     QStringList details;
     QString suggestedUsername;
     QString privacyHint;
+    bool rememberAvailable = false;
+    bool rememberInitiallyChecked = false;
     bool retry = false;
+    bool savedCredentialRejected = false;
+    bool savedCredentialRemoved = false;
     bool insecureTransport = false;
 };
 
@@ -25,8 +30,10 @@ public:
 
     [[nodiscard]] QString username() const;
     [[nodiscard]] QString password() const;
+    [[nodiscard]] bool rememberCredential() const;
 
 private:
     QLineEdit *m_username = nullptr;
     QLineEdit *m_password = nullptr;
+    QCheckBox *m_rememberCredential = nullptr;
 };

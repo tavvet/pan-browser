@@ -1,6 +1,7 @@
 #include "CredentialPromptDialog.h"
 
 #include <QCoreApplication>
+#include <QCheckBox>
 #include <QDialogButtonBox>
 #include <QFormLayout>
 #include <QLabel>
@@ -46,10 +47,20 @@ CredentialPromptDialog::CredentialPromptDialog(
 
     if (content.retry) {
         auto *retryMessage = plainTextLabel(
-            uiText(QT_TRANSLATE_NOOP(
-                "CredentialPromptDialog",
-                "Authentication failed. Check the credentials and try again."
-            )),
+            content.savedCredentialRejected
+                ? (content.savedCredentialRemoved
+                    ? uiText(QT_TRANSLATE_NOOP(
+                        "CredentialPromptDialog",
+                        "The saved credentials were not accepted and were removed. Enter new credentials to continue."
+                    ))
+                    : uiText(QT_TRANSLATE_NOOP(
+                        "CredentialPromptDialog",
+                        "The saved credentials were not accepted. Check them and try again."
+                    )))
+                : uiText(QT_TRANSLATE_NOOP(
+                    "CredentialPromptDialog",
+                    "Authentication failed. Check the credentials and try again."
+                )),
             this
         );
         retryMessage->setObjectName(QStringLiteral("errorText"));
@@ -100,6 +111,19 @@ CredentialPromptDialog::CredentialPromptDialog(
     );
     layout->addLayout(form);
 
+    if (content.rememberAvailable) {
+        m_rememberCredential = new QCheckBox(
+            uiText(QT_TRANSLATE_NOOP(
+                "CredentialPromptDialog",
+                "Remember in the system password manager"
+            )),
+            this
+        );
+        m_rememberCredential->setObjectName(QStringLiteral("rememberCredential"));
+        m_rememberCredential->setChecked(content.rememberInitiallyChecked);
+        layout->addWidget(m_rememberCredential);
+    }
+
     if (!content.privacyHint.isEmpty()) {
         auto *privacyHint = plainTextLabel(content.privacyHint, this);
         privacyHint->setObjectName(QStringLiteral("fieldHint"));
@@ -133,4 +157,9 @@ QString CredentialPromptDialog::username() const
 QString CredentialPromptDialog::password() const
 {
     return m_password->text();
+}
+
+bool CredentialPromptDialog::rememberCredential() const
+{
+    return m_rememberCredential && m_rememberCredential->isChecked();
 }

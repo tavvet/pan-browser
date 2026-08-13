@@ -75,6 +75,8 @@ set(PANBROWSER_APP_SOURCES
     src/PageZoom.h
     src/CredentialPromptDialog.cpp
     src/CredentialPromptDialog.h
+    src/CredentialStore.cpp
+    src/CredentialStore.h
     src/CrossDomainPresetCatalog.cpp
     src/CrossDomainPresetCatalog.h
     src/CrossDomainPolicySnapshot.cpp
@@ -204,17 +206,27 @@ if(APPLE)
     )
     list(APPEND PANBROWSER_APP_SOURCES
         src/CertificateTrustValidatorMac.mm
+        src/CredentialStoreMac.mm
         src/MacApplicationReopen.h
         src/MacApplicationReopen.mm
         src/WindowChromeMac.mm
         ${PANBROWSER_APP_ICON}
     )
 elseif(WIN32)
-    list(APPEND PANBROWSER_APP_SOURCES src/CertificateTrustValidatorWindows.cpp)
+    list(APPEND PANBROWSER_APP_SOURCES
+        src/CertificateTrustValidatorWindows.cpp
+        src/CredentialStoreFallback.cpp
+    )
 elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
-    list(APPEND PANBROWSER_APP_SOURCES src/CertificateTrustValidatorLinux.cpp)
+    list(APPEND PANBROWSER_APP_SOURCES
+        src/CertificateTrustValidatorLinux.cpp
+        src/CredentialStoreFallback.cpp
+    )
 else()
-    list(APPEND PANBROWSER_APP_SOURCES src/CertificateTrustValidatorFallback.cpp)
+    list(APPEND PANBROWSER_APP_SOURCES
+        src/CertificateTrustValidatorFallback.cpp
+        src/CredentialStoreFallback.cpp
+    )
 endif()
 
 if(NOT APPLE)
@@ -375,6 +387,8 @@ qt_add_executable(PanBrowserTests
     src/PageZoom.h
     src/CredentialPromptDialog.cpp
     src/CredentialPromptDialog.h
+    src/CredentialStore.cpp
+    src/CredentialStore.h
     src/CrossDomainPresetCatalog.cpp
     src/CrossDomainPresetCatalog.h
     src/CrossDomainPolicySnapshot.cpp
@@ -498,10 +512,17 @@ target_link_libraries(PanBrowserTests PRIVATE
 add_dependencies(PanBrowserTests PanBrowserLaunchClient)
 
 if(APPLE)
-    target_sources(PanBrowserTests PRIVATE src/WindowChromeMac.mm)
+    target_sources(PanBrowserTests PRIVATE
+        src/CredentialStoreMac.mm
+        src/WindowChromeMac.mm
+    )
+    target_link_libraries(PanBrowserTests PRIVATE ${SECURITY_FRAMEWORK})
     add_dependencies(PanBrowserTests PanBrowser)
 else()
-    target_sources(PanBrowserTests PRIVATE src/WindowChromePlatform.cpp)
+    target_sources(PanBrowserTests PRIVATE
+        src/CredentialStoreFallback.cpp
+        src/WindowChromePlatform.cpp
+    )
 endif()
 
 if(WIN32)

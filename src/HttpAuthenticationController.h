@@ -1,8 +1,12 @@
 #pragma once
 
+#include "CredentialStore.h"
+
 #include <QObject>
 #include <QSet>
 #include <QString>
+
+#include <memory>
 
 class QAuthenticator;
 class QUrl;
@@ -22,7 +26,10 @@ namespace HttpAuthenticationPolicy {
 
 class HttpAuthenticationController final : public QObject {
 public:
-    explicit HttpAuthenticationController(QObject *parent = nullptr);
+    explicit HttpAuthenticationController(
+        QObject *parent = nullptr,
+        CredentialStore *credentialStore = nullptr
+    );
 
     void requestAuthentication(
         QWidget *parent,
@@ -31,6 +38,10 @@ public:
     );
 
 private:
+    std::unique_ptr<CredentialStore> m_ownedCredentialStore;
+    CredentialStore *m_credentialStore = nullptr;
     QSet<QString> m_submittedChallenges;
+    QSet<QString> m_persistedCredentialAttempts;
+    QSet<QString> m_suppressedStoredChallenges;
     bool m_promptActive = false;
 };
