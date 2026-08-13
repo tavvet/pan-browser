@@ -8,6 +8,8 @@ may be unstable.
 
 ### Browser polish
 
+- [x] Keep normal page fullscreen in the browser window and expose video
+  pop-out as a separate, explicit overlay action.
 - [x] Add compact pinned tabs with a left-side group, constrained reordering,
   context-menu controls, and startup-independent session restoration.
 - [x] Add opt-in developer tools that default to disabled and expose both

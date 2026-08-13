@@ -98,6 +98,18 @@ state, and an optional developer tools window. `BrowserTabBar` owns the visual
 pin marker, compact size, hidden close button, and pinned-group movement
 boundary; `MainWindow` mirrors every accepted tab move in the page stack.
 
+Normal Fullscreen API requests and video pop-out are deliberately separate.
+`BrowserFullScreenController` keeps the page in its original view, hides only
+the browser chrome, and restores the previous visibility and window state on
+exit. `VideoElementBridge` injects an isolated, browser-provided button over a
+video while the pointer is on it. A trusted click carries a per-page random
+capability through `BrowserPage` and issues a short-lived, tab-bound fullscreen
+request for that video. Only this marked request is routed through the existing
+`DetachedVideoSession` and `DetachedVideoWindow` page-transfer path. Navigation,
+tab closure, expiry, or a mismatched request clears the capability, so page
+scripts and ordinary site fullscreen requests cannot be mistaken for a pop-out
+request.
+
 `MainWindow.cpp` is intentionally the orchestration layer. Parsing, policy,
 storage, and geometry calculations live in smaller classes so they can be unit
 tested without starting Chromium.

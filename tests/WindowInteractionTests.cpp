@@ -20,6 +20,8 @@ private slots:
     void pageZoomShortcutsAndWheelDeltas();
     void activeBrowserViewSeparatesDetachedSurfaceFromDialogs();
     void fullScreenRequestPolicyValidatesOriginAndState();
+    void videoElementBridgeUsesTrustedOverlayClick();
+    void browserFullScreenRestoresWindowChrome();
     void detachedVideoSessionCoordinatesReturnAndFallback();
     void detachedVideoWindowMovesAndRestoresPage();
     void detachedVideoWindowCloseRequestsReturn();
@@ -819,25 +821,45 @@ void WindowInteractionTests::activeBrowserViewSeparatesDetachedSurfaceFromDialog
 
 void WindowInteractionTests::fullScreenRequestPolicyValidatesOriginAndState()
 {
-    const FullScreenRequestDecision accepted = decideFullScreenRequest(
+    const FullScreenRequestDecision browserFullScreen = decideFullScreenRequest(
         true,
         true,
         false,
+        false,
+        false,
+        false,
         QUrl(QStringLiteral("HTTPS://Example.COM:443/watch?v=1#player"))
     );
-    QCOMPARE(accepted.action, FullScreenRequestAction::Detach);
-    QCOMPARE(accepted.origin.scheme(), QStringLiteral("https"));
-    QCOMPARE(accepted.origin.host(), QStringLiteral("example.com"));
-    QCOMPARE(accepted.origin.port(), -1);
-    QCOMPARE(fullScreenOriginDisplay(accepted.origin), QStringLiteral("https://example.com"));
+    QCOMPARE(browserFullScreen.action, FullScreenRequestAction::EnterBrowserFullScreen);
+    QCOMPARE(browserFullScreen.origin.scheme(), QStringLiteral("https"));
+    QCOMPARE(browserFullScreen.origin.host(), QStringLiteral("example.com"));
+    QCOMPARE(browserFullScreen.origin.port(), -1);
+    QCOMPARE(
+        fullScreenOriginDisplay(browserFullScreen.origin),
+        QStringLiteral("https://example.com")
+    );
+
+    const FullScreenRequestDecision videoPopout = decideFullScreenRequest(
+        true,
+        true,
+        true,
+        false,
+        false,
+        false,
+        QUrl(QStringLiteral("https://example.com/watch"))
+    );
+    QCOMPARE(videoPopout.action, FullScreenRequestAction::DetachVideo);
 
     const FullScreenRequestDecision customPort = decideFullScreenRequest(
         true,
         true,
         false,
+        false,
+        false,
+        false,
         QUrl(QStringLiteral("http://example.com:8080/video"))
     );
-    QCOMPARE(customPort.action, FullScreenRequestAction::Detach);
+    QCOMPARE(customPort.action, FullScreenRequestAction::EnterBrowserFullScreen);
     QCOMPARE(customPort.origin.port(), 8080);
     QCOMPARE(
         fullScreenOriginDisplay(customPort.origin),
@@ -848,9 +870,15 @@ void WindowInteractionTests::fullScreenRequestPolicyValidatesOriginAndState()
         true,
         true,
         false,
+        false,
+        false,
+        false,
         QUrl(QStringLiteral("https://пример.рф/video"))
     );
-    QCOMPARE(internationalizedHost.action, FullScreenRequestAction::Detach);
+    QCOMPARE(
+        internationalizedHost.action,
+        FullScreenRequestAction::EnterBrowserFullScreen
+    );
     QCOMPARE(
         fullScreenOriginDisplay(internationalizedHost.origin),
         QStringLiteral("https://xn--e1afmkfd.xn--p1ai")
@@ -861,6 +889,9 @@ void WindowInteractionTests::fullScreenRequestPolicyValidatesOriginAndState()
             true,
             false,
             false,
+            false,
+            false,
+            false,
             QUrl(QStringLiteral("https://example.com"))
         ).action,
         FullScreenRequestAction::Reject
@@ -869,7 +900,10 @@ void WindowInteractionTests::fullScreenRequestPolicyValidatesOriginAndState()
         decideFullScreenRequest(
             true,
             true,
+            false,
             true,
+            false,
+            false,
             QUrl(QStringLiteral("https://example.com"))
         ).action,
         FullScreenRequestAction::Reject
@@ -878,6 +912,9 @@ void WindowInteractionTests::fullScreenRequestPolicyValidatesOriginAndState()
         decideFullScreenRequest(
             true,
             true,
+            false,
+            false,
+            false,
             false,
             QUrl(QStringLiteral("ftp://example.com/video"))
         ).action,
@@ -888,15 +925,236 @@ void WindowInteractionTests::fullScreenRequestPolicyValidatesOriginAndState()
             true,
             true,
             false,
+            false,
+            false,
+            false,
             QUrl(QStringLiteral("https://user@example.com/video"))
         ).action,
         FullScreenRequestAction::Reject
     );
     QCOMPARE(
-        decideFullScreenRequest(false, false, true, QUrl()).action,
-        FullScreenRequestAction::Restore
+        decideFullScreenRequest(false, false, false, true, false, false, QUrl()).action,
+        FullScreenRequestAction::RestoreDetachedVideo
+    );
+    QCOMPARE(
+        decideFullScreenRequest(false, false, false, false, true, true, QUrl()).action,
+        FullScreenRequestAction::RestoreBrowserFullScreen
+    );
+    QCOMPARE(
+        decideFullScreenRequest(
+            true,
+            true,
+            false,
+            false,
+            true,
+            false,
+            QUrl(QStringLiteral("https://example.com"))
+        ).action,
+        FullScreenRequestAction::Reject
     );
     QVERIFY(fullScreenOriginDisplay(QUrl(QStringLiteral("file:///tmp/video.html"))).isEmpty());
+}
+
+void WindowInteractionTests::browserFullScreenRestoresWindowChrome()
+{
+    QMainWindow window;
+    auto *view = new QWebEngineView(&window);
+    window.setCentralWidget(view);
+    QToolBar *visibleToolBar = window.addToolBar(QStringLiteral("Visible"));
+    QToolBar *hiddenToolBar = window.addToolBar(QStringLiteral("Hidden"));
+    hiddenToolBar->hide();
+    QMenuBar *menuBar = window.menuBar();
+    menuBar->addMenu(QStringLiteral("Browser"));
+    window.statusBar()->showMessage(QStringLiteral("Ready"));
+    window.resize(720, 480);
+    window.show();
+    QTRY_VERIFY(window.isVisible());
+    const bool menuBarWasVisible = menuBar->isVisible();
+
+    BrowserFullScreenController controller(&window);
+    QVERIFY(controller.enter(view));
+    QVERIFY(controller.isActive());
+    QCOMPARE(controller.webView(), view);
+    QTRY_VERIFY_WITH_TIMEOUT(window.isFullScreen(), 3000);
+    QVERIFY(visibleToolBar->isHidden());
+    QVERIFY(hiddenToolBar->isHidden());
+    QVERIFY(window.statusBar()->isHidden());
+    QVERIFY(menuBar->isHidden());
+
+    controller.exit();
+    QVERIFY(!controller.isActive());
+    QVERIFY(!controller.webView());
+    QTRY_VERIFY_WITH_TIMEOUT(!window.isFullScreen(), 3000);
+    QVERIFY(visibleToolBar->isVisible());
+    QVERIFY(hiddenToolBar->isHidden());
+    QVERIFY(window.statusBar()->isVisible());
+    QCOMPARE(menuBar->isVisible(), menuBarWasVisible);
+
+}
+
+void WindowInteractionTests::videoElementBridgeUsesTrustedOverlayClick()
+{
+    QWebEngineView view;
+    auto *page = new BrowserPage(QWebEngineProfile::defaultProfile(), &view);
+    page->settings()->setAttribute(QWebEngineSettings::FullScreenSupportEnabled, true);
+    VideoElementBridge::install(
+        page,
+        page->videoPopoutToken(),
+        QStringLiteral("Open video separately")
+    );
+    view.setPage(page);
+    view.resize(500, 300);
+    view.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&view, 3000));
+    view.raise();
+    view.activateWindow();
+    view.setFocus(Qt::OtherFocusReason);
+    QTRY_VERIFY_WITH_TIMEOUT(view.isActiveWindow(), 3000);
+
+    QStringList eventOrder;
+    QUrl requestedFrameUrl;
+    connect(page, &BrowserPage::videoPopoutRequested, &view, [
+        &eventOrder,
+        &requestedFrameUrl
+    ](const QUrl &frameUrl) {
+        eventOrder.append(QStringLiteral("bridge"));
+        requestedFrameUrl = frameUrl;
+    });
+    connect(
+        page,
+        &QWebEnginePage::fullScreenRequested,
+        &view,
+        [&eventOrder](QWebEngineFullScreenRequest request) {
+            eventOrder.append(QStringLiteral("fullscreen"));
+            request.reject();
+        }
+    );
+
+    QSignalSpy loadSpy(page, &QWebEnginePage::loadFinished);
+    view.setHtml(
+        QStringLiteral(R"HTML(
+<!doctype html>
+<style>
+html, body { margin: 0; width: 100%; height: 100%; }
+video { position: fixed; left: 40px; top: 40px; width: 320px; height: 180px; background: black; }
+</style>
+<video id="target"></video>
+)HTML"),
+        QUrl(QStringLiteral("https://video.example/player"))
+    );
+    QTRY_VERIFY_WITH_TIMEOUT(!loadSpy.isEmpty(), 3000);
+    QVERIFY(loadSpy.constLast().constFirst().toBool());
+
+    bool overlayAttached = false;
+    page->runJavaScript(
+        QStringLiteral(R"JS(
+(() => {
+    return Boolean(document.querySelector("[data-panbrowser-video-popout]"));
+})()
+)JS"),
+        QWebEngineScript::ApplicationWorld,
+        [&overlayAttached](const QVariant &result) {
+            overlayAttached = result.toBool();
+        }
+    );
+    QTRY_VERIFY_WITH_TIMEOUT(overlayAttached, 3000);
+
+    bool syntheticClickDispatched = false;
+    page->runJavaScript(
+        QStringLiteral(R"JS(
+(() => {
+    const host = document.querySelector("[data-panbrowser-video-popout]");
+    host.dispatchEvent(new MouseEvent("click", { bubbles: true, composed: true }));
+    return true;
+})()
+)JS"),
+        QWebEngineScript::ApplicationWorld,
+        [&syntheticClickDispatched](const QVariant &result) {
+            syntheticClickDispatched = result.toBool();
+        }
+    );
+    QTRY_VERIFY_WITH_TIMEOUT(syntheticClickDispatched, 3000);
+    QTest::qWait(100);
+    QVERIFY(eventOrder.isEmpty());
+
+    bool spoofMessageDispatched = false;
+    page->runJavaScript(
+        QStringLiteral(R"JS(
+(() => {
+    console.info("__PANBROWSER_VIDEO_POPOUT_REQUEST__" + JSON.stringify({
+        token: "page-controlled-token",
+        url: "https://video.example/player"
+    }));
+    return true;
+})()
+)JS"),
+        [&spoofMessageDispatched](const QVariant &result) {
+            spoofMessageDispatched = result.toBool();
+        }
+    );
+    QTRY_VERIFY_WITH_TIMEOUT(spoofMessageDispatched, 3000);
+    QTest::qWait(100);
+    QVERIFY(eventOrder.isEmpty());
+
+    bool overlayActivated = false;
+    page->runJavaScript(
+        QStringLiteral(R"JS(
+globalThis.__panBrowserVideoPopoutController.showFor(
+    document.getElementById("target")
+)
+)JS"),
+        QWebEngineScript::ApplicationWorld,
+        [&overlayActivated](const QVariant &result) {
+            overlayActivated = result.toBool();
+        }
+    );
+    QTRY_VERIFY_WITH_TIMEOUT(overlayActivated, 3000);
+
+    QString overlayGeometryJson;
+    page->runJavaScript(
+        QStringLiteral(R"JS(
+(() => {
+    const host = document.querySelector("[data-panbrowser-video-popout]");
+    if (!host || getComputedStyle(host).display === "none")
+        return "";
+    const rect = host.getBoundingClientRect();
+    return JSON.stringify({ x: rect.x, y: rect.y, width: rect.width, height: rect.height });
+})()
+)JS"),
+        QWebEngineScript::ApplicationWorld,
+        [&overlayGeometryJson](const QVariant &result) {
+            overlayGeometryJson = result.toString();
+        }
+    );
+    QTRY_VERIFY_WITH_TIMEOUT(!overlayGeometryJson.isEmpty(), 3000);
+    const QJsonObject overlayGeometry = QJsonDocument::fromJson(
+        overlayGeometryJson.toUtf8()
+    ).object();
+    QVERIFY(!overlayGeometry.isEmpty());
+    const QPoint overlayCenter(
+        qRound(overlayGeometry.value(QStringLiteral("x")).toDouble()
+            + overlayGeometry.value(QStringLiteral("width")).toDouble() / 2.0),
+        qRound(overlayGeometry.value(QStringLiteral("y")).toDouble()
+            + overlayGeometry.value(QStringLiteral("height")).toDouble() / 2.0)
+    );
+    QWidget *eventTarget = view.focusProxy() ? view.focusProxy() : &view;
+    const auto targetPosition = [&view, eventTarget](const QPoint &position) {
+        return eventTarget == &view ? position : eventTarget->mapFrom(&view, position);
+    };
+    QTest::mouseMove(eventTarget, targetPosition(overlayCenter));
+    QTest::mouseClick(
+        eventTarget,
+        Qt::LeftButton,
+        Qt::NoModifier,
+        targetPosition(overlayCenter)
+    );
+
+    QTRY_VERIFY_WITH_TIMEOUT(eventOrder.contains(QStringLiteral("fullscreen")), 3000);
+    QCOMPARE(
+        eventOrder,
+        QStringList({QStringLiteral("bridge"), QStringLiteral("fullscreen")})
+    );
+    QCOMPARE(requestedFrameUrl.host(), QStringLiteral("video.example"));
 }
 
 void WindowInteractionTests::detachedVideoSessionCoordinatesReturnAndFallback()

@@ -16,6 +16,8 @@
 #include <QPointer>
 #include <QString>
 
+#include <memory>
+
 class QLabel;
 class AddressLineEdit;
 class QMessageBox;
@@ -27,6 +29,7 @@ class QMenu;
 class QAction;
 class QPoint;
 class BookmarkStore;
+class BrowserFullScreenController;
 class BrowserTabBar;
 class BrowserProfile;
 class DownloadButton;
@@ -95,6 +98,9 @@ private:
         bool loading = false;
         bool pinned = false;
         int progress = 0;
+        qint64 videoPopoutRequestDeadlineMs = 0;
+        quint64 videoPopoutRequestSerial = 0;
+        QUrl videoPopoutRequestOrigin;
         QUrl topLevelUrl;
         QUrl pendingUrl;
         HistoryTransition pendingHistoryTransition = HistoryTransition::Other;
@@ -164,6 +170,7 @@ private:
         QWebEngineView *webView,
         QWebEngineFullScreenRequest request
     );
+    void exitBrowserFullScreen(QWebEngineView *webView);
     void detachVideo(QWebEngineView *webView, const QUrl &origin);
     void requestDetachedVideoReturn(QWebEngineView *webView);
     void restoreDetachedVideo(QWebEngineView *webView);
@@ -258,6 +265,7 @@ private:
     QPointer<QWebEngineView> m_externalUrlSource;
     QPointer<QWebEngineView> m_findView;
     QPointer<QWebEngineView> m_lastInteractionWebView;
+    std::unique_ptr<BrowserFullScreenController> m_fullScreenController;
     BrowserTabBar *m_tabBar = nullptr;
     QStackedWidget *m_tabStack = nullptr;
     AddressLineEdit *m_address = nullptr;

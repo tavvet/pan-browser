@@ -16,8 +16,10 @@ struct BrowserInteractionSurface {
 
 enum class FullScreenRequestAction {
     Reject,
-    Detach,
-    Restore,
+    EnterBrowserFullScreen,
+    DetachVideo,
+    RestoreBrowserFullScreen,
+    RestoreDetachedVideo,
 };
 
 struct FullScreenRequestDecision {
@@ -75,7 +77,10 @@ private:
 [[nodiscard]] FullScreenRequestDecision decideFullScreenRequest(
     bool toggleOn,
     bool interactionActive,
+    bool videoPopoutRequested,
     bool alreadyDetached,
+    bool browserFullScreenActive,
+    bool browserFullScreenOwnsRequest,
     const QUrl &requestOrigin
 );
 

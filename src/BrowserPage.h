@@ -11,6 +11,7 @@ class BrowserPage final : public QWebEnginePage {
 
 public:
     explicit BrowserPage(QWebEngineProfile *profile, QObject *parent = nullptr);
+    [[nodiscard]] QString videoPopoutToken() const;
     void setWebApp(const WebApp &app);
     void fetchWebAppManifest(
         const QString &requestId,
@@ -23,6 +24,7 @@ signals:
     void externalUrlRequested(const QUrl &url);
     void outOfScopeNavigationRequested(const QUrl &url, int navigationType);
     void mainFrameNavigationRequested(const QUrl &url, int navigationType);
+    void videoPopoutRequested(const QUrl &frameUrl);
     void webAppManifestFetched(
         const QString &requestId,
         const QByteArray &contents,
@@ -44,4 +46,5 @@ protected:
 
 private:
     std::optional<WebApp> m_webApp;
+    QString m_videoPopoutToken;
 };

@@ -119,19 +119,32 @@ QWebEngineView *resolveBrowserCommandTarget(
 FullScreenRequestDecision decideFullScreenRequest(
     bool toggleOn,
     bool interactionActive,
+    bool videoPopoutRequested,
     bool alreadyDetached,
+    bool browserFullScreenActive,
+    bool browserFullScreenOwnsRequest,
     const QUrl &requestOrigin
 )
 {
-    if (!toggleOn)
-        return {FullScreenRequestAction::Restore, QUrl()};
-    if (!interactionActive || alreadyDetached)
+    if (!toggleOn) {
+        if (alreadyDetached)
+            return {FullScreenRequestAction::RestoreDetachedVideo, QUrl()};
+        if (browserFullScreenOwnsRequest)
+            return {FullScreenRequestAction::RestoreBrowserFullScreen, QUrl()};
+        return {};
+    }
+    if (!interactionActive || alreadyDetached || browserFullScreenActive)
         return {};
 
     const QUrl origin = normalizedWebOrigin(requestOrigin);
     if (origin.isEmpty())
         return {};
-    return {FullScreenRequestAction::Detach, origin};
+    return {
+        videoPopoutRequested
+            ? FullScreenRequestAction::DetachVideo
+            : FullScreenRequestAction::EnterBrowserFullScreen,
+        origin,
+    };
 }
 
 QString fullScreenOriginDisplay(const QUrl &origin)

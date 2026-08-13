@@ -5,12 +5,17 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QUuid>
 #include <QWebEngineScript>
 #include <QWebEngineSettings>
 
 namespace {
 
 const QString fetchMessagePrefix = QStringLiteral("__PANBROWSER_WEB_APP_FETCH__");
+const QString videoPopoutMessagePrefix = QStringLiteral(
+    "__PANBROWSER_VIDEO_POPOUT_REQUEST__"
+);
+constexpr qsizetype maximumVideoPopoutMessageLength = 2048;
 
 QString javaScriptString(const QString &value)
 {
@@ -22,10 +27,16 @@ QString javaScriptString(const QString &value)
 
 BrowserPage::BrowserPage(QWebEngineProfile *profile, QObject *parent)
     : QWebEnginePage(profile, parent)
+    , m_videoPopoutToken(QUuid::createUuid().toString(QUuid::WithoutBraces))
 {
     settings()->setUnknownUrlSchemePolicy(
         QWebEngineSettings::UnknownUrlSchemePolicy::AllowUnknownUrlSchemesFromUserInteraction
     );
+}
+
+QString BrowserPage::videoPopoutToken() const
+{
+    return m_videoPopoutToken;
 }
 
 void BrowserPage::setWebApp(const WebApp &app)
@@ -170,6 +181,31 @@ void BrowserPage::javaScriptConsoleMessage(
     const QString &sourceId
 )
 {
+    if (message.startsWith(videoPopoutMessagePrefix)) {
+        if (message.size() > maximumVideoPopoutMessageLength)
+            return;
+        QJsonParseError parseError;
+        const QJsonDocument document = QJsonDocument::fromJson(
+            message.mid(videoPopoutMessagePrefix.size()).toUtf8(),
+            &parseError
+        );
+        if (parseError.error != QJsonParseError::NoError || !document.isObject())
+            return;
+        const QJsonObject object = document.object();
+        if (object.value(QStringLiteral("token")).toString() != m_videoPopoutToken)
+            return;
+        const QUrl frameUrl(object.value(QStringLiteral("url")).toString());
+        const QString scheme = frameUrl.scheme().toLower();
+        if (!frameUrl.isValid()
+            || frameUrl.host().isEmpty()
+            || !frameUrl.userInfo().isEmpty()
+            || (scheme != QStringLiteral("http") && scheme != QStringLiteral("https"))) {
+            return;
+        }
+        emit videoPopoutRequested(frameUrl);
+        return;
+    }
+
     if (!message.startsWith(fetchMessagePrefix)) {
         QWebEnginePage::javaScriptConsoleMessage(level, message, lineNumber, sourceId);
         return;
