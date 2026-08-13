@@ -1,7 +1,11 @@
 #include "BrowserTabBar.h"
 
+#include <QEasingCurve>
 #include <QMouseEvent>
+#include <QResizeEvent>
+#include <QStyle>
 #include <QVariantMap>
+#include <QVariantAnimation>
 #include <QWidget>
 
 #include <algorithm>
@@ -9,8 +13,10 @@
 namespace {
 
 constexpr int pinnedTabMinimumWidth = 42;
+constexpr int maximumOpeningDurationMilliseconds = 180;
 constexpr auto pinnedKey = "pinned";
 constexpr auto identityKey = "identity";
+constexpr auto openingWidthKey = "openingWidth";
 
 QVariantMap tabMetadata(const QVariant &data)
 {
@@ -70,6 +76,93 @@ int BrowserTabBar::normalizedMoveDestination(int movedIndex) const
 
 QSize BrowserTabBar::tabSizeHint(int index) const
 {
+    QSize size = naturalTabSizeHint(index);
+    const QVariantMap metadata = tabMetadata(tabData(index));
+    const QVariant openingWidth = metadata.value(QString::fromLatin1(openingWidthKey));
+    if (openingWidth.isValid())
+        size.setWidth(std::clamp(openingWidth.toInt(), 1, size.width()));
+    return size;
+}
+
+void BrowserTabBar::animateTabOpening(int index)
+{
+    if (index < 0 || index >= count() || !isVisible())
+        return;
+
+    const int styleDuration = style()->styleHint(
+        QStyle::SH_Widget_Animation_Duration,
+        nullptr,
+        this
+    );
+    if (styleDuration <= 0)
+        return;
+
+    const quint64 identity = ensureTabIdentity(index);
+    const QSize targetSize = naturalTabSizeHint(index);
+    const int openingWidth = std::min(
+        targetSize.width(),
+        std::max(24, targetSize.height())
+    );
+    if (identity == 0 || openingWidth >= targetSize.width())
+        return;
+
+    if (QVariantAnimation *existing = m_openingAnimations.take(identity)) {
+        existing->stop();
+        existing->deleteLater();
+    }
+
+    QVariantMap metadata = tabMetadata(tabData(index));
+    metadata.insert(QString::fromLatin1(openingWidthKey), openingWidth);
+    setTabData(index, metadata);
+    refreshTabLayout();
+
+    auto *animation = new QVariantAnimation(this);
+    animation->setDuration(std::min(
+        styleDuration,
+        maximumOpeningDurationMilliseconds
+    ));
+    animation->setStartValue(openingWidth);
+    animation->setEndValue(targetSize.width());
+    animation->setEasingCurve(QEasingCurve::OutCubic);
+    m_openingAnimations.insert(identity, animation);
+
+    connect(
+        animation,
+        &QVariantAnimation::valueChanged,
+        this,
+        [this, identity](const QVariant &value) {
+            const int animatedIndex = indexForIdentity(identity);
+            if (animatedIndex < 0)
+                return;
+            QVariantMap animatedMetadata = tabMetadata(tabData(animatedIndex));
+            animatedMetadata.insert(
+                QString::fromLatin1(openingWidthKey),
+                value.toInt()
+            );
+            setTabData(animatedIndex, animatedMetadata);
+            refreshTabLayout();
+        }
+    );
+    connect(animation, &QVariantAnimation::finished, this, [this, identity, animation] {
+        if (m_openingAnimations.value(identity) != animation) {
+            animation->deleteLater();
+            return;
+        }
+        m_openingAnimations.remove(identity);
+        const int animatedIndex = indexForIdentity(identity);
+        if (animatedIndex >= 0) {
+            QVariantMap metadata = tabMetadata(tabData(animatedIndex));
+            metadata.remove(QString::fromLatin1(openingWidthKey));
+            setTabData(animatedIndex, metadata);
+            refreshTabLayout();
+        }
+        animation->deleteLater();
+    });
+    animation->start();
+}
+
+QSize BrowserTabBar::naturalTabSizeHint(int index) const
+{
     QSize size = QTabBar::tabSizeHint(index);
     if (isTabPinned(index))
         size.setWidth(std::max(pinnedTabMinimumWidth, size.height() + 8));
@@ -124,6 +217,14 @@ int BrowserTabBar::indexForIdentity(quint64 identity) const
             return index;
     }
     return -1;
+}
+
+void BrowserTabBar::refreshTabLayout()
+{
+    QResizeEvent event(size(), size());
+    QTabBar::resizeEvent(&event);
+    updateGeometry();
+    update();
 }
 
 void BrowserTabBar::updateCloseButtonVisibility(int index)

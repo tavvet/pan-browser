@@ -1313,6 +1313,8 @@ QWebEngineView *MainWindow::createTab(
 
     if (activate)
         m_tabBar->setCurrentIndex(tabIndex);
+    if (!m_restoringSession)
+        m_tabBar->animateTabOpening(tabIndex);
     if (!deferred && url.isValid() && !url.isEmpty())
         webView->setUrl(url);
     if (!m_restoringSession)

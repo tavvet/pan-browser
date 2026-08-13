@@ -1,5 +1,7 @@
 #include "PanBrowserTestCommon.h"
 
+#include <QStyle>
+
 class WindowInteractionTests final : public QObject {
     Q_OBJECT
 
@@ -13,6 +15,7 @@ private slots:
     void browserPreferencesValidateStartPage();
     void browserTabBarKeepsPinnedTabsInTheirGroup();
     void browserTabBarRestoresBoundaryAfterMouseDrag();
+    void browserTabBarAnimatesNewTabExpansion();
     void developerToolsPreferenceDefaultsToDisabled();
     void browserShortcutFallbackMatchesRegisteredKeys();
     void pageZoomUsesCanonicalOriginsAndDiscreteLevels();
@@ -102,6 +105,31 @@ void WindowInteractionTests::browserTabBarRestoresBoundaryAfterMouseDrag()
     QVERIFY(tabBar.isTabPinned(1));
     QVERIFY(!tabBar.isTabPinned(2));
     QVERIFY(!tabBar.isTabPinned(3));
+}
+
+void WindowInteractionTests::browserTabBarAnimatesNewTabExpansion()
+{
+    BrowserTabBar tabBar;
+    tabBar.setTabsClosable(true);
+    tabBar.setExpanding(false);
+    tabBar.resize(640, 40);
+    tabBar.addTab(QStringLiteral("Existing tab"));
+    tabBar.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&tabBar));
+
+    const int index = tabBar.addTab(QStringLiteral("Animated new tab"));
+    const int naturalWidth = tabBar.tabRect(index).width();
+    if (tabBar.style()->styleHint(
+            QStyle::SH_Widget_Animation_Duration,
+            nullptr,
+            &tabBar
+        ) <= 0) {
+        QSKIP("The active Qt style disables widget animations");
+    }
+    tabBar.animateTabOpening(index);
+
+    QVERIFY(tabBar.tabRect(index).width() < naturalWidth);
+    QTRY_COMPARE_WITH_TIMEOUT(tabBar.tabRect(index).width(), naturalWidth, 1000);
 }
 
 void WindowInteractionTests::visibleWindowPlacementIsPreserved()
