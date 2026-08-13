@@ -6,8 +6,8 @@ general-purpose browser.
 
 ## 0.2.0 — Unreleased
 
-Development continues on `main`. The initial scope focuses on browser polish,
-portable web-app integration, and safe transfer of trust configuration.
+Development continues on `main`. The current scope focuses on browser polish,
+tighter page-network controls, and experimental video tooling.
 
 - Added opt-in developer tools with a profile preference that defaults to off,
   an Inspect Element context action, and platform-appropriate shortcuts.
@@ -15,11 +15,21 @@ portable web-app integration, and safe transfer of trust configuration.
   trackpad, with discrete levels and per-origin persistence.
 - Added compact pinned tabs with constrained group reordering and restoration
   on every browser launch, independent of ordinary session-tab settings.
+- Added a short style-aware expansion animation for newly opened tabs while
+  keeping startup session restoration static.
+- Added an opt-in third-party connection firewall with Public Suffix List site
+  boundaries, browser-owned prompts, persistent and session decisions, global
+  exceptions, and separately managed tracker/CDN recommendations.
 - Separated normal page fullscreen from the explicit video pop-out action;
   videos can now be opened in a frameless, resizable, always-on-top window from
   a browser-provided overlay button. The window exposes a hover close control
   and can be dragged from its content; its initial size and subsequent resizing
   preserve the selected video's intrinsic aspect ratio.
+- Added opt-in integration with the independently maintained VOT 1.11.8
+  userscript. PanBrowser verifies the exact upstream file, injects it only on
+  declared pages, keeps its GM values outside page storage, bounds native HTTPS
+  requests, routes them through proxy and Site Connections policy, and
+  requires System DNS.
 
 ## 0.1.0 — 2026-08-10
 

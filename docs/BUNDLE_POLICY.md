@@ -75,6 +75,12 @@ The deployment tools discover transitive Qt dependencies. Removing one after
 deployment can turn an apparent size improvement into a startup failure on a
 different machine.
 
+The optional VOT userscript and `vot-storage.json` are user data, not bundle
+inputs. Packaging must never copy either from a developer profile into
+`dist/`. If PanBrowser ever starts distributing VOT itself, treat that as a new
+runtime component requiring an explicit size, security, update, and licensing
+review rather than an ordinary bundle-pruning change.
+
 ## CI policy
 
 The Windows workflow is manual during the stabilization period. It uses a

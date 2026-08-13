@@ -164,9 +164,14 @@ Before publishing a candidate:
    explicitly unnotarized release, confirm the documented warning and Open
    Anyway flow match the target macOS versions;
 5. smoke-test navigation, trust rules, downloads, HTTP authentication,
-   camera/microphone/location permissions, and an installed web app;
-6. compare the ZIP checksum with the committed or published checksum;
-7. create and push the annotated `v<version>` tag only after verification.
+   camera/microphone/location permissions, Site Connections, animated and
+   pinned tabs, video pop-out, and an installed web app;
+6. when the target version exposes VOT integration, select the exact supported
+   upstream userscript from outside the bundle, verify System DNS and
+   Site Connections behavior, then confirm that neither that source file nor
+   `vot-storage.json` was copied into the release archive;
+7. compare the ZIP checksum with the committed or published checksum;
+8. create and push the annotated `v<version>` tag only after verification.
 
 The release script deliberately keeps the ordinary `build-app.sh` workflow
 ad-hoc signed. Developer ID signing and notarization are explicit release

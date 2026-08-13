@@ -1,9 +1,10 @@
 # Licensing and binary distribution
 
-This document records the licensing boundary of the PanBrowser `0.1.0` source
-tree and the work required before distributing a packaged application. It is a
-maintenance checklist, not legal advice. A distributor remains responsible for
-reviewing the exact source, toolchain, and runtime components in each package.
+This document records the licensing boundary of the current PanBrowser source
+tree, including `0.2.0` development on `main`, and the work required before
+distributing a packaged application. It is a maintenance checklist, not legal
+advice. A distributor remains responsible for reviewing the exact source,
+toolchain, and runtime components in each package.
 
 ## 1. Source repository
 
@@ -16,8 +17,9 @@ The repository contains four licensing groups:
    [THIRD_PARTY_NOTICES.md](../THIRD_PARTY_NOTICES.md).
 3. The bundled Public Suffix List under `src/assets/`, licensed under MPL-2.0
    and identified in the third-party notices.
-4. References to external build and runtime dependencies. Qt, Chromium, and
-   OpenSSL source or binaries are not committed to this repository.
+4. References to external build and runtime dependencies and to the optional
+   VOT userscript integration. Qt, Chromium, OpenSSL, and VOT source or binaries
+   are not committed to this repository.
 
 Publishing a source tag does not require publishing a GitHub Release or a
 binary package. The source tag should contain the PanBrowser project license,
@@ -93,6 +95,21 @@ included in a package, include its exact license and notice files. If the
 package relies on a system copy, document that runtime dependency. OpenSSL 3.x
 and 1.1.1 use different licenses.
 
+### Optional VOT userscript
+
+PanBrowser implements a compatibility and security bridge for the independently
+maintained VOT userscript. The application does not bundle, download, modify,
+or redistribute VOT. A user supplies the supported upstream `vot.user.js`, and
+PanBrowser verifies its exact version, metadata, and SHA-256 digest before
+execution. The upstream project is MIT-licensed; its notice is reproduced in
+[THIRD_PARTY_NOTICES.md](../THIRD_PARTY_NOTICES.md).
+
+Because the current source and binary packages contain no VOT code, the
+userscript is not part of PanBrowser's distributed binary inventory. If a
+future package downloads, embeds, mirrors, or modifies it, that distribution
+must preserve the upstream MIT notice and update the package inventory,
+security documentation, source handling, and update policy before release.
+
 ## 4. Checklist before sharing any binary
 
 This checklist applies to a GitHub Release, a direct download, a package sent
@@ -112,6 +129,8 @@ to another person, and a downloadable CI artifact. The absence of a formal
 - [ ] Preserve the Lucide ISC and Feather MIT notices.
 - [ ] Preserve the Public Suffix List MPL-2.0 notice and make its source form
   available with the distributed version.
+- [ ] If VOT is ever included in a package rather than selected separately by
+  the user, preserve its MIT notice and record the exact distributed source.
 - [ ] Include the exact OpenSSL notice when OpenSSL is bundled.
 - [ ] Keep Qt dynamically linked and verify that recipients can replace the Qt
   libraries with ABI-compatible modified builds. Document any platform signing
@@ -137,8 +156,9 @@ The exact license texts, rather than this checklist, control.
 The generic platform build scripts create local testing packages. They include
 the PanBrowser README, Apache license, third-party notice, and this licensing
 guide, but they do not yet implement the complete binary-distribution checklist
-above. Windows CI artifacts and Linux packages should therefore remain
-development/test artifacts.
+above. They do not copy a configured VOT userscript or native VOT storage from
+the developer's application-data directory. Windows CI artifacts and Linux
+packages should therefore remain development/test artifacts.
 
 The macOS release-candidate script goes further. It collects the installed Qt
 SPDX documents, Chromium's top-level license, exact notices for loose Homebrew
@@ -163,8 +183,8 @@ that exact package.
 
 ## 6. Maintenance rule
 
-Whenever the Qt version, deployed module set, OpenSSL baseline, icon set, or
-packaging layout changes:
+Whenever the Qt version, deployed module set, OpenSSL baseline, supported VOT
+version, icon set, or packaging layout changes:
 
 1. regenerate and compare the dependency inventory;
 2. review the upstream license and SBOM files for that exact version;

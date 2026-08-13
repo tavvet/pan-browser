@@ -46,18 +46,22 @@ test environments, and other deliberately scoped trust configurations.
   `custom-only` modes.
 - Native certificate validation through Security.framework on macOS, CryptoAPI
   on Windows, and OpenSSL on Linux.
-- A dedicated WebEngine profile for cookies, storage, cache, history,
-  bookmarks, downloads, and installed web apps.
-- Movable and persistent pinned tabs, session restoration, popup handling,
-  native page fullscreen, frameless and draggable always-on-top video pop-out
-  with aspect-ratio-preserving resize, find in page, per-site page zoom, local
-  address completion, configurable search engines, and a download manager.
+- A dedicated WebEngine profile for Chromium cookies, site storage, and cache,
+  plus PanBrowser-owned history, bookmark, download, and installed-app stores.
+- Movable and persistent pinned tabs, animated new-tab opening, session
+  restoration, popup handling, native page fullscreen, frameless and draggable
+  always-on-top video pop-out with aspect-ratio-preserving resize, find in
+  page, per-site page zoom, local address completion, configurable search
+  engines, and a download manager.
 - Browser-owned prompts for camera, microphone, location, external schemes,
   HTTP Basic authentication, and HTTP proxy authentication.
 - Browser-wide System/Direct/HTTP/SOCKS5 proxy modes and configurable
   DNS-over-HTTPS providers.
 - An opt-in experimental firewall for third-party page connections, with
   global exceptions and per-site session or persistent decisions.
+- Opt-in integration with the independently maintained VOT userscript for
+  voice-over video translation. PanBrowser accepts only its pinned, verified
+  release and does not bundle or update the userscript automatically.
 - Manifest-based web app installation, including lightweight application
   shortcuts on macOS.
 - English and Russian interfaces with system-language detection.
@@ -280,6 +284,35 @@ its last valid backup. If neither copy is valid, the original files are
 preserved, a visible warning is shown, and unknown third-party connections are
 blocked until a valid configuration is saved.
 
+## Experimental video translation
+
+Open **Settings → Video Translation** to enable the experimental integration
+with [VOT — Voice Over Translation](https://github.com/ilyhalight/voice-over-translation).
+PanBrowser does not download or bundle third-party script code. Download the
+official
+[`vot.user.js`](https://github.com/ilyhalight/voice-over-translation/releases/download/1.11.8/vot.user.js)
+from the VOT `1.11.8` release, select it in Settings, and reload already open
+video pages. The file is accepted only when its exact SHA-256 hash and metadata
+match the version pinned by PanBrowser; arbitrary userscripts and modified VOT
+builds are rejected.
+
+The userscript runs at document-ready time in an isolated JavaScript world and
+only on URLs declared by its verified `@match` metadata. Its GM storage is kept
+in a PanBrowser-owned file instead of page `localStorage`. Native VOT requests
+are limited to HTTPS hosts declared by the verified `@connect` metadata, use
+the active application proxy, and pass through the Site Connections policy.
+When that firewall is enabled, the first request to an unknown translation or
+media host is blocked and produces the ordinary PanBrowser allow/block prompt;
+allowing it reloads the affected page.
+
+VOT currently requires **System DNS** because its native Qt Network requests
+cannot use Chromium's Secure DNS resolver. Those requests do not share
+Chromium cookies or PanBrowser's custom-CA recovery path and instead use Qt
+Network's system TLS validation. VOT is third-party code maintained outside
+PanBrowser, has access to every matching video page, and can contact its
+declared service hosts. Keep the feature disabled unless you accept that trust
+boundary.
+
 ## Security and privacy notes
 
 - Custom trust recovery is limited to unknown-CA errors. Hostname mismatch,
@@ -298,6 +331,10 @@ blocked until a valid configuration is saved.
 - The experimental connection firewall covers URL requests exposed through Qt
   WebEngine. It is not a complete network sandbox and does not claim to block
   every WebRTC, DNS-prefetch, or internal Chromium connection.
+- The optional VOT integration executes one exact, hash-verified third-party
+  userscript. PanBrowser provides only the compatibility bridge; it does not
+  audit or control the translation service, page-processing logic, or future
+  upstream releases.
 - Installed web apps currently share the main PanBrowser profile, including
   cookies, permissions, proxy, DNS, trust rules, and the site-connection
   firewall.
@@ -311,11 +348,22 @@ For the complete threat boundaries and maintenance invariants, read
 ## Local data
 
 PanBrowser uses the platform's per-user application-data and cache locations.
-Open **Settings → Diagnostics** to see their exact paths. The profile contains
-WebEngine cookies and site data together with PanBrowser's session, download,
-history, bookmark, web-app, search, DNS, proxy, and trust configuration.
-The same directory contains `site-connections.json` with the opt-in firewall
-mode, global exceptions, and persistent source-to-target decisions.
+Open **Settings → Diagnostics** to see the exact WebEngine profile and cache
+paths, or use **Show Configuration Folder** in the application menu to open the
+PanBrowser application-data directory. The WebEngine profile contains Chromium
+cookies and site data. The surrounding application-data directory contains
+session, download, history, bookmark, web-app, search, DNS, proxy, trust, and
+feature configuration. It also contains `site-connections.json` with the
+opt-in firewall mode, global exceptions, and persistent source-to-target
+decisions.
+
+Video translation adds `video-translation.json`, which stores whether the
+integration is enabled and the selected userscript path, plus
+`vot-storage.json`, which stores script-managed preferences and service state.
+Disabling VOT or resetting WebEngine site data does not delete that native
+script storage. To remove it completely, close PanBrowser and delete
+`vot-storage.json` from the folder opened by **Show Configuration Folder** in
+the application menu.
 
 Pinned tabs are stored in `session.json` and reopen on every launch. Ordinary
 tabs are stored only when **Continue with previous tabs** is selected. Closing

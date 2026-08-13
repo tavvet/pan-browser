@@ -4,10 +4,10 @@ This document explains how PanBrowser is put together, why the important
 boundaries exist, and which invariants must survive future changes. It is aimed
 at someone returning to the project after a long break.
 
-This document describes the **0.1.0** source milestone baseline. PanBrowser does
-not yet claim the compatibility or maintenance guarantees of a stable
-general-purpose browser. Update this document together with any change to
-component ownership, startup order, persistence, or a security boundary.
+This document describes the current **0.2.0 development** source on `main`.
+PanBrowser does not yet claim the compatibility or maintenance guarantees of a
+stable general-purpose browser. Update this document together with any change
+to component ownership, startup order, persistence, or a security boundary.
 
 For user-facing behavior and configuration examples, see
 [README.md](../README.md). For planned work, see [ROADMAP.md](../ROADMAP.md).
@@ -28,9 +28,12 @@ The main goals are:
   general-purpose browser;
 - keep security-sensitive decisions visible in browser-owned UI.
 
-Non-goals for the current implementation are browser extensions, account sync,
-password management, exclusive certificate pinning for chains Chromium already
-accepts, and silent handling of external applications or sensitive permissions.
+Non-goals for the current implementation are a general extension platform,
+arbitrary userscripts, account sync, password management, exclusive certificate
+pinning for chains Chromium already accepts, and silent handling of external
+applications or sensitive permissions. The optional VOT integration is one
+explicitly supported, exact-version userscript boundary rather than a general
+extension mechanism.
 
 Qt WebEngine was chosen because it provides a maintained Chromium embedding,
 tabs, cookies, media support, downloads, and a cross-platform API while still
@@ -55,12 +58,18 @@ flowchart TD
     MW --> Permissions["PermissionController"]
     MW --> HttpAuth["HttpAuthenticationController"]
     MW --> ProxyAuth["ProxyAuthenticationController"]
+    MW --> VotManager["VotUserscriptManager"]
     Profile --> RequestFilter["CrossDomainRequestInterceptor"]
     RequestFilter --> ConnectionPolicy["CrossDomainSettings / site-connections.json"]
     ConnectionPolicy --> PSL["Bundled Public Suffix List"]
     MW --> Session["SessionStore"]
     MW --> WebApps["WebAppStore / web-apps.json"]
     WebApps --> Shortcuts["WebAppShortcutManager / macOS .app launchers"]
+    Page --> VotBridge["VotUserscriptBridge / isolated world"]
+    VotManager --> VotStore["VotUserscriptStore / vot-storage.json"]
+    VotManager --> VotBridge
+    VotBridge --> NativeNetwork["Qt Network / bounded HTTPS"]
+    NativeNetwork --> RequestFilter
 
     Popup["Popup MainWindow"] --> Profile
     Popup --> History
@@ -79,6 +88,7 @@ flowchart TD
     Settings --> Search["SearchSettings"]
     Settings --> DNS["DnsSettings / QWebEngineGlobalSettings"]
     Settings --> Proxy["ProxySettings / QNetworkProxy"]
+    Settings --> VotSettings["VideoTranslationSettings"]
     Settings --> History
     Settings --> WebApps
     Settings --> Diagnostics["DiagnosticsPage"]
@@ -86,17 +96,21 @@ flowchart TD
 
 The primary `MainWindow` is the composition root. It creates and owns the
 shared `BrowserProfile`, `DownloadManager`, `HistoryStore`, `BookmarkStore`,
-and `WebAppStore`. Popup and installed web-app windows reuse those objects and
-the current trust, search, DNS, proxy, and preference state; they do not create
-independent browser profiles.
+`WebAppStore`, and `VotUserscriptManager`. Popup and installed web-app windows
+reuse those objects and the current trust, search, DNS, proxy, video-translation,
+and preference state; they do not create independent browser profiles.
 
 Each tab owns one `QWebEngineView` and one `BrowserPage`. `BrowserTabState` in
 `MainWindow` contains UI state that Qt WebEngine does not provide as a single
 unit: loading progress, pending restored URL, history transition, TLS status,
 the custom rule accepted for the top-level origin, the persisted title and pin
 state, and an optional developer tools window. `BrowserTabBar` owns the visual
-pin marker, compact size, hidden close button, and pinned-group movement
-boundary; `MainWindow` mirrors every accepted tab move in the page stack.
+pin marker, compact size, hidden close button, pinned-group movement boundary,
+and the short expansion animation for a newly opened visible tab; `MainWindow`
+mirrors every accepted tab move in the page stack. Opening animations use a
+stable per-tab identity so a move or pin transition cannot transfer animation
+state to another tab. They follow Qt's widget-animation duration, are capped at
+180 ms, and are not started while a session or hidden window is being built.
 
 Normal Fullscreen API requests and video pop-out are deliberately separate.
 `BrowserFullScreenController` keeps the page in its original view, hides only
@@ -163,6 +177,9 @@ The primary window owns browser-wide resources:
   never persists passwords.
 - `ProxyAuthenticationController` serializes HTTP-proxy credential prompts and
   never persists passwords.
+- `VotUserscriptManager` owns the verified userscript package state and one
+  native script-scoped store. It creates a per-page `VotUserscriptBridge` only
+  while the opt-in integration is ready.
 - popup windows are children of the primary window and use
   `Qt::WA_DeleteOnClose`.
 
@@ -665,7 +682,71 @@ interceptor. It is not a complete network sandbox: raw WebRTC/STUN/TURN paths,
 some speculative resolution, and Chromium-internal traffic may not be
 represented as interceptable page requests.
 
-### 6.6 HTTP server authentication
+### 6.6 Experimental VOT userscript boundary
+
+Video translation is disabled by default and is not a general userscript
+loader. `VideoTranslationSettings` stores only the enabled flag and selected
+source path. `VotUserscriptPackage` accepts one pinned upstream release: the
+file must be an existing UTF-8 JavaScript file no larger than 4 MiB, have the
+exact SHA-256 digest compiled into PanBrowser, declare the supported version,
+contain usable `@match` rules and explicit `@connect` hosts, and contain no
+wildcard network grant. PanBrowser neither bundles nor automatically downloads
+or updates this third-party file. A new upstream version requires an explicit
+source review and PanBrowser update.
+
+Each configured `BrowserPage` receives a `VotUserscriptBridge`. The bridge
+injects the verified source at document-ready time in WebEngine's isolated
+ApplicationWorld, including matching subframes. The wrapper first evaluates
+the verified `@match` and `@exclude` patterns. A random per-page capability
+authenticates bounded JSON messages received through the page's console hook;
+normal page JavaScript cannot read globals from ApplicationWorld. Every
+injected frame also creates a random identity. Native replies search the live
+frame tree and execute only after that exact frame identity matches, preventing
+a reply from crossing into a sibling frame or a frame that navigated while the
+request was active. Search and cache sizes are bounded.
+
+The bridge provides only the GM surface required by the supported VOT build.
+`GM_getValue`, `GM_setValue`, and related calls use the shared
+`VotUserscriptStore`, not page `localStorage`. The versioned
+`vot-storage.json` file is atomically replaced, capped at 4 MiB and 1,024 keys,
+and treated as private application data. Live updates are broadcast to matching
+frames; future documents receive a fresh storage snapshot in their installed
+script. The store can contain third-party preferences and service state, is not
+part of Chromium site data, and is not removed by the WebEngine profile-reset
+action.
+
+`GM_xmlhttpRequest` is implemented with one `QNetworkAccessManager` per bridge.
+It is deliberately narrower than a general userscript manager:
+
+- destinations must be HTTPS and match a verified `@connect` host;
+- methods, headers, request and response sizes, timeouts, redirect depth, and
+  concurrent requests are bounded;
+- cookies and proxy credentials supplied as raw request headers are rejected;
+- `Authorization` and cookie headers are stripped when a redirect changes
+  scheme, hostname, or effective port;
+- each initial destination and redirect is evaluated by the shared Site
+  Connections policy using the attributable top-level page, with the verified
+  frame URL only as a fallback;
+- invalid proxy configuration blocks native VOT traffic through the same
+  fail-closed policy used by WebEngine;
+- the application proxy and existing browser-owned HTTP proxy authentication
+  dialog are reused.
+
+The native network manager does not share Chromium cookies, WebEngine Secure
+DNS, or the `BrowserPage` custom-CA recovery callback. It uses Qt Network's
+system TLS and resolver behavior. `VotUserscriptManager` therefore refuses to
+activate while either Chromium Secure DNS mode is configured and reports the
+reason in Settings. Custom trust rules still apply to the video page itself,
+but not to VOT's native service requests. Unknown Site Connections requests
+cannot wait for a prompt; they fail immediately, and an allow decision reloads
+the matching page through the existing prompt controller.
+
+Changing the setting replaces page bridges and installed future-document
+scripts. Already executing userscript code cannot be unloaded safely from a
+live document, so the settings UI explicitly requires open video pages to be
+reloaded after enabling, disabling, or replacing the verified source.
+
+### 6.7 HTTP server authentication
 
 Every page forwards `QWebEnginePage::authenticationRequired` synchronously to
 the primary window, which accepts the challenge only from the current tab in
@@ -723,6 +804,8 @@ directory.
 | `proxy-settings.json` | `ProxySettings` | Versioned system/direct/manual mode plus proxy type, host, port, and optional HTTP username; no password; atomic write with `.backup` and owner-only mode bits on Unix-like systems. |
 | `site-connections.json` | `CrossDomainSettings` | Disabled-by-default firewall mode, enabled bundled preset IDs, personal global target allow/block lists, and persistent source-site/target-host decisions; atomic write with `.backup`. |
 | `site_connection_presets.json` | `CrossDomainPresetCatalog` | Immutable versioned tracker/CDN recommendation catalog bundled in Qt resources; never modified at runtime. |
+| `video-translation.json` | `VideoTranslationSettings` | Disabled-by-default VOT flag and normalized path to the externally obtained, verified userscript; atomically written. |
+| `vot-storage.json` | `VotUserscriptStore` | Versioned, size-bounded native GM values shared only by the verified VOT integration; atomically written and not exposed as page storage. |
 | `history.sqlite` | `HistoryStore` | WAL-mode SQLite browsing history, limited to 50,000 visits. |
 | `bookmarks.sqlite` | `BookmarkStore` | WAL-mode SQLite bookmarks with normalized URL and title fields for local lookup. |
 | `web-apps.json` | `WebAppStore` | Validated installed-app metadata and bounded page icons, atomically written. |
@@ -738,30 +821,39 @@ persistent by sites survive.
 Full site-data deletion is scheduled for the next launch. Chromium profile
 directories are removed before `BrowserProfile` is constructed because deleting
 an open WebEngine profile is unsafe. `BrowserDataCleanup` verifies that every
-recursive deletion target is a strict child of the expected managed root.
+recursive deletion target is a strict child of the expected managed root. This
+operation does not remove `vot-storage.json`: it is native userscript state,
+not storage owned by a web origin. Removing that file currently requires
+closing PanBrowser and deleting it from the application-data directory.
 
 ### 7.1 Settings save transaction
 
-The unified Settings dialog spans native `QSettings` and five JSON files, so a
+The unified Settings dialog spans native `QSettings` and six JSON files, so a
 single filesystem transaction is unavailable. Its save order and rollback are
 therefore deliberate:
 
 1. validate every page without changing persistent state;
-2. snapshot all five JSON files and their backups;
+2. snapshot all six JSON files and their backups;
 3. save general preferences;
 4. save search settings;
 5. save DNS settings;
 6. save proxy settings;
 7. save site-connection settings;
-8. save trust rules last;
-9. apply the new DNS mode to Qt WebEngine;
-10. finalize imported certificate files only after every save and runtime apply succeeds;
-11. after dialog acceptance, replace the profile's live site-connection policy.
+8. save video-translation settings;
+9. save trust rules last;
+10. apply the new DNS mode to Qt WebEngine;
+11. finalize imported certificate files only after every save and runtime apply succeeds;
+12. after dialog acceptance, replace the profile's live site-connection policy,
+    re-evaluate VOT against the effective DNS mode, and replace the bridges on
+    every open page.
 
 If a later step fails, earlier preferences and files are restored from their
 snapshots. If rollback itself is incomplete, the error dialog says so rather
 than claiming that nothing changed. Do not reorder these operations casually:
 trust expansion is the most security-sensitive mutation and must remain last.
+Runtime `vot-storage.json` writes are intentionally outside this transaction:
+they are initiated by the already verified userscript rather than the Settings
+dialog.
 
 ## 8. History, bookmarks, and address-bar completion
 
@@ -891,13 +983,16 @@ Primary-window startup is ordered as follows:
 3. load or create search settings;
 4. load DNS settings and apply the effective global resolver mode;
 5. load proxy settings and apply the effective application proxy;
-6. apply a pending profile reset before Chromium opens the profile;
-7. create the shared browser profile, download manager, history store,
-   bookmark store, and installed web-app store;
-8. create the UI and permission/authentication controllers;
-9. restore safe window geometry;
-10. reload runtime trust rules;
-11. restore pinned tabs and then the start page, or restore the complete lazy
+6. load or create Site Connections and video-translation settings;
+7. apply a pending profile reset before Chromium opens the profile;
+8. create the shared browser profile, VOT userscript manager, download manager,
+   history store, bookmark store, and installed web-app store;
+9. validate the configured VOT source and DNS compatibility before any page is
+   given a bridge;
+10. create the UI and permission/authentication controllers;
+11. restore safe window geometry;
+12. reload runtime trust rules;
+13. restore pinned tabs and then the start page, or restore the complete lazy
     session when that startup mode is enabled.
 
 On close, the primary window always saves pinned tabs and includes regular tabs
@@ -1014,7 +1109,8 @@ of collecting the entire browser test surface in one QObject:
 - `TrustTests.cpp` contains focused `trust-configuration`, `trust-rules`, and
   platform-only `certificate-validator` suites;
 - `WindowInteractionTests.cpp` covers browser-window interaction and chrome;
-- `PersistenceAndPolicyTests.cpp` covers stored state and navigation policy;
+- `PersistenceAndPolicyTests.cpp` covers stored state, navigation policy, and
+  the verified VOT package/storage/native-network boundary;
 - `NetworkSettingsAndAuthTests.cpp` covers DNS, proxy, permissions, and auth;
 - `BrowsingFeaturesTests.cpp` covers address suggestions, history, bookmarks,
   find-in-page, and zoom;
@@ -1024,14 +1120,19 @@ Together these suites cover domains and rule validation, settings backups,
 window placement, sessions, cleanup boundaries, downloads, permissions,
 external navigation, popup geometry, search parsing, history ranking/deletion,
 bookmark CRUD and normalization, combined suggestion ranking, proxy and DNS
-settings, page zoom, corrupt-database behavior, web-app persistence, and native
-custom-anchor, hostname, and weak-key validation on Windows and Linux.
+settings, page zoom, corrupt-database behavior, web-app persistence, VOT source
+hashing, storage, redirect credentials, Site Connections enforcement, matching
+page/subframe injection, and native custom-anchor, hostname, and weak-key
+validation on Windows and Linux.
 Window-chrome tests verify the macOS safe-area calculations and verify that
 unsupported platforms do not receive expanded-client-area flags.
 
-The test target deliberately excludes `MainWindow` and a live WebEngine process,
-so signal wiring and visual state still need a short manual smoke test after
-security- or lifecycle-sensitive changes.
+The test target deliberately excludes `MainWindow`, so its final signal wiring
+and visual state still need a short manual smoke test after security- or
+lifecycle-sensitive changes. Most suites remain pure Qt tests, but focused VOT
+bridge tests start `BrowserPage`, a live WebEngine renderer, and a local HTTP
+server to verify isolated-world and subframe injection. They therefore require
+the same GUI/process environment as other WebEngine tests.
 
 Recommended pre-commit checks:
 
@@ -1089,6 +1190,12 @@ Before merging a change, verify the relevant invariants:
 - the optional site-connection interceptor never waits for UI, never blocks
   main-frame navigation, and matches host boundaries through the bundled Public
   Suffix List rather than textual suffixes;
+- only the pinned, hash-verified VOT source may receive the isolated-world GM
+  bridge; arbitrary userscripts remain unsupported;
+- native VOT requests remain HTTPS-only, bounded by verified `@connect` hosts,
+  evaluated by Site Connections, and disabled outside System DNS mode;
+- VOT frame replies remain bound to the random identity of the requesting live
+  frame, and its native storage never falls back to page `localStorage`;
 - diagnostics do not expose custom DNS templates, proxy hosts, or usernames;
 - new persistent data is documented in both this file and the README data tree.
 
@@ -1121,6 +1228,15 @@ that `lrelease` reports no unfinished translations.
 Connect it for every page inside `MainWindow::connectBrowserSignals()`, decide
 how tab switching and navigation cancel its state, and check whether popup
 windows should share or isolate the associated controller.
+
+### Updating the supported VOT userscript
+
+Review the complete upstream diff and license, update the pinned version,
+download URL, and SHA-256 together, then rerun the exact-source integration
+test through `PANBROWSER_VOT_USERSCRIPT_TEST_PATH`. Inspect changes to
+`@match`, `@exclude`, `@connect`, required GM APIs, redirects, response types,
+storage values, and iframe behavior. Never relax verification to accept an
+arbitrary file merely to accommodate an upstream release.
 
 ### Changing a persistent format
 

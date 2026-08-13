@@ -12,6 +12,8 @@ may be unstable.
   pop-out as a separate, explicit overlay action.
 - [x] Add compact pinned tabs with a left-side group, constrained reordering,
   context-menu controls, and startup-independent session restoration.
+- [x] Animate new-tab expansion while respecting the active Qt style's
+  animation setting and leaving restored sessions static.
 - [x] Add opt-in developer tools that default to disabled and expose both
   Inspect Element and keyboard shortcuts only while enabled.
 - [ ] Complete favicon support: persist icons received from WebEngine and show
@@ -25,6 +27,9 @@ may be unstable.
   Public-Suffix-List site boundaries, global allow/block lists, per-site
   session and persistent decisions, browser-owned prompts, and separately
   managed PanBrowser tracker/CDN recommendation sets.
+- [x] Add opt-in integration with the exact hash-verified VOT 1.11.8
+  userscript, isolated native storage, bounded HTTPS networking, iframe-aware
+  response routing, proxy authentication, and Site Connections enforcement.
 
 ### Portable app and trust workflows
 
