@@ -75,5 +75,7 @@ private:
     bool m_dragCandidate = false;
     bool m_dragging = false;
     bool m_systemMoving = false;
+    bool m_systemResizing = false;
     bool m_resizing = false;
+    QSize m_pendingResizeCorrection;
 };

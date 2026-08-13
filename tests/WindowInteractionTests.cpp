@@ -953,6 +953,18 @@ void WindowInteractionTests::fullScreenRequestPolicyValidatesOriginAndState()
         ).action,
         FullScreenRequestAction::Reject
     );
+    QCOMPARE(
+        decideFullScreenRequest(
+            true,
+            true,
+            false,
+            false,
+            false,
+            true,
+            QUrl(QStringLiteral("https://example.com"))
+        ).action,
+        FullScreenRequestAction::Reject
+    );
     QVERIFY(fullScreenOriginDisplay(QUrl(QStringLiteral("file:///tmp/video.html"))).isEmpty());
 }
 
@@ -1439,6 +1451,13 @@ void WindowInteractionTests::detachedVideoWindowPreservesAspectRatioWhenResized(
         Qt::NoModifier
     );
     QApplication::sendEvent(webView, &releaseEvent);
+
+    detachedWindow.resize(800, 800);
+    QTRY_COMPARE_WITH_TIMEOUT(
+        detachedWindow.width(),
+        qRound(detachedWindow.height() * 4.0 / 3.0),
+        3000
+    );
 
     QWebEngineView extremeSourceView;
     DetachedVideoWindow extremeWindow(

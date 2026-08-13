@@ -28,7 +28,7 @@ constexpr int minimumVideoShortSide = 135;
 constexpr double minimumVideoAspectRatio = 1.0 / 4.0;
 constexpr double maximumVideoAspectRatio = 4.0;
 
-bool requiresSystemWindowMove()
+bool requiresSystemWindowOperations()
 {
     return QGuiApplication::platformName().startsWith(
         QStringLiteral("wayland"),
@@ -250,6 +250,37 @@ void DetachedVideoWindow::resizeEvent(QResizeEvent *event)
 {
     QMainWindow::resizeEvent(event);
     updateCloseButtonGeometry();
+
+    if (!event->oldSize().isValid())
+        return;
+
+    const QSize oldSize = event->oldSize();
+    const QSize newSize = event->size();
+    if (m_pendingResizeCorrection.isValid()) {
+        if (newSize == m_pendingResizeCorrection) {
+            m_pendingResizeCorrection = QSize();
+            return;
+        }
+        m_pendingResizeCorrection = QSize();
+    }
+    const double relativeWidthChange = qAbs(
+        static_cast<double>(newSize.width() - oldSize.width())
+        / qMax(1, oldSize.width())
+    );
+    const double relativeHeightChange = qAbs(
+        static_cast<double>(newSize.height() - oldSize.height())
+        / qMax(1, oldSize.height())
+    );
+    const QSize correctedSize = constrainedSize(
+        newSize.width(),
+        newSize.height(),
+        relativeWidthChange >= relativeHeightChange
+    );
+    if (correctedSize == newSize)
+        return;
+
+    m_pendingResizeCorrection = correctedSize;
+    resize(correctedSize);
 }
 
 bool DetachedVideoWindow::eventFilter(QObject *watched, QEvent *event)
@@ -283,6 +314,7 @@ bool DetachedVideoWindow::eventFilter(QObject *watched, QEvent *event)
         m_dragCandidate = false;
         m_dragging = false;
         m_systemMoving = false;
+        m_systemResizing = false;
         m_resizing = false;
         m_resizeEdges = {};
         if (!eventBelongsToWindow
@@ -303,10 +335,18 @@ bool DetachedVideoWindow::eventFilter(QObject *watched, QEvent *event)
         else if (localPosition.y() >= height() - resizeBorderWidth)
             resizeEdges |= Qt::BottomEdge;
         if (resizeEdges != Qt::Edges()) {
-            m_resizing = true;
             m_resizeEdges = resizeEdges;
             m_dragPressGlobal = globalPosition;
             m_resizeStartGeometry = geometry();
+            if (requiresSystemWindowOperations()) {
+                QWindow *nativeWindow = windowHandle();
+                if (nativeWindow && nativeWindow->startSystemResize(resizeEdges)) {
+                    m_systemResizing = true;
+                    mouseEvent->accept();
+                    return true;
+                }
+            }
+            m_resizing = true;
             mouseEvent->accept();
             return true;
         }
@@ -318,6 +358,15 @@ bool DetachedVideoWindow::eventFilter(QObject *watched, QEvent *event)
     }
 
     if (type == QEvent::MouseMove) {
+        if (m_systemResizing) {
+            if (mouseEvent->buttons() & Qt::LeftButton) {
+                mouseEvent->accept();
+                return true;
+            }
+            m_systemResizing = false;
+            m_resizeEdges = {};
+            return QMainWindow::eventFilter(watched, event);
+        }
         if (m_resizing && (mouseEvent->buttons() & Qt::LeftButton)) {
             setGeometry(constrainedResizeGeometry(globalPosition));
             mouseEvent->accept();
@@ -328,6 +377,7 @@ bool DetachedVideoWindow::eventFilter(QObject *watched, QEvent *event)
                 m_dragCandidate = false;
                 m_dragging = false;
                 m_systemMoving = false;
+                m_systemResizing = false;
                 m_resizing = false;
                 m_resizeEdges = {};
             }
@@ -336,8 +386,9 @@ bool DetachedVideoWindow::eventFilter(QObject *watched, QEvent *event)
 
         const QPoint delta = globalPosition - m_dragPressGlobal;
         if (!m_dragging
+            && !m_systemMoving
             && delta.manhattanLength() >= QApplication::startDragDistance()) {
-            if (requiresSystemWindowMove()) {
+            if (requiresSystemWindowOperations()) {
                 QWindow *nativeWindow = windowHandle();
                 if (nativeWindow && nativeWindow->startSystemMove()) {
                     m_systemMoving = true;
@@ -359,11 +410,15 @@ bool DetachedVideoWindow::eventFilter(QObject *watched, QEvent *event)
         return QMainWindow::eventFilter(watched, event);
     }
 
-    const bool consumed = (m_dragging || m_systemMoving || m_resizing)
+    const bool consumed = (m_dragging
+            || m_systemMoving
+            || m_systemResizing
+            || m_resizing)
         && mouseEvent->button() == Qt::LeftButton;
     m_dragCandidate = false;
     m_dragging = false;
     m_systemMoving = false;
+    m_systemResizing = false;
     m_resizing = false;
     m_resizeEdges = {};
     if (consumed) {

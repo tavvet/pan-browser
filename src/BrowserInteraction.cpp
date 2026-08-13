@@ -133,8 +133,12 @@ FullScreenRequestDecision decideFullScreenRequest(
             return {FullScreenRequestAction::RestoreBrowserFullScreen, QUrl()};
         return {};
     }
-    if (!interactionActive || alreadyDetached || browserFullScreenActive)
+    if (!interactionActive
+        || alreadyDetached
+        || browserFullScreenActive
+        || browserFullScreenOwnsRequest) {
         return {};
+    }
 
     const QUrl origin = normalizedWebOrigin(requestOrigin);
     if (origin.isEmpty())

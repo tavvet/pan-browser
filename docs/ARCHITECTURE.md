@@ -128,8 +128,12 @@ platform layer also applies `NSWindow.contentAspectRatio`, because AppKit can
 intercept a live window-edge resize before Qt receives content mouse events.
 The return path retains ownership of a pending WebEngine fullscreen exit after
 its UI fallback, so a delayed `toggleOff` is still accepted. Native Wayland
-sessions use `QWindow::startSystemMove()` because the compositor does not permit
-clients to reposition top-level windows directly.
+sessions use `QWindow::startSystemMove()` and `startSystemResize()` because the
+compositor does not permit clients to reposition top-level windows directly.
+Externally initiated resize events are normalized back to the video ratio on
+platforms without a native aspect constraint. A new fullscreen request cannot
+overtake an unresolved exit: the conflicting request is rejected while the old
+surface is reconciled, leaving the next explicit request to start cleanly.
 
 `MainWindow.cpp` is intentionally the orchestration layer. Parsing, policy,
 storage, and geometry calculations live in smaller classes so they can be unit

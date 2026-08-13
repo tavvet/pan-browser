@@ -1737,7 +1737,6 @@ void MainWindow::connectBrowserSignals(QWebEngineView *webView)
         m_permissionController->cancelForView(webView);
         cancelCrossDomainPromptsForView(webView);
         cancelExternalUrlPrompt(webView);
-        m_expectedDetachedVideoExits.remove(webView);
         if (m_fullScreenController && m_fullScreenController->webView() == webView) {
             requestBrowserFullScreenExit(webView);
         }
@@ -2039,8 +2038,23 @@ void MainWindow::handleFullScreenRequest(
 
     const qint64 now = QDateTime::currentMSecsSinceEpoch();
     if (request.toggleOn()) {
-        m_expectedBrowserFullScreenExits.remove(webView);
-        m_expectedDetachedVideoExits.remove(webView);
+        const bool browserExitPending = m_expectedBrowserFullScreenExits.remove(webView);
+        const bool detachedExitPending = m_expectedDetachedVideoExits.remove(webView);
+        if (browserExitPending || detachedExitPending) {
+            state->videoPopoutRequestDeadlineMs = 0;
+            state->videoPopoutRequestOrigin = QUrl();
+            state->videoPopoutRequestSize = QSize(16, 9);
+            if (browserExitPending)
+                exitBrowserFullScreen(webView);
+            if (detachedExitPending) {
+                if (state->detachedVideoSession)
+                    state->detachedVideoSession->forceRestore();
+                else
+                    restoreDetachedVideo(webView);
+            }
+            request.reject();
+            return;
+        }
     }
     const bool videoPopoutRequested = request.toggleOn()
         && state->videoPopoutRequestDeadlineMs >= now
