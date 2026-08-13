@@ -36,4 +36,5 @@ private:
     Qt::WindowStates m_previousWindowState = Qt::WindowNoState;
     bool m_active = false;
     bool m_nativeExitCheckPending = false;
+    bool m_nativeWindowExitObserved = false;
 };

@@ -14,6 +14,7 @@
 #include <QList>
 #include <QMainWindow>
 #include <QPointer>
+#include <QSet>
 #include <QSize>
 #include <QString>
 
@@ -274,6 +275,7 @@ private:
     QPointer<QWebEngineView> m_lastInteractionWebView;
     std::unique_ptr<BrowserFullScreenController> m_fullScreenController;
     QHash<QWebEngineView *, quint64> m_expectedBrowserFullScreenExits;
+    QSet<QWebEngineView *> m_expectedDetachedVideoExits;
     quint64 m_browserFullScreenExitSerial = 0;
     BrowserTabBar *m_tabBar = nullptr;
     QStackedWidget *m_tabStack = nullptr;

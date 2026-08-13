@@ -34,6 +34,7 @@ bool BrowserFullScreenController::enter(QWebEngineView *webView)
     m_previousWindowState = m_window->windowState();
     m_chromeVisibility.clear();
     m_nativeExitCheckPending = false;
+    m_nativeWindowExitObserved = false;
 
     const QList<QToolBar *> toolBars = m_window->findChildren<QToolBar *>(
         QString(),
@@ -72,12 +73,14 @@ void BrowserFullScreenController::exit()
     m_active = false;
     m_webView.clear();
     m_nativeExitCheckPending = false;
-    if (m_previousWindowState.testFlag(Qt::WindowFullScreen))
-        m_window->showFullScreen();
-    else if (m_previousWindowState.testFlag(Qt::WindowMaximized))
-        m_window->showMaximized();
-    else
-        m_window->showNormal();
+    if (!m_nativeWindowExitObserved) {
+        if (m_previousWindowState.testFlag(Qt::WindowFullScreen))
+            m_window->showFullScreen();
+        else if (m_previousWindowState.testFlag(Qt::WindowMaximized))
+            m_window->showMaximized();
+        else
+            m_window->showNormal();
+    }
 
     for (const auto &[widget, visible] : std::as_const(m_chromeVisibility)) {
         if (widget)
@@ -85,6 +88,7 @@ void BrowserFullScreenController::exit()
     }
     m_chromeVisibility.clear();
     m_previousWindowState = Qt::WindowNoState;
+    m_nativeWindowExitObserved = false;
 }
 
 bool BrowserFullScreenController::isActive() const
@@ -106,8 +110,10 @@ bool BrowserFullScreenController::eventFilter(QObject *watched, QEvent *event)
         m_nativeExitCheckPending = true;
         QTimer::singleShot(0, this, [this] {
             m_nativeExitCheckPending = false;
-            if (m_active && m_window && !m_window->isFullScreen() && m_webView)
+            if (m_active && m_window && !m_window->isFullScreen() && m_webView) {
+                m_nativeWindowExitObserved = true;
                 emit nativeExitRequested(m_webView);
+            }
         });
     }
     return QObject::eventFilter(watched, event);

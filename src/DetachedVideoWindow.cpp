@@ -16,6 +16,7 @@
 #include <QToolButton>
 #include <QVBoxLayout>
 #include <QWebEngineView>
+#include <QWindow>
 
 namespace {
 
@@ -26,6 +27,14 @@ constexpr int minimumVideoLongSide = 240;
 constexpr int minimumVideoShortSide = 135;
 constexpr double minimumVideoAspectRatio = 1.0 / 4.0;
 constexpr double maximumVideoAspectRatio = 4.0;
+
+bool requiresSystemWindowMove()
+{
+    return QGuiApplication::platformName().startsWith(
+        QStringLiteral("wayland"),
+        Qt::CaseInsensitive
+    );
+}
 
 } // namespace
 
@@ -273,6 +282,7 @@ bool DetachedVideoWindow::eventFilter(QObject *watched, QEvent *event)
     if (type == QEvent::MouseButtonPress) {
         m_dragCandidate = false;
         m_dragging = false;
+        m_systemMoving = false;
         m_resizing = false;
         m_resizeEdges = {};
         if (!eventBelongsToWindow
@@ -317,6 +327,7 @@ bool DetachedVideoWindow::eventFilter(QObject *watched, QEvent *event)
             if (!(mouseEvent->buttons() & Qt::LeftButton)) {
                 m_dragCandidate = false;
                 m_dragging = false;
+                m_systemMoving = false;
                 m_resizing = false;
                 m_resizeEdges = {};
             }
@@ -326,7 +337,19 @@ bool DetachedVideoWindow::eventFilter(QObject *watched, QEvent *event)
         const QPoint delta = globalPosition - m_dragPressGlobal;
         if (!m_dragging
             && delta.manhattanLength() >= QApplication::startDragDistance()) {
+            if (requiresSystemWindowMove()) {
+                QWindow *nativeWindow = windowHandle();
+                if (nativeWindow && nativeWindow->startSystemMove()) {
+                    m_systemMoving = true;
+                    mouseEvent->accept();
+                    return true;
+                }
+            }
             m_dragging = true;
+        }
+        if (m_systemMoving) {
+            mouseEvent->accept();
+            return true;
         }
         if (m_dragging) {
             move(m_dragStartPosition + delta);
@@ -336,10 +359,11 @@ bool DetachedVideoWindow::eventFilter(QObject *watched, QEvent *event)
         return QMainWindow::eventFilter(watched, event);
     }
 
-    const bool consumed = (m_dragging || m_resizing)
+    const bool consumed = (m_dragging || m_systemMoving || m_resizing)
         && mouseEvent->button() == Qt::LeftButton;
     m_dragCandidate = false;
     m_dragging = false;
+    m_systemMoving = false;
     m_resizing = false;
     m_resizeEdges = {};
     if (consumed) {

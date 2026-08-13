@@ -1011,6 +1011,18 @@ void WindowInteractionTests::browserFullScreenRestoresWindowChrome()
     QVERIFY(hiddenToolBar->isHidden());
     QVERIFY(window.statusBar()->isVisible());
     QCOMPARE(menuBar->isVisible(), menuBarWasVisible);
+
+    window.showFullScreen();
+    QTRY_VERIFY_WITH_TIMEOUT(window.isFullScreen(), 3000);
+    QVERIFY(controller.enter(view));
+    window.showNormal();
+    QTRY_COMPARE_WITH_TIMEOUT(nativeExitRequestCount, 2, 3000);
+    QVERIFY(!controller.isActive());
+    QVERIFY(!window.isFullScreen());
+    QVERIFY(visibleToolBar->isVisible());
+    QVERIFY(hiddenToolBar->isHidden());
+    QVERIFY(window.statusBar()->isVisible());
+    QCOMPARE(menuBar->isVisible(), menuBarWasVisible);
 }
 
 void WindowInteractionTests::videoElementBridgeUsesTrustedOverlayClick()
@@ -1055,6 +1067,9 @@ void WindowInteractionTests::videoElementBridgeUsesTrustedOverlayClick()
     );
 
     QSignalSpy loadSpy(page, &QWebEnginePage::loadFinished);
+    const QUrl longPageUrl(QStringLiteral(
+        "https://video.example/player?payload=%1"
+    ).arg(QString(2500, QLatin1Char('a'))));
     view.setHtml(
         QStringLiteral(R"HTML(
 <!doctype html>
@@ -1064,7 +1079,7 @@ video { position: fixed; left: 40px; top: 40px; width: 320px; height: 180px; bac
 </style>
 <video id="target"></video>
 )HTML"),
-        QUrl(QStringLiteral("https://video.example/player"))
+        longPageUrl
     );
     QTRY_VERIFY_WITH_TIMEOUT(!loadSpy.isEmpty(), 3000);
     QVERIFY(loadSpy.constLast().constFirst().toBool());
@@ -1178,7 +1193,7 @@ globalThis.__panBrowserVideoPopoutController.showFor(
         eventOrder,
         QStringList({QStringLiteral("bridge"), QStringLiteral("fullscreen")})
     );
-    QCOMPARE(requestedFrameUrl.host(), QStringLiteral("video.example"));
+    QCOMPARE(requestedFrameUrl, QUrl(QStringLiteral("https://video.example")));
     QCOMPARE(requestedVideoSize, QSize(320, 180));
 
     bool extremeAspectMessageSent = false;

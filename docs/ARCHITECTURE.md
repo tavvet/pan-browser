@@ -104,7 +104,8 @@ the browser chrome, and restores the previous visibility and window state on
 exit. Browser-initiated exits retain ownership until WebEngine acknowledges the
 `toggleOff` request; a timeout restores the window without rejecting a late
 acknowledgement. The controller also observes native window-state changes so a
-platform fullscreen control follows the same exit path. `VideoElementBridge`
+platform fullscreen control follows the same exit path without undoing the
+native state selected by the user. `VideoElementBridge`
 injects an isolated, browser-provided button over a video while the pointer is
 on it. A trusted click carries a per-page random capability through
 `BrowserPage` and issues a short-lived, tab-bound fullscreen request for that
@@ -125,6 +126,10 @@ an unusable surface. `DetachedVideoWindow` uses the resulting ratio for its
 initial geometry and its Qt-controlled edge or corner resize path. On macOS the
 platform layer also applies `NSWindow.contentAspectRatio`, because AppKit can
 intercept a live window-edge resize before Qt receives content mouse events.
+The return path retains ownership of a pending WebEngine fullscreen exit after
+its UI fallback, so a delayed `toggleOff` is still accepted. Native Wayland
+sessions use `QWindow::startSystemMove()` because the compositor does not permit
+clients to reposition top-level windows directly.
 
 `MainWindow.cpp` is intentionally the orchestration layer. Parsing, policy,
 storage, and geometry calculations live in smaller classes so they can be unit

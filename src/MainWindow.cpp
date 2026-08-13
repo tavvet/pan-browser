@@ -429,6 +429,7 @@ MainWindow::~MainWindow()
     if (qApp)
         qApp->removeEventFilter(this);
     m_expectedBrowserFullScreenExits.clear();
+    m_expectedDetachedVideoExits.clear();
     if (m_fullScreenController)
         m_fullScreenController->exit();
     restoreAllDetachedVideos();
@@ -471,6 +472,7 @@ QString MainWindow::startupError() const
 void MainWindow::closeEvent(QCloseEvent *event)
 {
     m_expectedBrowserFullScreenExits.clear();
+    m_expectedDetachedVideoExits.clear();
     if (m_fullScreenController)
         m_fullScreenController->exit();
     restoreAllDetachedVideos();
@@ -1214,8 +1216,10 @@ QWebEngineView *MainWindow::createTab(
             const auto state = m_tabStates.constFind(webView);
             if (state == m_tabStates.cend() || !state->detachedVideoWindow)
                 return;
-            if (QWebEnginePage *page = state->page)
+            if (QWebEnginePage *page = state->page) {
+                m_expectedDetachedVideoExits.insert(webView);
                 page->triggerAction(QWebEnginePage::ExitFullScreen);
+            }
         }
     );
     connect(
@@ -1348,6 +1352,7 @@ void MainWindow::closeTab(int index)
     if (!webView)
         return;
 
+    m_expectedDetachedVideoExits.remove(webView);
     restoreDetachedVideo(webView);
     m_expectedBrowserFullScreenExits.remove(webView);
     exitBrowserFullScreen(webView);
@@ -1484,8 +1489,10 @@ void MainWindow::returnDetachedVideoForPermissionPrompt(QWebEngineView *webView)
 
     const auto state = m_tabStates.constFind(webView);
     if (state != m_tabStates.cend() && state->detachedVideoWindow) {
-        if (state->page)
+        if (state->page) {
+            m_expectedDetachedVideoExits.insert(webView);
             state->page->triggerAction(QWebEnginePage::ExitFullScreen);
+        }
         if (m_tabStates.contains(webView)
             && m_tabStates.value(webView).detachedVideoWindow) {
             const BrowserTabState currentState = m_tabStates.value(webView);
@@ -1730,6 +1737,7 @@ void MainWindow::connectBrowserSignals(QWebEngineView *webView)
         m_permissionController->cancelForView(webView);
         cancelCrossDomainPromptsForView(webView);
         cancelExternalUrlPrompt(webView);
+        m_expectedDetachedVideoExits.remove(webView);
         if (m_fullScreenController && m_fullScreenController->webView() == webView) {
             requestBrowserFullScreenExit(webView);
         }
@@ -2030,8 +2038,10 @@ void MainWindow::handleFullScreenRequest(
     }
 
     const qint64 now = QDateTime::currentMSecsSinceEpoch();
-    if (request.toggleOn())
+    if (request.toggleOn()) {
         m_expectedBrowserFullScreenExits.remove(webView);
+        m_expectedDetachedVideoExits.remove(webView);
+    }
     const bool videoPopoutRequested = request.toggleOn()
         && state->videoPopoutRequestDeadlineMs >= now
         && isSameWebOrigin(state->videoPopoutRequestOrigin, request.origin());
@@ -2051,7 +2061,8 @@ void MainWindow::handleFullScreenRequest(
         request.toggleOn(),
         isTabInteractionActive(webView),
         videoPopoutRequested,
-        state->detachedVideoSession && state->detachedVideoSession->isDetached(),
+        (state->detachedVideoSession && state->detachedVideoSession->isDetached())
+            || m_expectedDetachedVideoExits.contains(webView),
         browserFullScreenActive,
         browserFullScreenOwnsRequest || browserFullScreenExitExpected,
         request.origin()
@@ -2078,6 +2089,7 @@ void MainWindow::handleFullScreenRequest(
         return;
     case FullScreenRequestAction::RestoreDetachedVideo:
         request.accept();
+        m_expectedDetachedVideoExits.remove(webView);
         if (state->detachedVideoSession)
             state->detachedVideoSession->browserExitedFullScreen();
         else

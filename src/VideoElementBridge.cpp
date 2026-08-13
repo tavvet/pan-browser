@@ -179,7 +179,7 @@ QString overlayScript(
             : Math.max(1, Math.round(videoRect.height));
         console.info(messagePrefix + JSON.stringify({
             token,
-            url: location.href,
+            url: location.origin,
             videoWidth,
             videoHeight
         }));
