@@ -2108,10 +2108,7 @@ void MainWindow::detachVideo(QWebEngineView *webView, const QUrl &origin)
 
     auto *window = new DetachedVideoWindow(
         webView,
-        tr("Video — %1").arg(originText),
-        tr("Source:"),
-        originText,
-        nullptr
+        tr("Video — %1").arg(originText)
     );
     auto *placeholder = new DetachedVideoPlaceholder(
         webView,

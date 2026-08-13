@@ -49,9 +49,9 @@ test environments, and other deliberately scoped trust configurations.
 - A dedicated WebEngine profile for cookies, storage, cache, history,
   bookmarks, downloads, and installed web apps.
 - Movable and persistent pinned tabs, session restoration, popup handling,
-  native page fullscreen, resizable always-on-top video pop-out, find in page,
-  per-site page zoom, local address completion, configurable search engines,
-  and a download manager.
+  native page fullscreen, frameless and draggable always-on-top video pop-out,
+  find in page, per-site page zoom, local address completion, configurable
+  search engines, and a download manager.
 - Browser-owned prompts for camera, microphone, location, external schemes,
   HTTP Basic authentication, and HTTP proxy authentication.
 - Browser-wide System/Direct/HTTP/SOCKS5 proxy modes and configurable

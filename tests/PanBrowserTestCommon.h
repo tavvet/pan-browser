@@ -79,6 +79,7 @@
 #include <QTest>
 #include <QTimer>
 #include <QToolBar>
+#include <QToolButton>
 #include <QTimeZone>
 #include <QTranslator>
 #include <QUuid>

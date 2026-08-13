@@ -1154,17 +1154,20 @@ QMainWindow#detachedVideoWindow {
     background: #000000;
 }
 
-QFrame#detachedVideoOriginBar {
-    background: #151a23;
-    border: none;
-    border-bottom: 1px solid #313a49;
+QToolButton#closeDetachedVideoButton {
+    background: rgba(17, 24, 39, 220);
+    border: 1px solid rgba(255, 255, 255, 86);
+    border-radius: 9px;
+    padding: 7px;
 }
 
-QLabel#detachedVideoOriginCaption,
-QLabel#detachedVideoOrigin {
-    color: #b9c3d2;
-    font-size: 12px;
-    font-weight: 600;
+QToolButton#closeDetachedVideoButton:hover {
+    background: rgba(42, 48, 58, 238);
+    border-color: rgba(255, 255, 255, 122);
+}
+
+QToolButton#closeDetachedVideoButton:pressed {
+    background: rgba(10, 14, 21, 245);
 }
 
 QFrame#detachedVideoPlaceholder {

@@ -110,6 +110,11 @@ tab closure, expiry, or a mismatched request clears the capability, so page
 scripts and ordinary site fullscreen requests cannot be mistaken for a pop-out
 request. The detached window is created with `Qt::WindowStaysOnTopHint`, making
 video pop-out an always-on-top surface by default on every supported platform.
+It is frameless and contains only the WebEngine view plus a native close button
+shown while the pointer is inside the window. Dragging beyond the platform drag
+threshold moves the window from any content point, while a short click remains
+available to the video's own controls; edge presses delegate native resizing to
+`QWindow::startSystemResize()`.
 
 `MainWindow.cpp` is intentionally the orchestration layer. Parsing, policy,
 storage, and geometry calculations live in smaller classes so they can be unit

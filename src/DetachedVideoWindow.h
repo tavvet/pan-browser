@@ -3,13 +3,11 @@
 #include <QFrame>
 #include <QMainWindow>
 #include <QPointer>
-#include <QString>
-
-#include <functional>
 
 class QCloseEvent;
 class QEvent;
-class QLabel;
+class QResizeEvent;
+class QToolButton;
 class QWebEngineView;
 
 class DetachedVideoPlaceholder final : public QFrame {
@@ -37,20 +35,14 @@ class DetachedVideoWindow final : public QMainWindow {
     Q_OBJECT
 
 public:
-    using CopyTextHandler = std::function<void(const QString &)>;
-
     DetachedVideoWindow(
         QWebEngineView *sourceView,
         const QString &windowTitle,
-        const QString &sourceCaption,
-        const QString &sourceOrigin,
-        QWidget *parent = nullptr,
-        CopyTextHandler copyTextHandler = {}
+        QWidget *parent = nullptr
     );
     ~DetachedVideoWindow() override;
 
     [[nodiscard]] QWebEngineView *webView() const;
-    [[nodiscard]] QString sourceOriginText() const;
     void restorePage();
 
 signals:
@@ -59,12 +51,22 @@ signals:
 
 protected:
     void closeEvent(QCloseEvent *event) override;
+    void resizeEvent(QResizeEvent *event) override;
     bool eventFilter(QObject *watched, QEvent *event) override;
 
 private:
+    void updateCloseButtonGeometry();
+    void setCloseButtonVisible(bool visible);
+
     QPointer<QWebEngineView> m_sourceView;
     QWebEngineView *m_webView = nullptr;
-    QLabel *m_originLabel = nullptr;
-    QString m_sourceOriginText;
+    QToolButton *m_closeButton = nullptr;
+    QPoint m_dragPressGlobal;
+    QPoint m_dragStartPosition;
+    QRect m_resizeStartGeometry;
+    Qt::Edges m_resizeEdges;
     bool m_pageRestored = false;
+    bool m_dragCandidate = false;
+    bool m_dragging = false;
+    bool m_resizing = false;
 };

@@ -1,155 +1,26 @@
 #include "DetachedVideoWindow.h"
 
 #include <QApplication>
-#include <QClipboard>
 #include <QCloseEvent>
-#include <QContextMenuEvent>
 #include <QEvent>
 #include <QGuiApplication>
-#include <QHBoxLayout>
 #include <QIcon>
 #include <QKeyEvent>
-#include <QKeySequence>
 #include <QLabel>
-#include <QMenu>
+#include <QMouseEvent>
 #include <QPushButton>
+#include <QResizeEvent>
 #include <QScreen>
+#include <QToolButton>
 #include <QVBoxLayout>
 #include <QWebEngineView>
-
-#include <utility>
+#include <QWindow>
 
 namespace {
 
-class ElidedCaptionLabel final : public QLabel {
-public:
-    explicit ElidedCaptionLabel(const QString &fullText, QWidget *parent = nullptr)
-        : QLabel(parent)
-        , m_fullText(fullText)
-    {
-        setToolTip(fullText);
-        setAccessibleName(fullText);
-        updateDisplayedText();
-    }
-
-protected:
-    void resizeEvent(QResizeEvent *event) override
-    {
-        QLabel::resizeEvent(event);
-        updateDisplayedText();
-    }
-
-    void changeEvent(QEvent *event) override
-    {
-        QLabel::changeEvent(event);
-        if (event->type() == QEvent::FontChange || event->type() == QEvent::StyleChange)
-            updateDisplayedText();
-    }
-
-private:
-    void updateDisplayedText()
-    {
-        const QMargins margins = contentsMargins();
-        const int availableWidth = qMax(0, width() - margins.left() - margins.right());
-        setText(fontMetrics().elidedText(m_fullText, Qt::ElideRight, availableWidth));
-    }
-
-    QString m_fullText;
-};
-
-class SecurityOriginLabel final : public QLabel {
-public:
-    SecurityOriginLabel(
-        const QString &fullText,
-        const QString &copyActionText,
-        DetachedVideoWindow::CopyTextHandler copyTextHandler,
-        QWidget *parent = nullptr
-    )
-        : QLabel(parent)
-        , m_fullText(fullText)
-        , m_copyActionText(copyActionText)
-        , m_copyTextHandler(std::move(copyTextHandler))
-    {
-        setToolTip(fullText);
-        setAccessibleName(fullText);
-        updateDisplayedText();
-    }
-
-protected:
-    void keyPressEvent(QKeyEvent *event) override
-    {
-        if (event->matches(QKeySequence::Copy)) {
-            copyFullText();
-            event->accept();
-            return;
-        }
-        QLabel::keyPressEvent(event);
-    }
-
-    void contextMenuEvent(QContextMenuEvent *event) override
-    {
-        QMenu menu(this);
-        QAction *copyAction = menu.addAction(m_copyActionText);
-        connect(copyAction, &QAction::triggered, this, [this] {
-            copyFullText();
-        });
-        menu.exec(event->globalPos());
-        event->accept();
-    }
-
-    void resizeEvent(QResizeEvent *event) override
-    {
-        QLabel::resizeEvent(event);
-        updateDisplayedText();
-    }
-
-    void changeEvent(QEvent *event) override
-    {
-        QLabel::changeEvent(event);
-        if (event->type() == QEvent::FontChange || event->type() == QEvent::StyleChange)
-            updateDisplayedText();
-    }
-
-private:
-    void copyFullText() const
-    {
-        if (m_copyTextHandler)
-            m_copyTextHandler(m_fullText);
-    }
-
-    void updateDisplayedText()
-    {
-        const QMargins margins = contentsMargins();
-        const int availableWidth = qMax(0, width() - margins.left() - margins.right());
-        const QFontMetrics metrics = fontMetrics();
-        if (metrics.horizontalAdvance(m_fullText) <= availableWidth) {
-            setText(m_fullText);
-            return;
-        }
-
-        const qsizetype schemeDelimiter = m_fullText.indexOf(QStringLiteral("://"));
-        if (schemeDelimiter < 0) {
-            setText(metrics.elidedText(m_fullText, Qt::ElideMiddle, availableWidth));
-            return;
-        }
-
-        const QString fixedPrefix = m_fullText.left(schemeDelimiter + 3);
-        const int suffixWidth = availableWidth - metrics.horizontalAdvance(fixedPrefix);
-        if (suffixWidth <= metrics.horizontalAdvance(QString(QChar(0x2026)))) {
-            setText(metrics.elidedText(m_fullText, Qt::ElideMiddle, availableWidth));
-            return;
-        }
-        setText(fixedPrefix + metrics.elidedText(
-            m_fullText.mid(schemeDelimiter + 3),
-            Qt::ElideLeft,
-            suffixWidth
-        ));
-    }
-
-    QString m_fullText;
-    QString m_copyActionText;
-    DetachedVideoWindow::CopyTextHandler m_copyTextHandler;
-};
+constexpr int closeButtonSize = 36;
+constexpr int closeButtonMargin = 8;
+constexpr int resizeBorderWidth = 6;
 
 } // namespace
 
@@ -212,24 +83,17 @@ bool DetachedVideoPlaceholder::eventFilter(QObject *watched, QEvent *event)
 DetachedVideoWindow::DetachedVideoWindow(
     QWebEngineView *sourceView,
     const QString &windowTitle,
-    const QString &sourceCaption,
-    const QString &sourceOrigin,
-    QWidget *parent,
-    CopyTextHandler copyTextHandler
+    QWidget *parent
 )
-    : QMainWindow(parent, Qt::Window | Qt::WindowStaysOnTopHint)
+    : QMainWindow(
+          parent,
+          Qt::Window | Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint
+      )
     , m_sourceView(sourceView)
-    , m_sourceOriginText(sourceOrigin)
 {
-    if (!copyTextHandler) {
-        copyTextHandler = [](const QString &text) {
-            if (QClipboard *clipboard = QGuiApplication::clipboard())
-                clipboard->setText(text);
-        };
-    }
-
     setObjectName(QStringLiteral("detachedVideoWindow"));
     setAttribute(Qt::WA_DeleteOnClose, false);
+    setMinimumSize(240, 135);
     setWindowTitle(windowTitle);
     if (sourceView)
         setWindowIcon(sourceView->window()->windowIcon());
@@ -239,44 +103,21 @@ DetachedVideoWindow::DetachedVideoWindow(
     containerLayout->setContentsMargins(0, 0, 0, 0);
     containerLayout->setSpacing(0);
 
-    auto *originBar = new QFrame(container);
-    originBar->setObjectName(QStringLiteral("detachedVideoOriginBar"));
-    originBar->setAttribute(Qt::WA_StyledBackground, true);
-    auto *originLayout = new QHBoxLayout(originBar);
-    originLayout->setContentsMargins(12, 7, 12, 7);
-    originLayout->setSpacing(8);
-    auto *originIcon = new QLabel(originBar);
-    originIcon->setPixmap(
-        QIcon(QStringLiteral(":/assets/icons/info.svg")).pixmap(QSize(15, 15))
-    );
-    originLayout->addWidget(originIcon, 0, Qt::AlignVCenter);
-    auto *originTextLayout = new QVBoxLayout;
-    originTextLayout->setContentsMargins(0, 0, 0, 0);
-    originTextLayout->setSpacing(1);
-    auto *originCaption = new ElidedCaptionLabel(sourceCaption, originBar);
-    originCaption->setObjectName(QStringLiteral("detachedVideoOriginCaption"));
-    originCaption->setMinimumWidth(0);
-    originCaption->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);
-    originTextLayout->addWidget(originCaption);
-    m_originLabel = new SecurityOriginLabel(
-        sourceOrigin,
-        tr("Copy Source Address"),
-        std::move(copyTextHandler),
-        originBar
-    );
-    m_originLabel->setObjectName(QStringLiteral("detachedVideoOrigin"));
-    m_originLabel->setMinimumWidth(0);
-    m_originLabel->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);
-    m_originLabel->setTextInteractionFlags(
-        Qt::TextSelectableByMouse | Qt::TextSelectableByKeyboard
-    );
-    originTextLayout->addWidget(m_originLabel);
-    originLayout->addLayout(originTextLayout, 1);
-    containerLayout->addWidget(originBar);
-
     m_webView = new QWebEngineView(container);
+    m_webView->setMouseTracking(true);
     containerLayout->addWidget(m_webView, 1);
     setCentralWidget(container);
+
+    m_closeButton = new QToolButton(this);
+    m_closeButton->setObjectName(QStringLiteral("closeDetachedVideoButton"));
+    m_closeButton->setIcon(QIcon(QStringLiteral(":/assets/icons/x.svg")));
+    m_closeButton->setIconSize(QSize(19, 19));
+    m_closeButton->setFixedSize(closeButtonSize, closeButtonSize);
+    m_closeButton->setFocusPolicy(Qt::NoFocus);
+    m_closeButton->setToolTip(tr("Close Video Window"));
+    m_closeButton->setAccessibleName(tr("Close Video Window"));
+    m_closeButton->hide();
+    connect(m_closeButton, &QToolButton::clicked, this, &DetachedVideoWindow::returnRequested);
 
     m_webView->setContextMenuPolicy(Qt::CustomContextMenu);
     connect(
@@ -322,6 +163,7 @@ DetachedVideoWindow::DetachedVideoWindow(
         ));
     }
     setGeometry(initialGeometry);
+    updateCloseButtonGeometry();
 
     qApp->installEventFilter(this);
 }
@@ -336,11 +178,6 @@ DetachedVideoWindow::~DetachedVideoWindow()
 QWebEngineView *DetachedVideoWindow::webView() const
 {
     return m_webView;
-}
-
-QString DetachedVideoWindow::sourceOriginText() const
-{
-    return m_sourceOriginText;
 }
 
 void DetachedVideoWindow::restorePage()
@@ -358,9 +195,14 @@ void DetachedVideoWindow::closeEvent(QCloseEvent *event)
     emit returnRequested();
 }
 
+void DetachedVideoWindow::resizeEvent(QResizeEvent *event)
+{
+    QMainWindow::resizeEvent(event);
+    updateCloseButtonGeometry();
+}
+
 bool DetachedVideoWindow::eventFilter(QObject *watched, QEvent *event)
 {
-    Q_UNUSED(watched);
     if (isActiveWindow() && event->type() == QEvent::KeyPress) {
         const auto *keyEvent = static_cast<QKeyEvent *>(event);
         if (keyEvent->key() == Qt::Key_Escape && keyEvent->modifiers() == Qt::NoModifier) {
@@ -368,5 +210,148 @@ bool DetachedVideoWindow::eventFilter(QObject *watched, QEvent *event)
             return true;
         }
     }
+
+    const QEvent::Type type = event->type();
+    if (type != QEvent::MouseMove
+        && type != QEvent::MouseButtonPress
+        && type != QEvent::MouseButtonRelease) {
+        return QMainWindow::eventFilter(watched, event);
+    }
+
+    auto *mouseEvent = static_cast<QMouseEvent *>(event);
+    const QPoint globalPosition = mouseEvent->globalPosition().toPoint();
+    const bool pointerInside = frameGeometry().contains(globalPosition);
+    setCloseButtonVisible(pointerInside);
+
+    QWidget *watchedWidget = qobject_cast<QWidget *>(watched);
+    const bool eventBelongsToWindow = watchedWidget && watchedWidget->window() == this;
+    const bool closeButtonEvent = watchedWidget
+        && (watchedWidget == m_closeButton || m_closeButton->isAncestorOf(watchedWidget));
+
+    if (type == QEvent::MouseButtonPress) {
+        m_dragCandidate = false;
+        m_dragging = false;
+        m_resizing = false;
+        m_resizeEdges = {};
+        if (!eventBelongsToWindow
+            || closeButtonEvent
+            || mouseEvent->button() != Qt::LeftButton
+            || mouseEvent->modifiers() != Qt::NoModifier) {
+            return QMainWindow::eventFilter(watched, event);
+        }
+
+        const QPoint localPosition = mapFromGlobal(globalPosition);
+        Qt::Edges resizeEdges;
+        if (localPosition.x() < resizeBorderWidth)
+            resizeEdges |= Qt::LeftEdge;
+        else if (localPosition.x() >= width() - resizeBorderWidth)
+            resizeEdges |= Qt::RightEdge;
+        if (localPosition.y() < resizeBorderWidth)
+            resizeEdges |= Qt::TopEdge;
+        else if (localPosition.y() >= height() - resizeBorderWidth)
+            resizeEdges |= Qt::BottomEdge;
+        if (resizeEdges != Qt::Edges()) {
+            QWindow *handle = windowHandle();
+            if (handle && handle->startSystemResize(resizeEdges)) {
+                mouseEvent->accept();
+                return true;
+            }
+            m_resizing = true;
+            m_resizeEdges = resizeEdges;
+            m_dragPressGlobal = globalPosition;
+            m_resizeStartGeometry = geometry();
+            mouseEvent->accept();
+            return true;
+        }
+
+        m_dragCandidate = true;
+        m_dragPressGlobal = globalPosition;
+        m_dragStartPosition = pos();
+        return QMainWindow::eventFilter(watched, event);
+    }
+
+    if (type == QEvent::MouseMove) {
+        if (m_resizing && (mouseEvent->buttons() & Qt::LeftButton)) {
+            const QPoint delta = globalPosition - m_dragPressGlobal;
+            QRect resized = m_resizeStartGeometry;
+            if (m_resizeEdges.testFlag(Qt::LeftEdge)) {
+                resized.setLeft(qMin(
+                    resized.right() - minimumWidth() + 1,
+                    m_resizeStartGeometry.left() + delta.x()
+                ));
+            } else if (m_resizeEdges.testFlag(Qt::RightEdge)) {
+                resized.setRight(qMax(
+                    resized.left() + minimumWidth() - 1,
+                    m_resizeStartGeometry.right() + delta.x()
+                ));
+            }
+            if (m_resizeEdges.testFlag(Qt::TopEdge)) {
+                resized.setTop(qMin(
+                    resized.bottom() - minimumHeight() + 1,
+                    m_resizeStartGeometry.top() + delta.y()
+                ));
+            } else if (m_resizeEdges.testFlag(Qt::BottomEdge)) {
+                resized.setBottom(qMax(
+                    resized.top() + minimumHeight() - 1,
+                    m_resizeStartGeometry.bottom() + delta.y()
+                ));
+            }
+            setGeometry(resized);
+            mouseEvent->accept();
+            return true;
+        }
+        if (!m_dragCandidate || !(mouseEvent->buttons() & Qt::LeftButton)) {
+            if (!(mouseEvent->buttons() & Qt::LeftButton)) {
+                m_dragCandidate = false;
+                m_dragging = false;
+                m_resizing = false;
+                m_resizeEdges = {};
+            }
+            return QMainWindow::eventFilter(watched, event);
+        }
+
+        const QPoint delta = globalPosition - m_dragPressGlobal;
+        if (!m_dragging
+            && delta.manhattanLength() >= QApplication::startDragDistance()) {
+            m_dragging = true;
+        }
+        if (m_dragging) {
+            move(m_dragStartPosition + delta);
+            mouseEvent->accept();
+            return true;
+        }
+        return QMainWindow::eventFilter(watched, event);
+    }
+
+    const bool consumed = (m_dragging || m_resizing)
+        && mouseEvent->button() == Qt::LeftButton;
+    m_dragCandidate = false;
+    m_dragging = false;
+    m_resizing = false;
+    m_resizeEdges = {};
+    if (consumed) {
+        mouseEvent->accept();
+        return true;
+    }
     return QMainWindow::eventFilter(watched, event);
+}
+
+void DetachedVideoWindow::updateCloseButtonGeometry()
+{
+    if (!m_closeButton)
+        return;
+    m_closeButton->move(
+        qMax(0, width() - closeButtonSize - closeButtonMargin),
+        closeButtonMargin
+    );
+    m_closeButton->raise();
+}
+
+void DetachedVideoWindow::setCloseButtonVisible(bool visible)
+{
+    if (!m_closeButton || m_closeButton->isVisible() == visible)
+        return;
+    m_closeButton->setVisible(visible);
+    if (visible)
+        m_closeButton->raise();
 }

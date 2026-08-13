@@ -16,8 +16,9 @@ portable web-app integration, and safe transfer of trust configuration.
 - Added compact pinned tabs with constrained group reordering and restoration
   on every browser launch, independent of ordinary session-tab settings.
 - Separated normal page fullscreen from the explicit video pop-out action;
-  videos can now be opened in a resizable, always-on-top window from a
-  browser-provided overlay button.
+  videos can now be opened in a frameless, resizable, always-on-top window from
+  a browser-provided overlay button. The window exposes a hover close control
+  and can be dragged from its content.
 
 ## 0.1.0 — 2026-08-10
 

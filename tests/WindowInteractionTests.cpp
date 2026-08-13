@@ -1009,7 +1009,7 @@ void WindowInteractionTests::videoElementBridgeUsesTrustedOverlayClick()
     view.raise();
     view.activateWindow();
     view.setFocus(Qt::OtherFocusReason);
-    QTRY_VERIFY_WITH_TIMEOUT(view.isActiveWindow(), 3000);
+    QApplication::processEvents();
 
     QStringList eventOrder;
     QUrl requestedFrameUrl;
@@ -1206,16 +1206,14 @@ void WindowInteractionTests::detachedVideoWindowMovesAndRestoresPage()
     {
         DetachedVideoWindow detachedWindow(
             &sourceView,
-            QStringLiteral("Video — https://example.com"),
-            QStringLiteral("Source:"),
-            QStringLiteral("https://example.com")
+            QStringLiteral("Video — https://example.com")
         );
         QCOMPARE(detachedWindow.windowTitle(), QStringLiteral("Video — https://example.com"));
         QVERIFY(detachedWindow.windowFlags().testFlag(Qt::WindowStaysOnTopHint));
-        QCOMPARE(
-            detachedWindow.sourceOriginText(),
-            QStringLiteral("https://example.com")
-        );
+        QVERIFY(detachedWindow.windowFlags().testFlag(Qt::FramelessWindowHint));
+        QVERIFY(!detachedWindow.findChild<QWidget *>(
+            QStringLiteral("detachedVideoOriginBar")
+        ));
         QCOMPARE(detachedWindow.webView()->page(), originalPage);
         QCOMPARE(detachedWindow.webView()->contextMenuPolicy(), Qt::CustomContextMenu);
         QCOMPARE(QWebEngineView::forPage(originalPage), detachedWindow.webView());
@@ -1234,6 +1232,67 @@ void WindowInteractionTests::detachedVideoWindowMovesAndRestoresPage()
         QCOMPARE(contextMenuSpy.count(), 1);
         QCOMPARE(contextMenuSpy.takeFirst().at(0).toPoint(), contextMenuPosition);
 
+        QToolButton *closeButton = detachedWindow.findChild<QToolButton *>(
+            QStringLiteral("closeDetachedVideoButton")
+        );
+        QVERIFY(closeButton);
+        QVERIFY(closeButton->isHidden());
+        QSignalSpy returnSpy(&detachedWindow, &DetachedVideoWindow::returnRequested);
+        detachedWindow.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&detachedWindow, 3000));
+        const QPoint hoverPosition = detachedWindow.webView()->rect().center();
+        const QPoint hoverGlobal = detachedWindow.webView()->mapToGlobal(hoverPosition);
+        QMouseEvent hoverEvent(
+            QEvent::MouseMove,
+            QPointF(hoverPosition),
+            QPointF(hoverPosition),
+            QPointF(hoverGlobal),
+            Qt::NoButton,
+            Qt::NoButton,
+            Qt::NoModifier
+        );
+        QApplication::sendEvent(detachedWindow.webView(), &hoverEvent);
+        QVERIFY(closeButton->isVisible());
+
+        const QPoint dragStartPosition = detachedWindow.pos();
+        const QPoint localPress = detachedWindow.webView()->rect().center();
+        const QPoint globalPress = detachedWindow.webView()->mapToGlobal(localPress);
+        const QPoint dragDelta(48, 32);
+        QMouseEvent pressEvent(
+            QEvent::MouseButtonPress,
+            QPointF(localPress),
+            QPointF(localPress),
+            QPointF(globalPress),
+            Qt::LeftButton,
+            Qt::LeftButton,
+            Qt::NoModifier
+        );
+        QApplication::sendEvent(detachedWindow.webView(), &pressEvent);
+        QMouseEvent moveEvent(
+            QEvent::MouseMove,
+            QPointF(localPress + dragDelta),
+            QPointF(localPress + dragDelta),
+            QPointF(globalPress + dragDelta),
+            Qt::NoButton,
+            Qt::LeftButton,
+            Qt::NoModifier
+        );
+        QApplication::sendEvent(detachedWindow.webView(), &moveEvent);
+        QCOMPARE(detachedWindow.pos(), dragStartPosition + dragDelta);
+        QMouseEvent releaseEvent(
+            QEvent::MouseButtonRelease,
+            QPointF(localPress + dragDelta),
+            QPointF(localPress + dragDelta),
+            QPointF(globalPress + dragDelta),
+            Qt::LeftButton,
+            Qt::NoButton,
+            Qt::NoModifier
+        );
+        QApplication::sendEvent(detachedWindow.webView(), &releaseEvent);
+
+        QTest::mouseClick(closeButton, Qt::LeftButton);
+        QCOMPARE(returnSpy.count(), 1);
+
         detachedWindow.restorePage();
         QCOMPARE(sourceView.page(), originalPage);
         QCOMPARE(QWebEngineView::forPage(originalPage), &sourceView);
@@ -1245,64 +1304,13 @@ void WindowInteractionTests::detachedVideoWindowMovesAndRestoresPage()
     {
         DetachedVideoWindow detachedWindow(
             &sourceView,
-            QStringLiteral("Video — https://example.com"),
-            QStringLiteral("Source:"),
-            QStringLiteral("https://example.com")
+            QStringLiteral("Video — https://example.com")
         );
         QCOMPARE(QWebEngineView::forPage(originalPage), detachedWindow.webView());
     }
     QCOMPARE(sourceView.page(), originalPage);
     QCOMPARE(QWebEngineView::forPage(originalPage), &sourceView);
 
-    QWebEngineView narrowSourceView;
-    const QString longOrigin = QStringLiteral(
-        "https://online.vtb.ru.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.evil.example"
-    );
-    const QString longCaption = QStringLiteral(
-        "A deliberately long translated source address caption:"
-    );
-    QString copiedOrigin;
-    DetachedVideoWindow narrowWindow(
-        &narrowSourceView,
-        QStringLiteral("Video"),
-        longCaption,
-        longOrigin,
-        nullptr,
-        [&copiedOrigin](const QString &text) {
-            copiedOrigin = text;
-        }
-    );
-    QLabel *narrowOriginLabel = narrowWindow.findChild<QLabel *>(
-        QStringLiteral("detachedVideoOrigin")
-    );
-    QVERIFY(narrowOriginLabel);
-    narrowWindow.resize(360, 220);
-    narrowWindow.show();
-    QApplication::processEvents();
-    QVERIFY(narrowOriginLabel->text().contains(QChar(0x2026)));
-    QVERIFY2(
-        narrowOriginLabel->text().startsWith(QStringLiteral("https://")),
-        qPrintable(QStringLiteral("Displayed origin: %1").arg(narrowOriginLabel->text()))
-    );
-    QVERIFY(narrowOriginLabel->text().endsWith(QStringLiteral("evil.example")));
-    QCOMPARE(narrowOriginLabel->toolTip(), longOrigin);
-    QCOMPARE(narrowOriginLabel->accessibleName(), longOrigin);
-    QCOMPARE(narrowWindow.sourceOriginText(), longOrigin);
-    QLabel *originCaption = narrowWindow.findChild<QLabel *>(
-        QStringLiteral("detachedVideoOriginCaption")
-    );
-    QVERIFY(originCaption);
-    QVERIFY(originCaption->text().contains(QChar(0x2026)));
-    QCOMPARE(originCaption->toolTip(), longCaption);
-    QCOMPARE(originCaption->accessibleName(), longCaption);
-
-    const QKeyCombination copyCombination = QKeySequence(QKeySequence::Copy)[0];
-    QTest::keyClick(
-        narrowOriginLabel,
-        copyCombination.key(),
-        copyCombination.keyboardModifiers()
-    );
-    QCOMPARE(copiedOrigin, longOrigin);
 }
 
 void WindowInteractionTests::detachedVideoWindowCloseRequestsReturn()
@@ -1311,9 +1319,7 @@ void WindowInteractionTests::detachedVideoWindowCloseRequestsReturn()
     QWebEnginePage *originalPage = sourceView.page();
     DetachedVideoWindow detachedWindow(
         &sourceView,
-        QStringLiteral("Video — https://example.com"),
-        QStringLiteral("Source:"),
-        QStringLiteral("https://example.com")
+        QStringLiteral("Video — https://example.com")
     );
     QSignalSpy returnSpy(&detachedWindow, &DetachedVideoWindow::returnRequested);
 
