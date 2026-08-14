@@ -21,7 +21,7 @@ int main(int argc, char *argv[])
 {
     QApplication application(argc, argv);
     application.setStyle(QStyleFactory::create(QStringLiteral("Fusion")));
-    application.setWindowIcon(QIcon(QStringLiteral(":/assets/app-icon.svg")));
+    application.setWindowIcon(QIcon(QStringLiteral(":/assets/app-icon.png")));
     QCoreApplication::setApplicationName(QStringLiteral("PanBrowser"));
     QCoreApplication::setApplicationVersion(QStringLiteral(PANBROWSER_VERSION));
     // Keep AppDataLocation stable at ~/Library/Application Support/PanBrowser.

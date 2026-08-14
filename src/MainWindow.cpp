@@ -683,7 +683,7 @@ void MainWindow::createInterface()
     setWindowTitle(
         m_windowRole == WindowRole::WebApp ? m_webApp.name : QStringLiteral("PanBrowser")
     );
-    QIcon windowIcon(QStringLiteral(":/assets/app-icon.svg"));
+    QIcon windowIcon(QStringLiteral(":/assets/app-icon.png"));
     if (m_windowRole == WindowRole::WebApp && !m_webApp.iconPng.isEmpty()) {
         QPixmap pixmap;
         if (pixmap.loadFromData(m_webApp.iconPng, "PNG"))
@@ -1398,7 +1398,7 @@ void MainWindow::updateTabPresentation(QWebEngineView *webView)
 
     QIcon icon = page ? page->icon() : QIcon();
     if (state->pinned && icon.isNull())
-        icon = QIcon(QStringLiteral(":/assets/app-icon.svg"));
+        icon = QIcon(QStringLiteral(":/assets/app-icon.png"));
     m_tabBar->setTabIcon(index, icon);
 }
 
@@ -3027,7 +3027,7 @@ void MainWindow::rebuildWebAppsMenu()
     m_webAppsMenu->clear();
     const QList<WebApp> apps = m_webAppStore->apps();
     for (const WebApp &app : apps) {
-        QIcon icon(QStringLiteral(":/assets/app-icon.svg"));
+        QIcon icon(QStringLiteral(":/assets/app-icon.png"));
         QPixmap pixmap;
         if (!app.iconPng.isEmpty() && pixmap.loadFromData(app.iconPng, "PNG"))
             icon = QIcon(pixmap);
@@ -3064,7 +3064,7 @@ void MainWindow::activatePrimaryWindow()
         m_primaryTabsInitialized = true;
         restoreInitialTabs();
     }
-    qApp->setWindowIcon(QIcon(QStringLiteral(":/assets/app-icon.svg")));
+    qApp->setWindowIcon(QIcon(QStringLiteral(":/assets/app-icon.png")));
     show();
     raise();
     activateWindow();
@@ -3111,7 +3111,7 @@ void MainWindow::openUrlInPrimaryWindow(const QUrl &url)
         }
         primary->m_restoringSession = false;
     }
-    qApp->setWindowIcon(QIcon(QStringLiteral(":/assets/app-icon.svg")));
+    qApp->setWindowIcon(QIcon(QStringLiteral(":/assets/app-icon.png")));
     primary->show();
     primary->raise();
     primary->activateWindow();

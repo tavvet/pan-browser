@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="src/assets/app-icon.svg" width="96" height="96" alt="PanBrowser icon">
+  <img src="src/assets/app-icon.png" width="96" height="96" alt="PanBrowser icon">
 </p>
 
 <h1 align="center">PanBrowser</h1>

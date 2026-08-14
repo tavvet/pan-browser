@@ -101,7 +101,7 @@ void WebAppsSettingsPage::rebuildList(const QString &selectedId)
     if (m_store && m_store->isAvailable()) {
         const QList<WebApp> apps = m_store->apps();
         for (const WebApp &app : apps) {
-            QIcon icon(QStringLiteral(":/assets/app-icon.svg"));
+            QIcon icon(QStringLiteral(":/assets/app-icon.png"));
             QPixmap pixmap;
             if (!app.iconPng.isEmpty() && pixmap.loadFromData(app.iconPng, "PNG"))
                 icon = QIcon(pixmap);

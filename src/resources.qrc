@@ -3,7 +3,7 @@
         <file>assets/theme.qss</file>
         <file>assets/public_suffix_list.dat</file>
         <file>assets/site_connection_presets.json</file>
-        <file>assets/app-icon.svg</file>
+        <file>assets/app-icon.png</file>
         <file>assets/icons/arrow-left.svg</file>
         <file>assets/icons/arrow-right.svg</file>
         <file>assets/icons/rotate-cw.svg</file>
