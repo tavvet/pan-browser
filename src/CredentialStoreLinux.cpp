@@ -1249,17 +1249,39 @@ public:
         return runOnApplicationThread<CredentialStoreRemovalResult>(
             [store, targets] {
                 CredentialStoreRemovalResult result;
-                for (const CredentialTarget &target : targets) {
+                for (qsizetype index = 0; index < targets.size(); ++index) {
+                    const CredentialTarget &target = targets.at(index);
                     CredentialStoreError error;
+                    bool backendUnavailable = false;
                     if (!store->removeImpl(
                             target,
                             &error,
-                            QEventLoop::AllEvents
+                            QEventLoop::AllEvents,
+                            &backendUnavailable
                         )) {
                         result.failures.append(CredentialRemovalFailure{
                             target,
-                            std::move(error),
+                            error,
                         });
+                        if (!backendUnavailable)
+                            continue;
+
+                        const CredentialStoreError unprocessedError{
+                            CredentialStoreErrorCode::Unavailable,
+                            QStringLiteral(
+                                "Removal was not attempted because Secret Service "
+                                "became unavailable"
+                            ),
+                        };
+                        for (qsizetype remaining = index + 1;
+                             remaining < targets.size();
+                             ++remaining) {
+                            result.failures.append(CredentialRemovalFailure{
+                                targets.at(remaining),
+                                unprocessedError,
+                            });
+                        }
+                        break;
                     }
                 }
                 return result;
@@ -1286,9 +1308,12 @@ private:
     bool removeImpl(
         const CredentialTarget &target,
         CredentialStoreError *error,
-        QEventLoop::ProcessEventsFlags processEvents
+        QEventLoop::ProcessEventsFlags processEvents,
+        bool *backendUnavailable = nullptr
     )
     {
+        if (backendUnavailable)
+            *backendUnavailable = false;
         clearError(error);
         if (!target.isValid()) {
             setError(
@@ -1329,6 +1354,9 @@ private:
             processEvents
         );
         if (call.timedOut || call.error) {
+            const bool nativeBackendUnavailable = call.timedOut
+                || codeForNativeError(call.error)
+                    == CredentialStoreErrorCode::Unavailable;
             m_available.store(false, std::memory_order_release);
             consumeNativeError(
                 error,
@@ -1336,6 +1364,8 @@ private:
                 QStringLiteral("Could not remove the Secret Service credential"),
                 call.timedOut
             );
+            if (backendUnavailable)
+                *backendUnavailable = nativeBackendUnavailable;
             return false;
         }
         if (call.value == RemovalResult::MatchingItemsRemain) {
@@ -1422,7 +1452,6 @@ private:
                     static_cast<SecretSearchFlags>(
                         SECRET_SEARCH_ALL
                         | SECRET_SEARCH_UNLOCK
-                        | SECRET_SEARCH_LOAD_SECRETS
                     ),
                     cancellable,
                     listSearchFinished,

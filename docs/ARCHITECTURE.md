@@ -812,8 +812,11 @@ time returned by `CredentialStore::listAsync()`; password values are never
 placed in widgets. Listing and deletion expose `QFuture` results so macOS and
 Windows password-manager work runs outside the GUI thread. Linux schedules the
 same native asynchronous Secret Service operations on the application thread
-while continuing to process input events. Individual deletion removes the
-selected targets; bulk deletion uses a backend namespace purge and therefore
+while continuing to process input events. Its listing search retrieves secrets
+sequentially instead of preloading every matched value. Individual deletion
+removes the selected targets and stops the batch after an unavailable-backend or
+timeout result; unprocessed targets are reported as failures without starting
+more native calls. Bulk deletion uses a backend namespace purge and therefore
 also removes damaged entries that could not be decoded for display. Both paths
 require explicit confirmation and take effect immediately, independently of
 the settings dialog's Save and Cancel actions. While either destructive request
