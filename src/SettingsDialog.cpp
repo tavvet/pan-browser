@@ -293,7 +293,7 @@ void SettingsDialog::createInterface(
     crossDomainScrollArea->setWidget(m_crossDomainPage);
     registerPage(
         Page::SiteConnections,
-        QIcon(QStringLiteral(":/assets/icons/shield-ban.svg")),
+        QIcon(QStringLiteral(":/assets/icons/site-connections.svg")),
         tr("Site Connections"),
         crossDomainScrollArea
     );
