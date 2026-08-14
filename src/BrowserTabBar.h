@@ -10,6 +10,7 @@ class BrowserTabBar final : public QTabBar {
 public:
     explicit BrowserTabBar(QWidget *parent = nullptr);
 
+    [[nodiscard]] QSize minimumSizeHint() const override;
     [[nodiscard]] bool isTabPinned(int index) const;
     void setTabPinned(int index, bool pinned);
     [[nodiscard]] int pinnedTabCount() const;
@@ -18,6 +19,7 @@ public:
 
 protected:
     [[nodiscard]] QSize tabSizeHint(int index) const override;
+    [[nodiscard]] QSize minimumTabSizeHint(int index) const override;
     void mousePressEvent(QMouseEvent *event) override;
     void mouseReleaseEvent(QMouseEvent *event) override;
 

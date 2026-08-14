@@ -15,8 +15,6 @@ QTabBar#browserTabBar {
 }
 
 QTabBar#browserTabBar::tab {
-    min-width: 130px;
-    max-width: 230px;
     min-height: 31px;
     color: #929baa;
     background: #1b1f26;

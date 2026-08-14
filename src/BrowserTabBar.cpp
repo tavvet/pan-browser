@@ -12,7 +12,9 @@
 
 namespace {
 
-constexpr int pinnedTabMinimumWidth = 42;
+constexpr int pinnedTabWidth = 42;
+constexpr int regularTabMinimumWidth = 130;
+constexpr int regularTabMaximumWidth = 230;
 constexpr int maximumOpeningDurationMilliseconds = 180;
 constexpr auto pinnedKey = "pinned";
 constexpr auto identityKey = "identity";
@@ -31,6 +33,18 @@ QVariantMap tabMetadata(const QVariant &data)
 BrowserTabBar::BrowserTabBar(QWidget *parent)
     : QTabBar(parent)
 {
+}
+
+QSize BrowserTabBar::minimumSizeHint() const
+{
+    QSize minimum = QTabBar::minimumSizeHint();
+    if (count() > 0 && pinnedTabCount() == count()) {
+        minimum.setWidth(std::min(
+            minimum.width(),
+            count() * pinnedTabWidth
+        ));
+    }
+    return minimum;
 }
 
 bool BrowserTabBar::isTabPinned(int index) const
@@ -81,6 +95,13 @@ QSize BrowserTabBar::tabSizeHint(int index) const
     const QVariant openingWidth = metadata.value(QString::fromLatin1(openingWidthKey));
     if (openingWidth.isValid())
         size.setWidth(std::clamp(openingWidth.toInt(), 1, size.width()));
+    return size;
+}
+
+QSize BrowserTabBar::minimumTabSizeHint(int index) const
+{
+    QSize size = QTabBar::minimumTabSizeHint(index);
+    size.setWidth(isTabPinned(index) ? pinnedTabWidth : regularTabMinimumWidth);
     return size;
 }
 
@@ -164,8 +185,15 @@ void BrowserTabBar::animateTabOpening(int index)
 QSize BrowserTabBar::naturalTabSizeHint(int index) const
 {
     QSize size = QTabBar::tabSizeHint(index);
-    if (isTabPinned(index))
-        size.setWidth(std::max(pinnedTabMinimumWidth, size.height() + 8));
+    size.setWidth(
+        isTabPinned(index)
+            ? pinnedTabWidth
+            : std::clamp(
+                size.width(),
+                regularTabMinimumWidth,
+                regularTabMaximumWidth
+            )
+    );
     return size;
 }
 
