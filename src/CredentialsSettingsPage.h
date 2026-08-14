@@ -20,6 +20,9 @@ public:
         QWidget *parent = nullptr
     );
 
+signals:
+    void destructiveOperationActiveChanged(bool active);
+
 protected:
     void showEvent(QShowEvent *event) override;
 
@@ -27,10 +30,12 @@ private:
     void reload();
     void applyListResult(CredentialStoreListResult result);
     void setBusy(bool busy, const QString &status = {});
+    void setDestructiveOperationActive(bool active);
     void updateActions();
     void removeSelected();
     void removeAll();
     void removeTargets(const QList<CredentialTarget> &targets);
+    [[nodiscard]] bool canRemoveAll() const;
     [[nodiscard]] QList<CredentialTarget> selectedTargets() const;
 
     std::shared_ptr<CredentialStore> m_credentialStore;
@@ -43,4 +48,5 @@ private:
     CredentialStoreErrorCode m_listError = CredentialStoreErrorCode::None;
     bool m_loaded = false;
     bool m_busy = false;
+    bool m_destructiveOperationActive = false;
 };

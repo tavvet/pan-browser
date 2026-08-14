@@ -357,7 +357,7 @@ public:
                 removedAll = false;
                 continue;
             }
-            if (CredDeleteW(credential->TargetName, CRED_TYPE_GENERIC, 0))
+            if (CredDeleteW(credential->TargetName, credential->Type, 0))
                 continue;
             const DWORD errorCode = GetLastError();
             if (errorCode == ERROR_NOT_FOUND)

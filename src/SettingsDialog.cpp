@@ -137,6 +137,9 @@ VideoTranslationSettings SettingsDialog::videoTranslationSettings() const
 
 void SettingsDialog::reject()
 {
+    if (m_credentialOperationActive)
+        return;
+
     const QStringList failures = m_trustRules->rollbackPendingCertificates();
     if (!failures.isEmpty()) {
         QMessageBox::warning(
@@ -331,7 +334,11 @@ void SettingsDialog::createInterface(
         this
     );
     buttons->setContentsMargins(18, 12, 18, 0);
-    buttons->button(QDialogButtonBox::Save)->setText(tr("Save settings"));
+    m_saveButton = buttons->button(QDialogButtonBox::Save);
+    m_cancelButton = buttons->button(QDialogButtonBox::Cancel);
+    m_saveButton->setObjectName(QStringLiteral("saveSettingsButton"));
+    m_cancelButton->setObjectName(QStringLiteral("cancelSettingsButton"));
+    m_saveButton->setText(tr("Save settings"));
     rootLayout->addWidget(buttons);
 
     connect(m_sidebar, &QListWidget::currentRowChanged, this, [this](int row) {
@@ -343,6 +350,12 @@ void SettingsDialog::createInterface(
     });
     connect(buttons, &QDialogButtonBox::accepted, this, &SettingsDialog::saveAndClose);
     connect(buttons, &QDialogButtonBox::rejected, this, &SettingsDialog::reject);
+    connect(
+        m_credentialsPage,
+        &CredentialsSettingsPage::destructiveOperationActiveChanged,
+        this,
+        &SettingsDialog::setCredentialOperationActive
+    );
     selectPage(initialPage);
 }
 
@@ -370,6 +383,13 @@ void SettingsDialog::selectPage(Page page)
     }
 }
 
+void SettingsDialog::setCredentialOperationActive(bool active)
+{
+    m_credentialOperationActive = active;
+    m_saveButton->setEnabled(!active);
+    m_cancelButton->setEnabled(!active);
+}
+
 BrowserPreferences SettingsDialog::preferencesFromControls() const
 {
     BrowserPreferences preferences = m_generalPage->applyTo(m_preferences);
@@ -379,6 +399,9 @@ BrowserPreferences SettingsDialog::preferencesFromControls() const
 
 void SettingsDialog::saveAndClose()
 {
+    if (m_credentialOperationActive)
+        return;
+
     BrowserPreferences preferences = preferencesFromControls();
     QString error;
     if (!preferences.validate(&error)) {

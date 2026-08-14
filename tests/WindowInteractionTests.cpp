@@ -687,6 +687,43 @@ void WindowInteractionTests::settingsDialogRegistersEveryPageAndSelectsInitialPa
         QCOMPARE(pages->currentWidget()->objectName(), expectedObjectNames.at(row));
     }
 
+    auto *credentialsPage = dialog.findChild<CredentialsSettingsPage *>(
+        QStringLiteral("credentialsSettingsPage")
+    );
+    auto *saveButton = dialog.findChild<QPushButton *>(
+        QStringLiteral("saveSettingsButton")
+    );
+    auto *cancelButton = dialog.findChild<QPushButton *>(
+        QStringLiteral("cancelSettingsButton")
+    );
+    QVERIFY(credentialsPage);
+    QVERIFY(saveButton);
+    QVERIFY(cancelButton);
+    QVERIFY(saveButton->isEnabled());
+    QVERIFY(cancelButton->isEnabled());
+
+    QVERIFY(QMetaObject::invokeMethod(
+        credentialsPage,
+        "destructiveOperationActiveChanged",
+        Qt::DirectConnection,
+        Q_ARG(bool, true)
+    ));
+    QVERIFY(!saveButton->isEnabled());
+    QVERIFY(!cancelButton->isEnabled());
+    dialog.setResult(QDialog::Accepted);
+    dialog.reject();
+    QCOMPARE(dialog.result(), static_cast<int>(QDialog::Accepted));
+
+    QVERIFY(QMetaObject::invokeMethod(
+        credentialsPage,
+        "destructiveOperationActiveChanged",
+        Qt::DirectConnection,
+        Q_ARG(bool, false)
+    ));
+    QVERIFY(saveButton->isEnabled());
+    QVERIFY(cancelButton->isEnabled());
+    dialog.reject();
+    QCOMPARE(dialog.result(), static_cast<int>(QDialog::Rejected));
 }
 
 void WindowInteractionTests::generalSettingsPageRoundTripsPreferences()

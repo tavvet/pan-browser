@@ -816,8 +816,13 @@ while continuing to process input events. Individual deletion removes the
 selected targets; bulk deletion uses a backend namespace purge and therefore
 also removes damaged entries that could not be decoded for display. Both paths
 require explicit confirmation and take effect immediately, independently of
-the settings dialog's Save and Cancel actions. Untrusted realm and username
-text is control-character stripped and length-bounded before display.
+the settings dialog's Save and Cancel actions. While either destructive request
+is in flight, the settings dialog disables Save and Cancel and rejects Escape
+or window-close requests so its result handler cannot be discarded. Untrusted
+realm and username text is control-character stripped and length-bounded before
+display. A namespace purge remains available after access, validation, size,
+corruption, or platform errors because those failures may hide matching entries;
+an unavailable backend or an ordinary empty result does not offer the action.
 
 The checkbox is off by default. A stored credential must be available before
 the authentication signal handler returns because Qt requires its

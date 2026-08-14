@@ -139,9 +139,30 @@ public:
 
     [[nodiscard]] QFuture<CredentialStoreOperationResult> removeAllAsync() override
     {
+        if (deferRemoveAll) {
+            deferredRemoveAll = std::make_shared<
+                QPromise<CredentialStoreOperationResult>
+            >();
+            QFuture<CredentialStoreOperationResult> future =
+                deferredRemoveAll->future();
+            deferredRemoveAll->start();
+            return future;
+        }
+
         CredentialStoreOperationResult result;
         result.succeeded = removeAll(&result.error);
         return readyFuture(std::move(result));
+    }
+
+    void completeDeferredRemoveAll()
+    {
+        if (!deferredRemoveAll)
+            return;
+        CredentialStoreOperationResult result;
+        result.succeeded = removeAll(&result.error);
+        deferredRemoveAll->addResult(std::move(result));
+        deferredRemoveAll->finish();
+        deferredRemoveAll.reset();
     }
 
     bool m_available = true;
@@ -150,6 +171,8 @@ public:
     int removeCount = 0;
     int removeAllCount = 0;
     int hiddenCredentialCount = 0;
+    bool deferRemoveAll = false;
+    std::shared_ptr<QPromise<CredentialStoreOperationResult>> deferredRemoveAll;
     CredentialStoreError listError;
     CredentialTarget lastTarget;
     QHash<QString, StoredCredential> credentials;
@@ -1166,7 +1189,23 @@ void NetworkSettingsAndAuthTests::credentialsSettingsPageListsAndRemovesSavedCre
     };
     QTRY_VERIFY(hasPartialStatus());
 
+    store.credentials.clear();
+    store.targets.clear();
+    store.listError.code = CredentialStoreErrorCode::AccessDenied;
+    store.listError.message = QStringLiteral("The password manager is locked");
+    refresh->click();
+    QTRY_VERIFY(
+        list->count() == 1
+            && list->item(0)->text() == QStringLiteral("No readable credentials")
+    );
+    QVERIFY(removeAll->isEnabled());
+
     bool confirmedAllRemoval = false;
+    store.deferRemoveAll = true;
+    QSignalSpy destructiveOperationSpy(
+        &page,
+        &CredentialsSettingsPage::destructiveOperationActiveChanged
+    );
     QTimer::singleShot(0, &page, [&] {
         auto *messageBox = qobject_cast<QMessageBox *>(
             QApplication::activeModalWidget()
@@ -1178,7 +1217,15 @@ void NetworkSettingsAndAuthTests::credentialsSettingsPageListsAndRemovesSavedCre
     });
     removeAll->click();
     QVERIFY(confirmedAllRemoval);
+    QCOMPARE(destructiveOperationSpy.count(), 1);
+    QVERIFY(destructiveOperationSpy.constFirst().constFirst().toBool());
+    QVERIFY(!refresh->isEnabled());
+    QCOMPARE(store.removeAllCount, 0);
+
+    store.completeDeferredRemoveAll();
     QTRY_COMPARE(store.removeAllCount, 1);
+    QTRY_COMPARE(destructiveOperationSpy.count(), 2);
+    QVERIFY(!destructiveOperationSpy.constLast().constFirst().toBool());
     QCOMPARE(store.removeCount, 1);
     QCOMPARE(store.hiddenCredentialCount, 0);
     QVERIFY(store.targets.isEmpty());

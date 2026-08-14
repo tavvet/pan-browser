@@ -16,11 +16,20 @@
 #include <QVBoxLayout>
 
 #include <algorithm>
+#include <limits>
 #include <utility>
 
 namespace {
 
 constexpr qsizetype maximumDisplayTextLength = 160;
+
+int numerusCount(qsizetype count)
+{
+    return static_cast<int>(qMin(
+        count,
+        static_cast<qsizetype>(std::numeric_limits<int>::max())
+    ));
+}
 
 QString boundedDisplayText(const QString &text)
 {
@@ -307,13 +316,17 @@ void CredentialsSettingsPage::applyListResult(CredentialStoreListResult result)
                 tr(
                     "%n saved credential(s). Some entries could not be read.",
                     nullptr,
-                    m_summaries.size()
+                    numerusCount(m_summaries.size())
                 )
             );
         }
     } else {
         m_status->setText(
-            tr("%n saved credential(s)", nullptr, m_summaries.size())
+            tr(
+                "%n saved credential(s)",
+                nullptr,
+                numerusCount(m_summaries.size())
+            )
         );
     }
     setBusy(false);
@@ -328,17 +341,41 @@ void CredentialsSettingsPage::setBusy(bool busy, const QString &status)
     updateActions();
 }
 
+void CredentialsSettingsPage::setDestructiveOperationActive(bool active)
+{
+    if (m_destructiveOperationActive == active)
+        return;
+    m_destructiveOperationActive = active;
+    emit destructiveOperationActiveChanged(active);
+}
+
 void CredentialsSettingsPage::updateActions()
 {
     m_refresh->setEnabled(!m_busy);
     m_removeSelected->setEnabled(
         !m_busy && !selectedTargets().isEmpty()
     );
-    m_removeAll->setEnabled(
-        !m_busy
-            && (!m_summaries.isEmpty()
-                || m_listError == CredentialStoreErrorCode::CorruptData)
-    );
+    m_removeAll->setEnabled(!m_busy && canRemoveAll());
+}
+
+bool CredentialsSettingsPage::canRemoveAll() const
+{
+    if (!m_summaries.isEmpty())
+        return true;
+
+    switch (m_listError) {
+    case CredentialStoreErrorCode::AccessDenied:
+    case CredentialStoreErrorCode::InvalidTarget:
+    case CredentialStoreErrorCode::TooLarge:
+    case CredentialStoreErrorCode::CorruptData:
+    case CredentialStoreErrorCode::PlatformError:
+        return true;
+    case CredentialStoreErrorCode::None:
+    case CredentialStoreErrorCode::NotFound:
+    case CredentialStoreErrorCode::Unavailable:
+        return false;
+    }
+    return false;
 }
 
 QList<CredentialTarget> CredentialsSettingsPage::selectedTargets() const
@@ -375,7 +412,7 @@ void CredentialsSettingsPage::removeSelected()
             "Remove %n selected saved credential(s)? The affected websites and "
             "proxies may ask you to sign in again.",
             nullptr,
-            targets.size()
+            numerusCount(targets.size())
         );
     if (QMessageBox::question(
             this,
@@ -391,8 +428,7 @@ void CredentialsSettingsPage::removeSelected()
 
 void CredentialsSettingsPage::removeAll()
 {
-    if (m_summaries.isEmpty()
-        && m_listError != CredentialStoreErrorCode::CorruptData) {
+    if (!canRemoveAll()) {
         return;
     }
 
@@ -406,7 +442,7 @@ void CredentialsSettingsPage::removeAll()
             "Remove all %n saved credential(s) managed by PanBrowser? Websites "
             "and proxies may ask you to sign in again.",
             nullptr,
-            m_summaries.size()
+            numerusCount(m_summaries.size())
         );
 
     if (QMessageBox::question(
@@ -419,6 +455,7 @@ void CredentialsSettingsPage::removeAll()
         return;
     }
 
+    setDestructiveOperationActive(true);
     setBusy(true, tr("Removing saved credentials…"));
     auto *watcher = new QFutureWatcher<CredentialStoreOperationResult>(this);
     connect(
@@ -429,6 +466,7 @@ void CredentialsSettingsPage::removeAll()
             const CredentialStoreOperationResult result = watcher->result();
             watcher->deleteLater();
             setBusy(false);
+            setDestructiveOperationActive(false);
             if (!result.succeeded) {
                 const QString errorText = boundedDisplayText(result.error.message);
                 QMessageBox::warning(
@@ -447,6 +485,7 @@ void CredentialsSettingsPage::removeTargets(
     const QList<CredentialTarget> &targets
 )
 {
+    setDestructiveOperationActive(true);
     setBusy(true, tr("Removing saved credentials…"));
     auto *watcher = new QFutureWatcher<CredentialStoreRemovalResult>(this);
     connect(
@@ -457,6 +496,7 @@ void CredentialsSettingsPage::removeTargets(
             const CredentialStoreRemovalResult result = watcher->result();
             watcher->deleteLater();
             setBusy(false);
+            setDestructiveOperationActive(false);
 
             QStringList failures;
             for (const CredentialRemovalFailure &failure : result.failures) {

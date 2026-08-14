@@ -12,6 +12,7 @@
 
 class QIcon;
 class QListWidget;
+class QPushButton;
 class QStackedWidget;
 class BrowserProfile;
 class CredentialStore;
@@ -103,6 +104,7 @@ private:
     );
     void registerPage(Page page, const QIcon &icon, const QString &title, QWidget *widget);
     void selectPage(Page page);
+    void setCredentialOperationActive(bool active);
     BrowserPreferences preferencesFromControls() const;
     void saveAndClose();
 
@@ -124,6 +126,8 @@ private:
     VotUserscriptManager *m_votUserscriptManager = nullptr;
     QListWidget *m_sidebar = nullptr;
     QStackedWidget *m_pages = nullptr;
+    QPushButton *m_saveButton = nullptr;
+    QPushButton *m_cancelButton = nullptr;
     QHash<int, QWidget *> m_pageWidgets;
     GeneralSettingsPage *m_generalPage = nullptr;
     PrivacyDataSettingsPage *m_privacyDataPage = nullptr;
@@ -137,4 +141,5 @@ private:
     VideoTranslationSettingsPage *m_videoTranslationPage = nullptr;
     DiagnosticsPage *m_diagnosticsPage = nullptr;
     TrustRulesSettingsPage *m_trustRules = nullptr;
+    bool m_credentialOperationActive = false;
 };
