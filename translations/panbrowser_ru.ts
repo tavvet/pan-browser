@@ -578,6 +578,192 @@
     </message>
 </context>
 <context>
+    <name>CredentialsSettingsPage</name>
+    <message>
+        <location filename="../src/CredentialsSettingsPage.cpp" line="72"/>
+        <source>Website</source>
+        <translation>Сайт</translation>
+    </message>
+    <message>
+        <location filename="../src/CredentialsSettingsPage.cpp" line="73"/>
+        <source>Proxy</source>
+        <translation>Прокси</translation>
+    </message>
+    <message>
+        <location filename="../src/CredentialsSettingsPage.cpp" line="98"/>
+        <source>Saved Credentials</source>
+        <translation>Сохранённые учётные данные</translation>
+    </message>
+    <message>
+        <location filename="../src/CredentialsSettingsPage.cpp" line="102"/>
+        <source>Review usernames saved by PanBrowser and remove credentials you no longer want to keep.</source>
+        <translation>Просматривайте сохранённые PanBrowser имена пользователей и удаляйте ненужные учётные данные.</translation>
+    </message>
+    <message>
+        <location filename="../src/CredentialsSettingsPage.cpp" line="118"/>
+        <source>Passwords stay hidden</source>
+        <translation>Пароли не отображаются</translation>
+    </message>
+    <message>
+        <location filename="../src/CredentialsSettingsPage.cpp" line="124"/>
+        <source>Password values are stored by the operating system and are never displayed here. Deletions take effect immediately and are not reverted by Cancel.</source>
+        <translation>Пароли хранятся операционной системой и никогда не отображаются здесь. Удаление выполняется сразу и не отменяется кнопкой «Отмена».</translation>
+    </message>
+    <message>
+        <location filename="../src/CredentialsSettingsPage.cpp" line="136"/>
+        <source>SAVED LOGINS</source>
+        <translation>СОХРАНЁННЫЕ ДАННЫЕ ВХОДА</translation>
+    </message>
+    <message>
+        <location filename="../src/CredentialsSettingsPage.cpp" line="153"/>
+        <source>Refresh</source>
+        <translation>Обновить</translation>
+    </message>
+    <message>
+        <location filename="../src/CredentialsSettingsPage.cpp" line="155"/>
+        <source>Remove selected…</source>
+        <translation>Удалить выбранные…</translation>
+    </message>
+    <message>
+        <location filename="../src/CredentialsSettingsPage.cpp" line="157"/>
+        <source>Remove all…</source>
+        <translation>Удалить все…</translation>
+    </message>
+    <message>
+        <source>The system password manager is unavailable in this session.</source>
+        <translation type="vanished">Системный менеджер паролей недоступен в этом сеансе.</translation>
+    </message>
+    <message>
+        <location filename="../src/CredentialsSettingsPage.cpp" line="261"/>
+        <source>Unknown date</source>
+        <translation>Дата неизвестна</translation>
+    </message>
+    <message>
+        <location filename="../src/CredentialsSettingsPage.cpp" line="263"/>
+        <source>No username</source>
+        <translation>Имя пользователя не указано</translation>
+    </message>
+    <message>
+        <location filename="../src/CredentialsSettingsPage.cpp" line="265"/>
+        <source>No realm</source>
+        <translation>Область авторизации не указана</translation>
+    </message>
+    <message>
+        <location filename="../src/CredentialsSettingsPage.cpp" line="266"/>
+        <source>%1 · Username: %2 · Realm: %3 · Updated: %4</source>
+        <translation>%1 · Пользователь: %2 · Область авторизации: %3 · Изменено: %4</translation>
+    </message>
+    <message>
+        <location filename="../src/CredentialsSettingsPage.cpp" line="290"/>
+        <source>No readable credentials</source>
+        <translation>Нет доступных для чтения учётных данных</translation>
+    </message>
+    <message>
+        <location filename="../src/CredentialsSettingsPage.cpp" line="291"/>
+        <source>No saved credentials</source>
+        <translation>Нет сохранённых учётных данных</translation>
+    </message>
+    <message>
+        <location filename="../src/CredentialsSettingsPage.cpp" line="301"/>
+        <source>Saved credentials could not be loaded: %1</source>
+        <translation>Не удалось загрузить сохранённые учётные данные: %1</translation>
+    </message>
+    <message numerus="yes">
+        <location filename="../src/CredentialsSettingsPage.cpp" line="307"/>
+        <source>%n saved credential(s). Some entries could not be read.</source>
+        <translation>
+            <numerusform>%n сохранённая учётная запись. Часть записей не удалось прочитать.</numerusform>
+            <numerusform>%n сохранённые учётные записи. Часть записей не удалось прочитать.</numerusform>
+            <numerusform>%n сохранённых учётных записей. Часть записей не удалось прочитать.</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <location filename="../src/CredentialsSettingsPage.cpp" line="316"/>
+        <source>%n saved credential(s)</source>
+        <translation>
+            <numerusform>%n сохранённая учётная запись</numerusform>
+            <numerusform>%n сохранённые учётные записи</numerusform>
+            <numerusform>%n сохранённых учётных записей</numerusform>
+        </translation>
+    </message>
+    <message>
+        <location filename="../src/CredentialsSettingsPage.cpp" line="368"/>
+        <source>Remove the saved credentials for “%1”? The website or proxy may ask you to sign in again.</source>
+        <translation>Удалить сохранённые учётные данные для «%1»? Сайт или прокси может снова запросить вход.</translation>
+    </message>
+    <message numerus="yes">
+        <location filename="../src/CredentialsSettingsPage.cpp" line="374"/>
+        <source>Remove %n selected saved credential(s)? The affected websites and proxies may ask you to sign in again.</source>
+        <translation>
+            <numerusform>Удалить %n выбранную сохранённую учётную запись? Соответствующий сайт или прокси может снова запросить вход.</numerusform>
+            <numerusform>Удалить %n выбранные сохранённые учётные записи? Соответствующие сайты и прокси могут снова запросить вход.</numerusform>
+            <numerusform>Удалить %n выбранных сохранённых учётных записей? Соответствующие сайты и прокси могут снова запросить вход.</numerusform>
+        </translation>
+    </message>
+    <message>
+        <location filename="../src/CredentialsSettingsPage.cpp" line="382"/>
+        <source>Remove saved credentials</source>
+        <translation>Удаление сохранённых учётных данных</translation>
+    </message>
+    <message>
+        <location filename="../src/CredentialsSettingsPage.cpp" line="400"/>
+        <source>Remove every saved credential managed by PanBrowser, including entries that could not be displayed? Websites and proxies may ask you to sign in again.</source>
+        <translation>Удалить все сохранённые PanBrowser учётные данные, включая записи, которые не удалось отобразить? Сайты и прокси-серверы могут снова запросить вход.</translation>
+    </message>
+    <message>
+        <location filename="../src/CredentialsSettingsPage.cpp" line="414"/>
+        <source>Remove all saved credentials</source>
+        <translation>Удаление всех сохранённых учётных данных</translation>
+    </message>
+    <message numerus="yes">
+        <location filename="../src/CredentialsSettingsPage.cpp" line="405"/>
+        <source>Remove all %n saved credential(s) managed by PanBrowser? Websites and proxies may ask you to sign in again.</source>
+        <translation>
+            <numerusform>Удалить все сохранённые учётные данные (%n запись), которыми управляет PanBrowser? Сайты и прокси могут снова запросить вход.</numerusform>
+            <numerusform>Удалить все сохранённые учётные данные (%n записи), которыми управляет PanBrowser? Сайты и прокси могут снова запросить вход.</numerusform>
+            <numerusform>Удалить все сохранённые учётные данные (%n записей), которыми управляет PanBrowser? Сайты и прокси могут снова запросить вход.</numerusform>
+        </translation>
+    </message>
+    <message>
+        <location filename="../src/CredentialsSettingsPage.cpp" line="208"/>
+        <source>The system password manager is unavailable</source>
+        <translation>Системный менеджер паролей недоступен</translation>
+    </message>
+    <message>
+        <location filename="../src/CredentialsSettingsPage.cpp" line="213"/>
+        <source>Loading saved credentials…</source>
+        <translation>Загрузка сохранённых учётных данных…</translation>
+    </message>
+    <message>
+        <location filename="../src/CredentialsSettingsPage.cpp" line="422"/>
+        <location filename="../src/CredentialsSettingsPage.cpp" line="450"/>
+        <source>Removing saved credentials…</source>
+        <translation>Удаление сохранённых учётных данных…</translation>
+    </message>
+    <message>
+        <location filename="../src/CredentialsSettingsPage.cpp" line="436"/>
+        <source>Credentials were not removed</source>
+        <translation>Не удалось удалить учётные данные</translation>
+    </message>
+    <message>
+        <location filename="../src/CredentialsSettingsPage.cpp" line="465"/>
+        <source>%1: %2</source>
+        <translation>%1: %2</translation>
+    </message>
+    <message>
+        <location filename="../src/CredentialsSettingsPage.cpp" line="302"/>
+        <location filename="../src/CredentialsSettingsPage.cpp" line="437"/>
+        <location filename="../src/CredentialsSettingsPage.cpp" line="467"/>
+        <source>Unknown error</source>
+        <translation>Неизвестная ошибка</translation>
+    </message>
+    <message>
+        <location filename="../src/CredentialsSettingsPage.cpp" line="474"/>
+        <source>Some credentials were not removed</source>
+        <translation>Не удалось удалить некоторые учётные данные</translation>
+    </message>
+</context>
+<context>
     <name>CrossDomainPrompt</name>
     <message>
         <location filename="../src/CrossDomainPrompt.cpp" line="36"/>
@@ -3540,55 +3726,55 @@ Warning: searches sent through HTTP are not encrypted.</source>
         <translation>Не удалось восстановить %1: %2</translation>
     </message>
     <message>
-        <location filename="../src/SettingsDialog.cpp" line="154"/>
+        <location filename="../src/SettingsDialog.cpp" line="162"/>
         <location filename="../tests/PersistenceAndPolicyTests.cpp" line="1258"/>
         <source>Settings</source>
         <translation>Настройки</translation>
     </message>
     <message>
         <location filename="../src/GeneralSettingsPage.cpp" line="26"/>
-        <location filename="../src/SettingsDialog.cpp" line="184"/>
+        <location filename="../src/SettingsDialog.cpp" line="192"/>
         <source>General</source>
         <translation>Основные</translation>
     </message>
     <message>
-        <location filename="../src/SettingsDialog.cpp" line="192"/>
+        <location filename="../src/SettingsDialog.cpp" line="200"/>
         <source>Search</source>
         <translation>Поиск</translation>
     </message>
     <message>
-        <location filename="../src/SettingsDialog.cpp" line="204"/>
+        <location filename="../src/SettingsDialog.cpp" line="212"/>
         <source>History</source>
         <translation>История</translation>
     </message>
     <message>
-        <location filename="../src/SettingsDialog.cpp" line="212"/>
+        <location filename="../src/SettingsDialog.cpp" line="220"/>
         <source>Web Apps</source>
         <translation>Веб-приложения</translation>
     </message>
     <message>
         <location filename="../src/PrivacyDataSettingsPage.cpp" line="24"/>
-        <location filename="../src/SettingsDialog.cpp" line="242"/>
+        <location filename="../src/SettingsDialog.cpp" line="250"/>
         <source>Privacy &amp; Data</source>
         <translation>Конфиденциальность и данные</translation>
     </message>
     <message>
-        <location filename="../src/SettingsDialog.cpp" line="250"/>
+        <location filename="../src/SettingsDialog.cpp" line="269"/>
         <source>DNS</source>
         <translation>DNS</translation>
     </message>
     <message>
-        <location filename="../src/SettingsDialog.cpp" line="258"/>
+        <location filename="../src/SettingsDialog.cpp" line="277"/>
         <source>Proxy</source>
         <translation>Прокси</translation>
     </message>
     <message>
-        <location filename="../src/SettingsDialog.cpp" line="283"/>
+        <location filename="../src/SettingsDialog.cpp" line="302"/>
         <source>Trust Rules</source>
         <translation>Правила доверия</translation>
     </message>
     <message>
-        <location filename="../src/SettingsDialog.cpp" line="298"/>
+        <location filename="../src/SettingsDialog.cpp" line="317"/>
         <source>Diagnostics</source>
         <translation>Диагностика</translation>
     </message>
@@ -3743,7 +3929,7 @@ Warning: searches sent through HTTP are not encrypted.</source>
         <translation>При следующем запуске удалить файлы cookie, локальное хранилище, IndexedDB, сервис-воркеры и кэш. Настройки, история, правила доверия, сертификаты и сохранённые вкладки останутся.</translation>
     </message>
     <message>
-        <location filename="../src/SettingsDialog.cpp" line="315"/>
+        <location filename="../src/SettingsDialog.cpp" line="334"/>
         <source>Save settings</source>
         <translation>Сохранить настройки</translation>
     </message>
@@ -3808,78 +3994,83 @@ Warning: searches sent through HTTP are not encrypted.</source>
         <translation>Не удалось запланировать сброс</translation>
     </message>
     <message>
-        <location filename="../src/SettingsDialog.cpp" line="137"/>
+        <location filename="../src/SettingsDialog.cpp" line="144"/>
         <source>Certificate cleanup incomplete</source>
         <translation>Очистка сертификатов завершена не полностью</translation>
     </message>
     <message>
-        <location filename="../src/SettingsDialog.cpp" line="138"/>
+        <location filename="../src/SettingsDialog.cpp" line="145"/>
         <source>Some imported certificate files could not be removed:
 %1</source>
         <translation>Не удалось удалить некоторые импортированные файлы сертификатов:
 %1</translation>
     </message>
     <message>
-        <location filename="../src/SettingsDialog.cpp" line="234"/>
+        <location filename="../src/SettingsDialog.cpp" line="242"/>
         <source>Video Translation</source>
         <translation>Перевод видео</translation>
     </message>
     <message>
-        <location filename="../src/SettingsDialog.cpp" line="275"/>
+        <location filename="../src/SettingsDialog.cpp" line="261"/>
+        <source>Credentials</source>
+        <translation>Учётные данные</translation>
+    </message>
+    <message>
+        <location filename="../src/SettingsDialog.cpp" line="294"/>
         <source>Site Connections</source>
         <translation>Подключения сайтов</translation>
     </message>
     <message>
-        <location filename="../src/SettingsDialog.cpp" line="367"/>
-        <location filename="../src/SettingsDialog.cpp" line="418"/>
-        <location filename="../src/SettingsDialog.cpp" line="430"/>
+        <location filename="../src/SettingsDialog.cpp" line="386"/>
+        <location filename="../src/SettingsDialog.cpp" line="437"/>
+        <location filename="../src/SettingsDialog.cpp" line="449"/>
         <source>Cannot save settings</source>
         <translation>Не удалось сохранить настройки</translation>
     </message>
     <message>
-        <location filename="../src/SettingsDialog.cpp" line="372"/>
-        <location filename="../src/SettingsDialog.cpp" line="485"/>
+        <location filename="../src/SettingsDialog.cpp" line="391"/>
+        <location filename="../src/SettingsDialog.cpp" line="504"/>
         <source>Cannot save trust rules</source>
         <translation>Не удалось сохранить правила доверия</translation>
     </message>
     <message>
-        <location filename="../src/SettingsDialog.cpp" line="377"/>
-        <location filename="../src/SettingsDialog.cpp" line="438"/>
+        <location filename="../src/SettingsDialog.cpp" line="396"/>
+        <location filename="../src/SettingsDialog.cpp" line="457"/>
         <source>Cannot save search settings</source>
         <translation>Не удалось сохранить настройки поиска</translation>
     </message>
     <message>
-        <location filename="../src/SettingsDialog.cpp" line="382"/>
-        <location filename="../src/SettingsDialog.cpp" line="446"/>
+        <location filename="../src/SettingsDialog.cpp" line="401"/>
+        <location filename="../src/SettingsDialog.cpp" line="465"/>
         <source>Cannot save DNS settings</source>
         <translation>Не удалось сохранить настройки DNS</translation>
     </message>
     <message>
-        <location filename="../src/SettingsDialog.cpp" line="387"/>
-        <location filename="../src/SettingsDialog.cpp" line="454"/>
+        <location filename="../src/SettingsDialog.cpp" line="406"/>
+        <location filename="../src/SettingsDialog.cpp" line="473"/>
         <source>Cannot save proxy settings</source>
         <translation>Не удалось сохранить настройки прокси</translation>
     </message>
     <message>
-        <location filename="../src/SettingsDialog.cpp" line="392"/>
-        <location filename="../src/SettingsDialog.cpp" line="462"/>
+        <location filename="../src/SettingsDialog.cpp" line="411"/>
+        <location filename="../src/SettingsDialog.cpp" line="481"/>
         <source>Cannot save site connection settings</source>
         <translation>Не удалось сохранить настройки подключений сайтов</translation>
     </message>
     <message>
-        <location filename="../src/SettingsDialog.cpp" line="397"/>
-        <location filename="../src/SettingsDialog.cpp" line="475"/>
+        <location filename="../src/SettingsDialog.cpp" line="416"/>
+        <location filename="../src/SettingsDialog.cpp" line="494"/>
         <source>Cannot save video translation settings</source>
         <translation>Не удалось сохранить настройки перевода видео</translation>
     </message>
     <message>
-        <location filename="../src/SettingsDialog.cpp" line="437"/>
-        <location filename="../src/SettingsDialog.cpp" line="445"/>
-        <location filename="../src/SettingsDialog.cpp" line="453"/>
-        <location filename="../src/SettingsDialog.cpp" line="461"/>
+        <location filename="../src/SettingsDialog.cpp" line="456"/>
+        <location filename="../src/SettingsDialog.cpp" line="464"/>
         <location filename="../src/SettingsDialog.cpp" line="472"/>
-        <location filename="../src/SettingsDialog.cpp" line="484"/>
-        <location filename="../src/SettingsDialog.cpp" line="492"/>
+        <location filename="../src/SettingsDialog.cpp" line="480"/>
+        <location filename="../src/SettingsDialog.cpp" line="491"/>
+        <location filename="../src/SettingsDialog.cpp" line="503"/>
+        <location filename="../src/SettingsDialog.cpp" line="511"/>
         <source>
 
 Rollback was incomplete:
@@ -3890,17 +4081,17 @@ Rollback was incomplete:
 </translation>
     </message>
     <message>
-        <location filename="../src/SettingsDialog.cpp" line="493"/>
+        <location filename="../src/SettingsDialog.cpp" line="512"/>
         <source>Cannot apply DNS settings</source>
         <translation>Не удалось применить настройки DNS</translation>
     </message>
     <message>
-        <location filename="../src/SettingsDialog.cpp" line="507"/>
+        <location filename="../src/SettingsDialog.cpp" line="526"/>
         <source>Settings saved with a warning</source>
         <translation>Настройки сохранены с предупреждением</translation>
     </message>
     <message>
-        <location filename="../src/SettingsDialog.cpp" line="508"/>
+        <location filename="../src/SettingsDialog.cpp" line="527"/>
         <source>Settings were saved, but some unused imported certificate files could not be removed:
 %1</source>
         <translation>Настройки сохранены, но не удалось удалить некоторые неиспользуемые импортированные файлы сертификатов:

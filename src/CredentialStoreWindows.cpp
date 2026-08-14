@@ -326,6 +326,49 @@ public:
         return false;
     }
 
+    bool removeAll(CredentialStoreError *error) override
+    {
+        clearError(error);
+        const std::wstring filter = std::wstring(targetPrefix) + L"*";
+        DWORD count = 0;
+        PCREDENTIALW *rawCredentials = nullptr;
+        if (!CredEnumerateW(filter.c_str(), 0, &count, &rawCredentials)) {
+            const DWORD errorCode = GetLastError();
+            if (errorCode == ERROR_NOT_FOUND)
+                return true;
+            setWindowsError(error, errorCode);
+            return false;
+        }
+
+        ScopedCredentialArray ownedCredentials(rawCredentials, count);
+        bool removedAll = true;
+        for (DWORD index = 0; index < count; ++index) {
+            const PCREDENTIALW credential = rawCredentials[index];
+            if (!credential || !credential->TargetName) {
+                if (removedAll) {
+                    setError(
+                        error,
+                        CredentialStoreErrorCode::CorruptData,
+                        QStringLiteral(
+                            "Windows Credential Manager returned an invalid target name"
+                        )
+                    );
+                }
+                removedAll = false;
+                continue;
+            }
+            if (CredDeleteW(credential->TargetName, CRED_TYPE_GENERIC, 0))
+                continue;
+            const DWORD errorCode = GetLastError();
+            if (errorCode == ERROR_NOT_FOUND)
+                continue;
+            if (removedAll)
+                setWindowsError(error, errorCode);
+            removedAll = false;
+        }
+        return removedAll;
+    }
+
     [[nodiscard]] QList<StoredCredentialSummary> list(
         CredentialStoreError *error
     ) override
@@ -398,7 +441,7 @@ public:
 
 } // namespace
 
-std::unique_ptr<CredentialStore> createSystemCredentialStore()
+std::shared_ptr<CredentialStore> createSystemCredentialStore()
 {
-    return std::make_unique<WindowsCredentialStore>();
+    return std::make_shared<WindowsCredentialStore>();
 }

@@ -392,6 +392,27 @@ public:
         return false;
     }
 
+    bool removeAll(CredentialStoreError *error) override
+    {
+        clearError(error);
+        ScopedCf query = serviceQuery();
+        if (!query.get()) {
+            setError(
+                error,
+                CredentialStoreErrorCode::PlatformError,
+                QStringLiteral("Could not create a Keychain query")
+            );
+            return false;
+        }
+        const OSStatus status = SecItemDelete(
+            static_cast<CFDictionaryRef>(query.get())
+        );
+        if (status == errSecSuccess || status == errSecItemNotFound)
+            return true;
+        setStatusError(error, status);
+        return false;
+    }
+
     [[nodiscard]] QList<StoredCredentialSummary> list(
         CredentialStoreError *error
     ) override
@@ -518,8 +539,10 @@ public:
                 continue;
             }
             decoded->credential.password.fill(QChar('\0'));
-            if (!decoded->target)
+            if (!decoded->target) {
+                encounteredCorruptData = true;
                 continue;
+            }
             const QString expectedAccount = QString::fromLatin1(accountPrefix)
                 + decoded->target->identifier();
             if (account != expectedAccount) {
@@ -563,7 +586,7 @@ public:
 
 } // namespace
 
-std::unique_ptr<CredentialStore> createSystemCredentialStore()
+std::shared_ptr<CredentialStore> createSystemCredentialStore()
 {
-    return std::make_unique<MacCredentialStore>();
+    return std::make_shared<MacCredentialStore>();
 }

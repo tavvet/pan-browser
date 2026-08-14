@@ -805,6 +805,20 @@ attributes, and verifies that none remain, so an explicitly rejected stored
 credential is not silently retained. Backend or session D-Bus absence is
 reported as unavailable and preserves session-only behavior.
 
+`CredentialsSettingsPage` creates the platform backend only when no injected
+store is supplied and loads it lazily when the page is first shown. It displays
+only the normalized endpoint, authentication realm, username, and modification
+time returned by `CredentialStore::listAsync()`; password values are never
+placed in widgets. Listing and deletion expose `QFuture` results so macOS and
+Windows password-manager work runs outside the GUI thread. Linux schedules the
+same native asynchronous Secret Service operations on the application thread
+while continuing to process input events. Individual deletion removes the
+selected targets; bulk deletion uses a backend namespace purge and therefore
+also removes damaged entries that could not be decoded for display. Both paths
+require explicit confirmation and take effect immediately, independently of
+the settings dialog's Save and Cancel actions. Untrusted realm and username
+text is control-character stripped and length-bounded before display.
+
 The checkbox is off by default. A stored credential must be available before
 the authentication signal handler returns because Qt requires its
 `QAuthenticator` to be completed synchronously. The Linux adapter uses
@@ -815,8 +829,9 @@ PanBrowser then reports the backend as unavailable without leaving a blocking
 task in Qt's global thread pool. Native results and secrets retain shared
 ownership until a late callback can clean them up safely. Website and proxy
 credential mutations also hold a process-wide lease for their opaque target
-identifier until the callback arrives. A timed-out write or removal therefore
-cannot be overtaken by another mutation of the same credential.
+identifier until the callback arrives. Namespace purge takes an exclusive
+lease. A timed-out write or removal therefore cannot be overtaken by another
+mutation of the same credential.
 Successful availability probes are cached, while backend failures invalidate
 the cache. The operation may invoke a desktop prompt to unlock the default
 collection. If the same challenge returns, the rejected stored value is deleted

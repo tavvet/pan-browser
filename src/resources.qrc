@@ -28,5 +28,6 @@
         <file>assets/icons/network.svg</file>
         <file>assets/icons/proxy.svg</file>
         <file>assets/icons/languages.svg</file>
+        <file>assets/icons/key-round.svg</file>
     </qresource>
 </RCC>

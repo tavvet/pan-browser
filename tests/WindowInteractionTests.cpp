@@ -2,6 +2,48 @@
 
 #include <QStyle>
 
+class UnavailableTestCredentialStore final : public CredentialStore {
+public:
+    [[nodiscard]] bool isAvailable() const override
+    {
+        return false;
+    }
+
+    [[nodiscard]] std::optional<StoredCredential> read(
+        const CredentialTarget &,
+        CredentialStoreError *
+    ) override
+    {
+        return std::nullopt;
+    }
+
+    bool write(
+        const CredentialTarget &,
+        const StoredCredential &,
+        CredentialStoreError *
+    ) override
+    {
+        return false;
+    }
+
+    bool remove(const CredentialTarget &, CredentialStoreError *) override
+    {
+        return false;
+    }
+
+    bool removeAll(CredentialStoreError *) override
+    {
+        return false;
+    }
+
+    [[nodiscard]] QList<StoredCredentialSummary> list(
+        CredentialStoreError *
+    ) override
+    {
+        return {};
+    }
+};
+
 class WindowInteractionTests final : public QObject {
     Q_OBJECT
 
@@ -567,6 +609,7 @@ void WindowInteractionTests::settingsDialogRegistersEveryPageAndSelectsInitialPa
     BrowserProfile profile(false);
     HistoryStore historyStore(directory.filePath(QStringLiteral("history.sqlite")));
     WebAppStore webAppStore(directory.filePath(QStringLiteral("web-apps.json")));
+    UnavailableTestCredentialStore credentialStore;
     SettingsDialogContext context;
     context.trustConfigurationPath = directory.filePath(QStringLiteral("trust.json"));
     context.searchConfigurationPath = directory.filePath(QStringLiteral("search.json"));
@@ -582,6 +625,7 @@ void WindowInteractionTests::settingsDialogRegistersEveryPageAndSelectsInitialPa
     context.profile = &profile;
     context.historyStore = &historyStore;
     context.webAppStore = &webAppStore;
+    context.credentialStore = &credentialStore;
     SettingsDialog dialog(
         context,
         QUrl(QStringLiteral("https://current.example/")),
@@ -592,8 +636,8 @@ void WindowInteractionTests::settingsDialogRegistersEveryPageAndSelectsInitialPa
     auto *pages = dialog.findChild<QStackedWidget *>(QStringLiteral("settingsPages"));
     QVERIFY(sidebar);
     QVERIFY(pages);
-    QCOMPARE(sidebar->count(), 11);
-    QCOMPARE(pages->count(), 11);
+    QCOMPARE(sidebar->count(), 12);
+    QCOMPARE(pages->count(), 12);
     QCOMPARE(
         sidebar->currentItem()->data(Qt::UserRole).toInt(),
         static_cast<int>(SettingsDialog::Page::WebApps)
@@ -613,6 +657,7 @@ void WindowInteractionTests::settingsDialogRegistersEveryPageAndSelectsInitialPa
         SettingsDialog::Page::WebApps,
         SettingsDialog::Page::VideoTranslation,
         SettingsDialog::Page::PrivacyData,
+        SettingsDialog::Page::Credentials,
         SettingsDialog::Page::Dns,
         SettingsDialog::Page::Proxy,
         SettingsDialog::Page::SiteConnections,
@@ -626,6 +671,7 @@ void WindowInteractionTests::settingsDialogRegistersEveryPageAndSelectsInitialPa
         QStringLiteral("webAppsSettingsPage"),
         QStringLiteral("videoTranslationSettingsPage"),
         QStringLiteral("privacyDataSettingsPage"),
+        QStringLiteral("credentialsSettingsPage"),
         QStringLiteral("dnsSettingsPage"),
         QStringLiteral("proxySettingsPage"),
         QStringLiteral("settingsPageScrollArea"),

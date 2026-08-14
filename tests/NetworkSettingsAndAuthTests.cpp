@@ -1,12 +1,26 @@
 #include "PanBrowserTestCommon.h"
 #include "CredentialStorePayload.h"
 
+#include <QAbstractButton>
 #include <QDataStream>
 #include <QIODevice>
+#include <QMessageBox>
+#include <QPromise>
 
 #include <algorithm>
 
 namespace {
+
+template<typename Result>
+QFuture<Result> readyFuture(Result result)
+{
+    QPromise<Result> promise;
+    QFuture<Result> future = promise.future();
+    promise.start();
+    promise.addResult(std::move(result));
+    promise.finish();
+    return future;
+}
 
 class FakeCredentialStore final : public CredentialStore {
 public:
@@ -67,12 +81,24 @@ public:
         return true;
     }
 
+    bool removeAll(CredentialStoreError *error) override
+    {
+        if (error)
+            error->clear();
+        ++removeAllCount;
+        credentials.clear();
+        targets.clear();
+        hiddenCredentialCount = 0;
+        listError.clear();
+        return true;
+    }
+
     [[nodiscard]] QList<StoredCredentialSummary> list(
         CredentialStoreError *error
     ) override
     {
         if (error)
-            error->clear();
+            *error = listError;
         QList<StoredCredentialSummary> summaries;
         for (auto iterator = targets.cbegin(); iterator != targets.cend(); ++iterator) {
             const auto credential = credentials.constFind(iterator.key());
@@ -87,10 +113,44 @@ public:
         return summaries;
     }
 
+    [[nodiscard]] QFuture<CredentialStoreListResult> listAsync() override
+    {
+        CredentialStoreListResult result;
+        result.summaries = list(&result.error);
+        return readyFuture(std::move(result));
+    }
+
+    [[nodiscard]] QFuture<CredentialStoreRemovalResult> removeAsync(
+        const QList<CredentialTarget> &targetsToRemove
+    ) override
+    {
+        CredentialStoreRemovalResult result;
+        for (const CredentialTarget &target : targetsToRemove) {
+            CredentialStoreError error;
+            if (!remove(target, &error)) {
+                result.failures.append(CredentialRemovalFailure{
+                    target,
+                    std::move(error),
+                });
+            }
+        }
+        return readyFuture(std::move(result));
+    }
+
+    [[nodiscard]] QFuture<CredentialStoreOperationResult> removeAllAsync() override
+    {
+        CredentialStoreOperationResult result;
+        result.succeeded = removeAll(&result.error);
+        return readyFuture(std::move(result));
+    }
+
     bool m_available = true;
     int readCount = 0;
     int writeCount = 0;
     int removeCount = 0;
+    int removeAllCount = 0;
+    int hiddenCredentialCount = 0;
+    CredentialStoreError listError;
     CredentialTarget lastTarget;
     QHash<QString, StoredCredential> credentials;
     QHash<QString, CredentialTarget> targets;
@@ -113,6 +173,7 @@ private slots:
     void proxyFailureBlocksWebEngineNetworkSchemes();
     void credentialTargetsAreOriginScopedAndDeterministic();
     void credentialPayloadRoundTripsMetadataAndLegacyRecords();
+    void credentialsSettingsPageListsAndRemovesSavedCredentials();
     void httpAuthenticationAcceptsCredentialsAndSanitizesDisplay();
     void httpAuthenticationCancelClearsAuthenticator();
     void httpAuthenticationRetriesAndWarnsForPlainHttp();
@@ -998,6 +1059,135 @@ void NetworkSettingsAndAuthTests::manualProxyAuthenticationUsesSavedCredentials(
     QCOMPARE(authenticator.password(), QStringLiteral("proxy-secret"));
 }
 
+void NetworkSettingsAndAuthTests::credentialsSettingsPageListsAndRemovesSavedCredentials()
+{
+    FakeCredentialStore store;
+    const auto websiteTarget = CredentialTarget::forHttpServer(
+        QUrl(QStringLiteral("https://accounts.example.com/")),
+        QStringLiteral("Members\narea")
+    );
+    const auto proxyTarget = CredentialTarget::forHttpProxy(
+        QStringLiteral("proxy.example.com"),
+        3128,
+        QStringLiteral("Office proxy")
+    );
+    QVERIFY(websiteTarget);
+    QVERIFY(proxyTarget);
+
+    CredentialStoreError error;
+    QVERIFY(store.write(
+        *websiteTarget,
+        StoredCredential{
+            QStringLiteral("alice\nuser"),
+            QStringLiteral("website-secret-value"),
+        },
+        &error
+    ));
+    QVERIFY(store.write(
+        *proxyTarget,
+        StoredCredential{
+            QStringLiteral("proxy-user"),
+            QStringLiteral("proxy-secret-value"),
+        },
+        &error
+    ));
+
+    CredentialsSettingsPage page(&store);
+    page.show();
+    QApplication::processEvents();
+
+    auto *list = page.findChild<QListWidget *>(
+        QStringLiteral("credentialsList")
+    );
+    auto *removeSelected = page.findChild<QPushButton *>(
+        QStringLiteral("removeSelectedCredentials")
+    );
+    auto *removeAll = page.findChild<QPushButton *>(
+        QStringLiteral("removeAllCredentials")
+    );
+    auto *refresh = page.findChild<QPushButton *>(
+        QStringLiteral("refreshCredentials")
+    );
+    QVERIFY(list);
+    QVERIFY(removeSelected);
+    QVERIFY(removeAll);
+    QVERIFY(refresh);
+    QTRY_COMPARE(list->count(), 2);
+
+    QString visibleText;
+    int websiteRow = -1;
+    for (int row = 0; row < list->count(); ++row) {
+        const QListWidgetItem *item = list->item(row);
+        visibleText += item->text() + QLatin1Char('\n');
+        if (item->data(Qt::UserRole).toString() == websiteTarget->identifier())
+            websiteRow = row;
+    }
+    QVERIFY(visibleText.contains(QStringLiteral("accounts.example.com")));
+    QVERIFY(visibleText.contains(QStringLiteral("alice user")));
+    QVERIFY(visibleText.contains(QStringLiteral("Members area")));
+    QVERIFY(visibleText.contains(QStringLiteral("proxy.example.com:3128")));
+    QVERIFY(!visibleText.contains(QStringLiteral("website-secret-value")));
+    QVERIFY(!visibleText.contains(QStringLiteral("proxy-secret-value")));
+    QVERIFY(websiteRow >= 0);
+
+    list->setCurrentRow(websiteRow);
+    QVERIFY(removeSelected->isEnabled());
+    bool confirmedSelectedRemoval = false;
+    QTimer::singleShot(0, &page, [&] {
+        auto *messageBox = qobject_cast<QMessageBox *>(
+            QApplication::activeModalWidget()
+        );
+        if (!messageBox)
+            return;
+        confirmedSelectedRemoval = true;
+        messageBox->button(QMessageBox::Yes)->click();
+    });
+    removeSelected->click();
+    QVERIFY(confirmedSelectedRemoval);
+    QTRY_COMPARE(store.removeCount, 1);
+    QVERIFY(!store.targets.contains(websiteTarget->identifier()));
+    QTRY_COMPARE(list->count(), 1);
+
+    store.hiddenCredentialCount = 1;
+    store.listError.code = CredentialStoreErrorCode::CorruptData;
+    store.listError.message = QStringLiteral("A hidden credential is corrupt");
+    refresh->click();
+    const auto hasPartialStatus = [&page] {
+        const QList<QLabel *> labels = page.findChildren<QLabel *>();
+        return std::any_of(
+            labels.cbegin(),
+            labels.cend(),
+            [](const QLabel *label) {
+                return label->text().contains(
+                    QStringLiteral("Some entries could not be read")
+                );
+            }
+        );
+    };
+    QTRY_VERIFY(hasPartialStatus());
+
+    bool confirmedAllRemoval = false;
+    QTimer::singleShot(0, &page, [&] {
+        auto *messageBox = qobject_cast<QMessageBox *>(
+            QApplication::activeModalWidget()
+        );
+        if (!messageBox)
+            return;
+        confirmedAllRemoval = true;
+        messageBox->button(QMessageBox::Yes)->click();
+    });
+    removeAll->click();
+    QVERIFY(confirmedAllRemoval);
+    QTRY_COMPARE(store.removeAllCount, 1);
+    QCOMPARE(store.removeCount, 1);
+    QCOMPARE(store.hiddenCredentialCount, 0);
+    QVERIFY(store.targets.isEmpty());
+    QTRY_VERIFY(
+        list->count() == 1
+            && !(list->item(0)->flags() & Qt::ItemIsEnabled)
+    );
+}
+
 void NetworkSettingsAndAuthTests::nativeCredentialStoreRoundTripsWhenEnabled()
 {
 #if !defined(Q_OS_MACOS) && !defined(Q_OS_WIN) && !defined(Q_OS_LINUX)
@@ -1008,7 +1198,7 @@ void NetworkSettingsAndAuthTests::nativeCredentialStoreRoundTripsWhenEnabled()
         QSKIP("Set PANBROWSER_RUN_CREDENTIAL_STORE_TESTS=1 to exercise the native credential store");
     }
 
-    std::unique_ptr<CredentialStore> store = createSystemCredentialStore();
+    std::shared_ptr<CredentialStore> store = createSystemCredentialStore();
     QVERIFY(store);
     QVERIFY(store->isAvailable());
     const QString uniqueHost = QStringLiteral("credential-store-test-%1.invalid").arg(

@@ -55,6 +55,9 @@ test environments, and other deliberately scoped trust configurations.
   engines, and a download manager.
 - Browser-owned prompts for camera, microphone, location, external schemes,
   HTTP Basic authentication, and HTTP proxy authentication.
+- Native password-manager integration for explicitly saved website and proxy
+  credentials, with a Settings page that lists usernames and metadata without
+  revealing passwords and supports confirmed deletion.
 - Browser-wide System/Direct/HTTP/SOCKS5 proxy modes and configurable
   DNS-over-HTTPS providers.
 - An opt-in experimental firewall for third-party page connections, with
@@ -344,7 +347,8 @@ boundary.
   session-only unless the user explicitly asks PanBrowser to save them. Saved
   credentials use the macOS login Keychain, Windows Credential Manager, or the
   desktop Secret Service on Linux and are never written to PanBrowser settings
-  or diagnostics.
+  or diagnostics. **Settings → Credentials** lists their non-secret metadata
+  and lets the user remove individual or all PanBrowser-managed entries.
 - Permission and external-application prompts require a direct action in the
   active tab. Background and cross-origin authentication prompts are rejected.
 - Invalid trust or proxy configuration fails closed. Invalid DNS configuration

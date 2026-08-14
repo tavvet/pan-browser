@@ -29,7 +29,7 @@ public:
 
 private:
     ProxySettings m_activeSettings;
-    std::unique_ptr<CredentialStore> m_ownedCredentialStore;
+    std::shared_ptr<CredentialStore> m_ownedCredentialStore;
     CredentialStore *m_credentialStore = nullptr;
     QSet<QString> m_promptedHosts;
     QSet<QString> m_persistedCredentialAttempts;

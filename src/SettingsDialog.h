@@ -14,6 +14,8 @@ class QIcon;
 class QListWidget;
 class QStackedWidget;
 class BrowserProfile;
+class CredentialStore;
+class CredentialsSettingsPage;
 class DiagnosticsPage;
 class CrossDomainSettingsPage;
 class DnsSettingsPage;
@@ -48,6 +50,7 @@ struct SettingsDialogContext {
     HistoryStore *historyStore = nullptr;
     WebAppStore *webAppStore = nullptr;
     VotUserscriptManager *votUserscriptManager = nullptr;
+    CredentialStore *credentialStore = nullptr;
 };
 
 class SettingsDialog final : public QDialog {
@@ -61,6 +64,7 @@ public:
         WebApps,
         VideoTranslation,
         PrivacyData,
+        Credentials,
         Dns,
         Proxy,
         SiteConnections,
@@ -94,7 +98,8 @@ private:
         const QUrl &currentUrl,
         Page initialPage,
         HistoryStore *historyStore,
-        WebAppStore *webAppStore
+        WebAppStore *webAppStore,
+        CredentialStore *credentialStore
     );
     void registerPage(Page page, const QIcon &icon, const QString &title, QWidget *widget);
     void selectPage(Page page);
@@ -122,6 +127,7 @@ private:
     QHash<int, QWidget *> m_pageWidgets;
     GeneralSettingsPage *m_generalPage = nullptr;
     PrivacyDataSettingsPage *m_privacyDataPage = nullptr;
+    CredentialsSettingsPage *m_credentialsPage = nullptr;
     SearchSettingsPage *m_searchPage = nullptr;
     DnsSettingsPage *m_dnsPage = nullptr;
     ProxySettingsPage *m_proxyPage = nullptr;

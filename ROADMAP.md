@@ -30,11 +30,11 @@ may be unstable.
 - [x] Add opt-in integration with the exact hash-verified VOT 1.11.8
   userscript, isolated native storage, bounded HTTPS networking, iframe-aware
   response routing, proxy authentication, and Site Connections enforcement.
-- [ ] Add opt-in persistent realm-based HTTP Basic/Digest and manual HTTP-proxy
+- [x] Add opt-in persistent realm-based HTTP Basic/Digest and manual HTTP-proxy
   credentials through native operating-system password managers. The macOS
   Keychain, Windows Credential Manager, and Linux Secret Service backends,
-  shared controller integration, and metadata-listing API are complete; the
-  management UI remains pending.
+  shared controller integration, metadata-listing API, and management UI are
+  complete.
 
 ### Portable app and trust workflows
 

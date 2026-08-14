@@ -2,6 +2,7 @@
 
 #include "BrowserProfile.h"
 #include "CrossDomainSettingsPage.h"
+#include "CredentialsSettingsPage.h"
 #include "DiagnosticsPage.h"
 #include "DnsSettingsPage.h"
 #include "GeneralSettingsPage.h"
@@ -90,7 +91,13 @@ SettingsDialog::SettingsDialog(
     , m_profile(context.profile)
     , m_votUserscriptManager(context.votUserscriptManager)
 {
-    createInterface(currentUrl, initialPage, context.historyStore, context.webAppStore);
+    createInterface(
+        currentUrl,
+        initialPage,
+        context.historyStore,
+        context.webAppStore,
+        context.credentialStore
+    );
 }
 
 bool SettingsDialog::load(QString *error)
@@ -147,7 +154,8 @@ void SettingsDialog::createInterface(
     const QUrl &currentUrl,
     Page initialPage,
     HistoryStore *historyStore,
-    WebAppStore *webAppStore
+    WebAppStore *webAppStore,
+    CredentialStore *credentialStore
 )
 {
     setObjectName(QStringLiteral("settingsDialog"));
@@ -241,6 +249,17 @@ void SettingsDialog::createInterface(
         QIcon(QStringLiteral(":/assets/icons/database.svg")),
         tr("Privacy & Data"),
         m_privacyDataPage
+    );
+
+    m_credentialsPage = new CredentialsSettingsPage(
+        credentialStore,
+        m_pages
+    );
+    registerPage(
+        Page::Credentials,
+        QIcon(QStringLiteral(":/assets/icons/key-round.svg")),
+        tr("Credentials"),
+        m_credentialsPage
     );
 
     m_dnsPage = new DnsSettingsPage(m_dnsSettings, m_pages);

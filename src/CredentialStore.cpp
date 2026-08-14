@@ -4,6 +4,9 @@
 #include <QDataStream>
 #include <QIODevice>
 #include <QUrl>
+#include <QtConcurrentRun>
+
+#include <utility>
 
 namespace {
 
@@ -107,4 +110,44 @@ std::optional<CredentialTarget> CredentialTarget::forHttpProxy(
     if (!target.isValid())
         return std::nullopt;
     return target;
+}
+
+QFuture<CredentialStoreListResult> CredentialStore::listAsync()
+{
+    const std::shared_ptr<CredentialStore> store = shared_from_this();
+    return QtConcurrent::run([store] {
+        CredentialStoreListResult result;
+        result.summaries = store->list(&result.error);
+        return result;
+    });
+}
+
+QFuture<CredentialStoreRemovalResult> CredentialStore::removeAsync(
+    const QList<CredentialTarget> &targets
+)
+{
+    const std::shared_ptr<CredentialStore> store = shared_from_this();
+    return QtConcurrent::run([store, targets] {
+        CredentialStoreRemovalResult result;
+        for (const CredentialTarget &target : targets) {
+            CredentialStoreError error;
+            if (!store->remove(target, &error)) {
+                result.failures.append(CredentialRemovalFailure{
+                    target,
+                    std::move(error),
+                });
+            }
+        }
+        return result;
+    });
+}
+
+QFuture<CredentialStoreOperationResult> CredentialStore::removeAllAsync()
+{
+    const std::shared_ptr<CredentialStore> store = shared_from_this();
+    return QtConcurrent::run([store] {
+        CredentialStoreOperationResult result;
+        result.succeeded = store->removeAll(&result.error);
+        return result;
+    });
 }

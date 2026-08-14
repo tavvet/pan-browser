@@ -31,6 +31,7 @@ if(APPLE)
 endif()
 
 find_package(Qt6 6.11 REQUIRED COMPONENTS
+    Concurrent
     Core
     Network
     Sql
@@ -80,6 +81,8 @@ set(PANBROWSER_APP_SOURCES
     src/PageZoom.h
     src/CredentialPromptDialog.cpp
     src/CredentialPromptDialog.h
+    src/CredentialsSettingsPage.cpp
+    src/CredentialsSettingsPage.h
     src/CredentialStore.cpp
     src/CredentialStore.h
     src/CredentialStorePayload.cpp
@@ -253,6 +256,7 @@ set_target_properties(PanBrowser PROPERTIES
 target_include_directories(PanBrowser PRIVATE src)
 target_compile_definitions(PanBrowser PRIVATE PANBROWSER_VERSION="${PROJECT_VERSION}")
 target_link_libraries(PanBrowser PRIVATE
+    Qt6::Concurrent
     Qt6::Core
     Qt6::Network
     Qt6::Sql
@@ -397,6 +401,8 @@ qt_add_executable(PanBrowserTests
     src/PageZoom.h
     src/CredentialPromptDialog.cpp
     src/CredentialPromptDialog.h
+    src/CredentialsSettingsPage.cpp
+    src/CredentialsSettingsPage.h
     src/CredentialStore.cpp
     src/CredentialStore.h
     src/CredentialStorePayload.cpp
@@ -513,6 +519,7 @@ if(WIN32)
 endif()
 target_include_directories(PanBrowserTests PRIVATE src)
 target_link_libraries(PanBrowserTests PRIVATE
+    Qt6::Concurrent
     Qt6::Core
     Qt6::Network
     Qt6::Sql

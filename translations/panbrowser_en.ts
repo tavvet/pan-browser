@@ -18,6 +18,41 @@
     </message>
 </context>
 <context>
+    <name>CredentialsSettingsPage</name>
+    <message numerus="yes">
+        <location filename="../src/CredentialsSettingsPage.cpp" line="307"/>
+        <source>%n saved credential(s). Some entries could not be read.</source>
+        <translation>
+            <numerusform>%n saved credential. Some entries could not be read.</numerusform>
+            <numerusform>%n saved credentials. Some entries could not be read.</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <location filename="../src/CredentialsSettingsPage.cpp" line="316"/>
+        <source>%n saved credential(s)</source>
+        <translation>
+            <numerusform>%n saved credential</numerusform>
+            <numerusform>%n saved credentials</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <location filename="../src/CredentialsSettingsPage.cpp" line="374"/>
+        <source>Remove %n selected saved credential(s)? The affected websites and proxies may ask you to sign in again.</source>
+        <translation>
+            <numerusform>Remove %n selected saved credential? The affected website or proxy may ask you to sign in again.</numerusform>
+            <numerusform>Remove %n selected saved credentials? The affected websites and proxies may ask you to sign in again.</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <location filename="../src/CredentialsSettingsPage.cpp" line="405"/>
+        <source>Remove all %n saved credential(s) managed by PanBrowser? Websites and proxies may ask you to sign in again.</source>
+        <translation>
+            <numerusform>Remove the %n saved credential managed by PanBrowser? The affected website or proxy may ask you to sign in again.</numerusform>
+            <numerusform>Remove all %n saved credentials managed by PanBrowser? Websites and proxies may ask you to sign in again.</numerusform>
+        </translation>
+    </message>
+</context>
+<context>
     <name>CrossDomainSettingsPage</name>
     <message numerus="yes">
         <location filename="../src/CrossDomainSettingsPage.cpp" line="116"/>

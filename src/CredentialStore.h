@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QDateTime>
+#include <QFuture>
 #include <QList>
 #include <QString>
 
@@ -71,7 +72,26 @@ struct StoredCredentialSummary {
     QDateTime lastModified;
 };
 
-class CredentialStore {
+struct CredentialStoreListResult {
+    QList<StoredCredentialSummary> summaries;
+    CredentialStoreError error;
+};
+
+struct CredentialRemovalFailure {
+    CredentialTarget target;
+    CredentialStoreError error;
+};
+
+struct CredentialStoreRemovalResult {
+    QList<CredentialRemovalFailure> failures;
+};
+
+struct CredentialStoreOperationResult {
+    bool succeeded = false;
+    CredentialStoreError error;
+};
+
+class CredentialStore : public std::enable_shared_from_this<CredentialStore> {
 public:
     virtual ~CredentialStore() = default;
 
@@ -89,9 +109,16 @@ public:
         const CredentialTarget &target,
         CredentialStoreError *error = nullptr
     ) = 0;
+    virtual bool removeAll(CredentialStoreError *error = nullptr) = 0;
     [[nodiscard]] virtual QList<StoredCredentialSummary> list(
         CredentialStoreError *error = nullptr
     ) = 0;
+
+    [[nodiscard]] virtual QFuture<CredentialStoreListResult> listAsync();
+    [[nodiscard]] virtual QFuture<CredentialStoreRemovalResult> removeAsync(
+        const QList<CredentialTarget> &targets
+    );
+    [[nodiscard]] virtual QFuture<CredentialStoreOperationResult> removeAllAsync();
 };
 
-[[nodiscard]] std::unique_ptr<CredentialStore> createSystemCredentialStore();
+[[nodiscard]] std::shared_ptr<CredentialStore> createSystemCredentialStore();

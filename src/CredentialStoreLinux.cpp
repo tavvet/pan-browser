@@ -8,6 +8,7 @@
 #include <QDateTime>
 #include <QEventLoop>
 #include <QPointer>
+#include <QPromise>
 #include <QSet>
 #include <QThread>
 #include <QTimer>
@@ -236,7 +237,8 @@ private:
 template<typename Result, typename Starter>
 NativeCallResult<Result> runNativeCall(
     Starter starter,
-    std::shared_ptr<void> keepAlive = {}
+    std::shared_ptr<void> keepAlive = {},
+    QEventLoop::ProcessEventsFlags processEvents = QEventLoop::ExcludeUserInputEvents
 )
 {
     QCoreApplication *application = QCoreApplication::instance();
@@ -299,7 +301,7 @@ NativeCallResult<Result> runNativeCall(
     });
     if (!state->isFinished()) {
         timeout.start(nativeOperationTimeoutMilliseconds);
-        loop.exec(QEventLoop::ExcludeUserInputEvents);
+        loop.exec(processEvents);
     }
     timeout.stop();
 
@@ -314,14 +316,14 @@ public:
     [[nodiscard]] bool contains(const QString &identifier) const
     {
         const std::lock_guard lock(m_mutex);
-        return m_identifiers.contains(identifier);
+        return m_exclusive || m_identifiers.contains(identifier);
     }
 
     [[nodiscard]] std::shared_ptr<void> acquire(const QString &identifier)
     {
         {
             const std::lock_guard lock(m_mutex);
-            if (m_identifiers.contains(identifier))
+            if (m_exclusive || m_identifiers.contains(identifier))
                 return {};
             m_identifiers.insert(identifier);
         }
@@ -337,9 +339,30 @@ public:
         );
     }
 
+    [[nodiscard]] std::shared_ptr<void> acquireAll()
+    {
+        {
+            const std::lock_guard lock(m_mutex);
+            if (m_exclusive || !m_identifiers.isEmpty())
+                return {};
+            m_exclusive = true;
+        }
+
+        const std::shared_ptr<MutationRegistry> registry = shared_from_this();
+        return std::shared_ptr<void>(
+            new char,
+            [registry](void *token) {
+                delete static_cast<char *>(token);
+                const std::lock_guard lock(registry->m_mutex);
+                registry->m_exclusive = false;
+            }
+        );
+    }
+
 private:
     mutable std::mutex m_mutex;
     QSet<QString> m_identifiers;
+    bool m_exclusive = false;
 };
 
 std::shared_ptr<MutationRegistry> mutationRegistry()
@@ -610,6 +633,7 @@ enum class RemovalResult {
 
 struct RemovalContext {
     QByteArray identifier;
+    bool allTargets = false;
     GCancellable *cancellable = nullptr;
     GMainContext *mainContext = nullptr;
     NativeCompletion<RemovalResult> completion;
@@ -666,18 +690,31 @@ void removalClearFinished(
 
     {
         const ThreadDefaultContextScope contextScope(context->mainContext);
-        secret_password_search(
-            credentialSchema(),
-            SECRET_SEARCH_ALL,
-            context->cancellable,
-            removalVerifyFinished,
-            context,
-            applicationAttribute,
-            applicationAttributeValue,
-            targetAttribute,
-            context->identifier.constData(),
-            nullptr
-        );
+        if (context->allTargets) {
+            secret_password_search(
+                credentialSchema(),
+                SECRET_SEARCH_ALL,
+                context->cancellable,
+                removalVerifyFinished,
+                context,
+                applicationAttribute,
+                applicationAttributeValue,
+                nullptr
+            );
+        } else {
+            secret_password_search(
+                credentialSchema(),
+                SECRET_SEARCH_ALL,
+                context->cancellable,
+                removalVerifyFinished,
+                context,
+                applicationAttribute,
+                applicationAttributeValue,
+                targetAttribute,
+                context->identifier.constData(),
+                nullptr
+            );
+        }
     }
 }
 
@@ -697,15 +734,72 @@ void removalSearchFinished(
 
     {
         const ThreadDefaultContextScope contextScope(context->mainContext);
-        secret_password_clear(
+        if (context->allTargets) {
+            secret_password_clear(
+                credentialSchema(),
+                context->cancellable,
+                removalClearFinished,
+                context,
+                applicationAttribute,
+                applicationAttributeValue,
+                nullptr
+            );
+        } else {
+            secret_password_clear(
+                credentialSchema(),
+                context->cancellable,
+                removalClearFinished,
+                context,
+                applicationAttribute,
+                applicationAttributeValue,
+                targetAttribute,
+                context->identifier.constData(),
+                nullptr
+            );
+        }
+    }
+}
+
+void startRemoval(
+    GCancellable *cancellable,
+    NativeCompletion<RemovalResult> completion,
+    const QByteArray &identifier,
+    bool allTargets
+)
+{
+    auto *context = new RemovalContext{
+        identifier,
+        allTargets,
+        G_CANCELLABLE(g_object_ref(cancellable)),
+        g_main_context_ref_thread_default(),
+        std::move(completion),
+    };
+    if (allTargets) {
+        secret_password_search(
             credentialSchema(),
-            context->cancellable,
-            removalClearFinished,
+            static_cast<SecretSearchFlags>(
+                SECRET_SEARCH_ALL | SECRET_SEARCH_UNLOCK
+            ),
+            cancellable,
+            removalSearchFinished,
+            context,
+            applicationAttribute,
+            applicationAttributeValue,
+            nullptr
+        );
+    } else {
+        secret_password_search(
+            credentialSchema(),
+            static_cast<SecretSearchFlags>(
+                SECRET_SEARCH_ALL | SECRET_SEARCH_UNLOCK
+            ),
+            cancellable,
+            removalSearchFinished,
             context,
             applicationAttribute,
             applicationAttributeValue,
             targetAttribute,
-            context->identifier.constData(),
+            identifier.constData(),
             nullptr
         );
     }
@@ -843,6 +937,29 @@ void listSearchFinished(
     }
     context->current = context->items;
     retrieveNextListItem(context);
+}
+
+template<typename Result, typename Work>
+QFuture<Result> runOnApplicationThread(Work work)
+{
+    auto promise = std::make_shared<QPromise<Result>>();
+    QFuture<Result> future = promise->future();
+    promise->start();
+    QCoreApplication *application = QCoreApplication::instance();
+    if (!application) {
+        promise->addResult(work());
+        promise->finish();
+        return future;
+    }
+    QTimer::singleShot(
+        0,
+        application,
+        [promise, work = std::move(work)]() mutable {
+            promise->addResult(work());
+            promise->finish();
+        }
+    );
+    return future;
 }
 
 struct WriteLifetime {
@@ -1088,6 +1205,90 @@ public:
         CredentialStoreError *error
     ) override
     {
+        return removeImpl(
+            target,
+            error,
+            QEventLoop::ExcludeUserInputEvents
+        );
+    }
+
+    bool removeAll(CredentialStoreError *error) override
+    {
+        return removeAllImpl(error, QEventLoop::ExcludeUserInputEvents);
+    }
+
+    [[nodiscard]] QList<StoredCredentialSummary> list(
+        CredentialStoreError *error
+    ) override
+    {
+        return listImpl(error, QEventLoop::ExcludeUserInputEvents);
+    }
+
+    [[nodiscard]] QFuture<CredentialStoreListResult> listAsync() override
+    {
+        const auto store = std::static_pointer_cast<LinuxCredentialStore>(
+            shared_from_this()
+        );
+        return runOnApplicationThread<CredentialStoreListResult>([store] {
+            CredentialStoreListResult result;
+            result.summaries = store->listImpl(
+                &result.error,
+                QEventLoop::AllEvents
+            );
+            return result;
+        });
+    }
+
+    [[nodiscard]] QFuture<CredentialStoreRemovalResult> removeAsync(
+        const QList<CredentialTarget> &targets
+    ) override
+    {
+        const auto store = std::static_pointer_cast<LinuxCredentialStore>(
+            shared_from_this()
+        );
+        return runOnApplicationThread<CredentialStoreRemovalResult>(
+            [store, targets] {
+                CredentialStoreRemovalResult result;
+                for (const CredentialTarget &target : targets) {
+                    CredentialStoreError error;
+                    if (!store->removeImpl(
+                            target,
+                            &error,
+                            QEventLoop::AllEvents
+                        )) {
+                        result.failures.append(CredentialRemovalFailure{
+                            target,
+                            std::move(error),
+                        });
+                    }
+                }
+                return result;
+            }
+        );
+    }
+
+    [[nodiscard]] QFuture<CredentialStoreOperationResult> removeAllAsync() override
+    {
+        const auto store = std::static_pointer_cast<LinuxCredentialStore>(
+            shared_from_this()
+        );
+        return runOnApplicationThread<CredentialStoreOperationResult>([store] {
+            CredentialStoreOperationResult result;
+            result.succeeded = store->removeAllImpl(
+                &result.error,
+                QEventLoop::AllEvents
+            );
+            return result;
+        });
+    }
+
+private:
+    bool removeImpl(
+        const CredentialTarget &target,
+        CredentialStoreError *error,
+        QEventLoop::ProcessEventsFlags processEvents
+    )
+    {
         clearError(error);
         if (!target.isValid()) {
             setError(
@@ -1117,28 +1318,15 @@ public:
                 GCancellable *cancellable,
                 NativeCompletion<RemovalResult> completion
             ) {
-                auto *context = new RemovalContext{
-                    identifier,
-                    G_CANCELLABLE(g_object_ref(cancellable)),
-                    g_main_context_ref_thread_default(),
-                    std::move(completion),
-                };
-                secret_password_search(
-                    credentialSchema(),
-                    static_cast<SecretSearchFlags>(
-                        SECRET_SEARCH_ALL | SECRET_SEARCH_UNLOCK
-                    ),
+                startRemoval(
                     cancellable,
-                    removalSearchFinished,
-                    context,
-                    applicationAttribute,
-                    applicationAttributeValue,
-                    targetAttribute,
-                    identifier.constData(),
-                    nullptr
+                    std::move(completion),
+                    identifier,
+                    false
                 );
             },
-            mutationLease
+            mutationLease,
+            processEvents
         );
         if (call.timedOut || call.error) {
             m_available.store(false, std::memory_order_release);
@@ -1162,9 +1350,61 @@ public:
         return true;
     }
 
-    [[nodiscard]] QList<StoredCredentialSummary> list(
-        CredentialStoreError *error
-    ) override
+    bool removeAllImpl(
+        CredentialStoreError *error,
+        QEventLoop::ProcessEventsFlags processEvents
+    )
+    {
+        clearError(error);
+        std::shared_ptr<void> mutationLease = mutationRegistry()->acquireAll();
+        if (!mutationLease) {
+            setError(
+                error,
+                CredentialStoreErrorCode::Unavailable,
+                QStringLiteral(
+                    "A previous Secret Service credential update is still pending"
+                )
+            );
+            return false;
+        }
+        NativeCallResult<RemovalResult> call = runNativeCall<RemovalResult>(
+            [](GCancellable *cancellable, NativeCompletion<RemovalResult> completion) {
+                startRemoval(
+                    cancellable,
+                    std::move(completion),
+                    {},
+                    true
+                );
+            },
+            mutationLease,
+            processEvents
+        );
+        if (call.timedOut || call.error) {
+            m_available.store(false, std::memory_order_release);
+            consumeNativeError(
+                error,
+                call.error,
+                QStringLiteral("Could not remove Secret Service credentials"),
+                call.timedOut
+            );
+            return false;
+        }
+        if (call.value == RemovalResult::MatchingItemsRemain) {
+            setError(
+                error,
+                CredentialStoreErrorCode::AccessDenied,
+                QStringLiteral("Secret Service credential items remain locked")
+            );
+            return false;
+        }
+        m_available.store(true, std::memory_order_release);
+        return true;
+    }
+
+    [[nodiscard]] QList<StoredCredentialSummary> listImpl(
+        CredentialStoreError *error,
+        QEventLoop::ProcessEventsFlags processEvents
+    )
     {
         clearError(error);
         NativeCallResult<ListResult> call = runNativeCall<ListResult>(
@@ -1191,7 +1431,9 @@ public:
                     applicationAttributeValue,
                     nullptr
                 );
-            }
+            },
+            {},
+            processEvents
         );
         if (call.timedOut || call.error) {
             m_available.store(false, std::memory_order_release);
@@ -1214,13 +1456,12 @@ public:
         return call.value.summaries;
     }
 
-private:
     mutable std::atomic_bool m_available = false;
 };
 
 } // namespace
 
-std::unique_ptr<CredentialStore> createSystemCredentialStore()
+std::shared_ptr<CredentialStore> createSystemCredentialStore()
 {
-    return std::make_unique<LinuxCredentialStore>();
+    return std::make_shared<LinuxCredentialStore>();
 }

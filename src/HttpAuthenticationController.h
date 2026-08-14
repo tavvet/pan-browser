@@ -38,7 +38,7 @@ public:
     );
 
 private:
-    std::unique_ptr<CredentialStore> m_ownedCredentialStore;
+    std::shared_ptr<CredentialStore> m_ownedCredentialStore;
     CredentialStore *m_credentialStore = nullptr;
     QSet<QString> m_submittedChallenges;
     QSet<QString> m_persistedCredentialAttempts;

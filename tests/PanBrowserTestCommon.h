@@ -15,6 +15,7 @@
 #include "CrossDomainPromptController.h"
 #include "CrossDomainRequestInterceptor.h"
 #include "CrossDomainSettings.h"
+#include "CredentialsSettingsPage.h"
 #include "DomainPatternMatcher.h"
 #include "BrowserDataCleanup.h"
 #include "BrowserInteraction.h"

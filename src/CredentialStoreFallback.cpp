@@ -34,6 +34,12 @@ public:
         return false;
     }
 
+    bool removeAll(CredentialStoreError *error) override
+    {
+        setUnavailable(error);
+        return false;
+    }
+
     [[nodiscard]] QList<StoredCredentialSummary> list(
         CredentialStoreError *error
     ) override
@@ -56,7 +62,7 @@ private:
 
 } // namespace
 
-std::unique_ptr<CredentialStore> createSystemCredentialStore()
+std::shared_ptr<CredentialStore> createSystemCredentialStore()
 {
-    return std::make_unique<UnavailableCredentialStore>();
+    return std::make_shared<UnavailableCredentialStore>();
 }
