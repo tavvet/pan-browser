@@ -31,7 +31,6 @@ if(APPLE)
 endif()
 
 find_package(Qt6 6.11 REQUIRED COMPONENTS
-    Concurrent
     Core
     Network
     Sql
@@ -323,7 +322,6 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     target_link_libraries(PanBrowser PRIVATE
         OpenSSL::Crypto
         PkgConfig::Libsecret
-        Qt6::Concurrent
     )
     set_target_properties(PanBrowser PROPERTIES
         INSTALL_RPATH "$ORIGIN/../${CMAKE_INSTALL_LIBDIR}"
@@ -544,7 +542,6 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     )
     target_link_libraries(PanBrowserTests PRIVATE
         PkgConfig::Libsecret
-        Qt6::Concurrent
     )
 else()
     target_sources(PanBrowserTests PRIVATE

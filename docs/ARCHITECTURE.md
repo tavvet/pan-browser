@@ -807,18 +807,22 @@ reported as unavailable and preserves session-only behavior.
 
 The checkbox is off by default. A stored credential must be available before
 the authentication signal handler returns because Qt requires its
-`QAuthenticator` to be completed synchronously. The Linux adapter therefore
-runs each blocking libsecret call in a Qt worker and waits with a nested event
-loop that continues processing non-input GUI events. A `GCancellable` requests
-termination at a hard 30-second deadline; PanBrowser then reports the backend as
-unavailable without waiting for the worker to finish. The worker, cancellable,
-native result, and any secret passed to storage retain shared ownership until a
-late completion can be cleaned up safely. Successful availability probes are
-cached, while backend failures invalidate the cache. The operation may invoke a
-desktop prompt to unlock the default collection. If the same challenge returns,
-the rejected stored value is deleted and suppressed for the rest of the process;
-the replacement-save checkbox is selected in the normal dialog. This prevents an
-automatic retry loop and avoids retrying a known-bad value after the next launch.
+`QAuthenticator` to be completed synchronously. The Linux adapter uses
+libsecret's asynchronous API on a private GLib main context, pumped by a short
+Qt timer, and waits with a nested event loop that continues processing non-input
+GUI events. A `GCancellable` requests termination at a hard 30-second deadline;
+PanBrowser then reports the backend as unavailable without leaving a blocking
+task in Qt's global thread pool. Native results and secrets retain shared
+ownership until a late callback can clean them up safely. Website and proxy
+credential mutations also hold a process-wide lease for their opaque target
+identifier until the callback arrives. A timed-out write or removal therefore
+cannot be overtaken by another mutation of the same credential.
+Successful availability probes are cached, while backend failures invalidate
+the cache. The operation may invoke a desktop prompt to unlock the default
+collection. If the same challenge returns, the rejected stored value is deleted
+and suppressed for the rest of the process; the replacement-save checkbox is
+selected in the normal dialog. This prevents an automatic retry loop and avoids
+retrying a known-bad value after the next launch.
 
 Passwords are never written to settings, session files, diagnostics, history,
 or logs. Chromium may cache accepted HTTP authentication credentials for the
