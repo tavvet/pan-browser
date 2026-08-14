@@ -85,7 +85,9 @@ review rather than an ordinary bundle-pruning change.
 
 The Windows workflow is manual during the stabilization period. It uses a
 Windows runner, an MSVC Qt build, and the same `scripts/build-windows.ps1`
-entry point documented for local packaging. `scripts/install-qt-windows.ps1`
+entry point documented for local packaging. It also enables the opt-in native
+credential-store round trip so the Windows Credential Manager backend is
+compiled and exercised before packaging. `scripts/install-qt-windows.ps1`
 downloads the pinned Qt 6.11.1 binary archives over HTTPS from Qt's official
 repository and verifies every archive against the Qt-published SHA-1 captured
 in the repository-owned package manifest before extraction. The extracted

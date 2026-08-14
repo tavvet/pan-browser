@@ -13,6 +13,7 @@ concurrency:
 env:
   QT_VERSION: 6.11.1
   QT_ROOT: ${{ github.workspace }}\build-tools\Qt\6.11.1\msvc2022_64
+  PANBROWSER_RUN_CREDENTIAL_STORE_TESTS: "1"
 
 jobs:
   package:

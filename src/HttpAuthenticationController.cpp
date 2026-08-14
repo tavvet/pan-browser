@@ -171,19 +171,19 @@ void HttpAuthenticationController::requestAuthentication(
         if (m_persistedCredentialAttempts.remove(key)) {
             rememberChallenge(m_suppressedStoredChallenges, key);
             savedCredentialRejected = true;
-            QString removeError;
+            CredentialStoreError removeError;
             savedCredentialRemoved = m_credentialStore->remove(
                 *credentialTarget,
                 &removeError
             );
-            if (!savedCredentialRemoved && !removeError.isEmpty()) {
+            if (!savedCredentialRemoved && removeError.shouldReport()) {
                 qWarning().noquote()
                     << "[PanBrowser credentials] Could not remove a rejected website credential:"
-                    << removeError;
+                    << removeError.message;
             }
         } else if (!m_suppressedStoredChallenges.contains(key)
                    && !m_submittedChallenges.contains(key)) {
-            QString readError;
+            CredentialStoreError readError;
             const auto stored = m_credentialStore->read(*credentialTarget, &readError);
             if (stored) {
                 authenticator->setUser(stored->username);
@@ -191,10 +191,10 @@ void HttpAuthenticationController::requestAuthentication(
                 rememberChallenge(m_persistedCredentialAttempts, key);
                 return;
             }
-            if (!readError.isEmpty()) {
+            if (readError.shouldReport()) {
                 qWarning().noquote()
                     << "[PanBrowser credentials] Could not read a saved website credential:"
-                    << readError;
+                    << readError.message;
             }
         }
     }
@@ -248,7 +248,7 @@ void HttpAuthenticationController::requestAuthentication(
     authenticator->setUser(dialog.username());
     authenticator->setPassword(dialog.password());
     if (dialog.rememberCredential() && credentialTarget && m_credentialStore) {
-        QString writeError;
+        CredentialStoreError writeError;
         if (!m_credentialStore->write(
                 *credentialTarget,
                 StoredCredential{dialog.username(), dialog.password()},
@@ -267,7 +267,7 @@ void HttpAuthenticationController::requestAuthentication(
             );
             qWarning().noquote()
                 << "[PanBrowser credentials] Could not save a website credential:"
-                << writeError;
+                << writeError.message;
         } else {
             m_suppressedStoredChallenges.remove(key);
             rememberChallenge(m_persistedCredentialAttempts, key);

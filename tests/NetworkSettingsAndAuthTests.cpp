@@ -1,4 +1,10 @@
 #include "PanBrowserTestCommon.h"
+#include "CredentialStorePayload.h"
+
+#include <QDataStream>
+#include <QIODevice>
+
+#include <algorithm>
 
 namespace {
 
@@ -16,7 +22,7 @@ public:
 
     [[nodiscard]] std::optional<StoredCredential> read(
         const CredentialTarget &target,
-        QString *error
+        CredentialStoreError *error
     ) override
     {
         if (error)
@@ -24,15 +30,18 @@ public:
         ++readCount;
         lastTarget = target;
         const auto found = credentials.constFind(target.identifier());
-        if (found == credentials.cend())
+        if (found == credentials.cend()) {
+            if (error)
+                error->code = CredentialStoreErrorCode::NotFound;
             return std::nullopt;
+        }
         return *found;
     }
 
     bool write(
         const CredentialTarget &target,
         const StoredCredential &credential,
-        QString *error
+        CredentialStoreError *error
     ) override
     {
         if (error)
@@ -40,17 +49,42 @@ public:
         ++writeCount;
         lastTarget = target;
         credentials.insert(target.identifier(), credential);
+        targets.insert(target.identifier(), target);
         return true;
     }
 
-    bool remove(const CredentialTarget &target, QString *error) override
+    bool remove(
+        const CredentialTarget &target,
+        CredentialStoreError *error
+    ) override
     {
         if (error)
             error->clear();
         ++removeCount;
         lastTarget = target;
         credentials.remove(target.identifier());
+        targets.remove(target.identifier());
         return true;
+    }
+
+    [[nodiscard]] QList<StoredCredentialSummary> list(
+        CredentialStoreError *error
+    ) override
+    {
+        if (error)
+            error->clear();
+        QList<StoredCredentialSummary> summaries;
+        for (auto iterator = targets.cbegin(); iterator != targets.cend(); ++iterator) {
+            const auto credential = credentials.constFind(iterator.key());
+            if (credential == credentials.cend())
+                continue;
+            summaries.append(StoredCredentialSummary{
+                iterator.value(),
+                credential->username,
+                {},
+            });
+        }
+        return summaries;
     }
 
     bool m_available = true;
@@ -59,6 +93,7 @@ public:
     int removeCount = 0;
     CredentialTarget lastTarget;
     QHash<QString, StoredCredential> credentials;
+    QHash<QString, CredentialTarget> targets;
 };
 
 } // namespace
@@ -77,6 +112,7 @@ private slots:
     void proxySettingsCompareOnlyEffectiveConfiguration();
     void proxyFailureBlocksWebEngineNetworkSchemes();
     void credentialTargetsAreOriginScopedAndDeterministic();
+    void credentialPayloadRoundTripsMetadataAndLegacyRecords();
     void httpAuthenticationAcceptsCredentialsAndSanitizesDisplay();
     void httpAuthenticationCancelClearsAuthenticator();
     void httpAuthenticationRetriesAndWarnsForPlainHttp();
@@ -414,6 +450,66 @@ void NetworkSettingsAndAuthTests::credentialTargetsAreOriginScopedAndDeterminist
         QStringLiteral("members")
     ));
     QVERIFY(!first->identifier().contains(QStringLiteral("example")));
+}
+
+void NetworkSettingsAndAuthTests::credentialPayloadRoundTripsMetadataAndLegacyRecords()
+{
+    const auto target = CredentialTarget::forHttpServer(
+        QUrl(QStringLiteral("https://example.com/private")),
+        QStringLiteral("members")
+    );
+    QVERIFY(target);
+    const StoredCredential credential{
+        QStringLiteral("alice"),
+        QStringLiteral("secret"),
+    };
+    QByteArray payload = encodeCredentialPayload(*target, credential);
+    QVERIFY(!payload.isEmpty());
+    const auto decoded = decodeCredentialPayload(payload);
+    QVERIFY(decoded);
+    QVERIFY(decoded->target);
+    QCOMPARE(decoded->target->identifier(), target->identifier());
+    QCOMPARE(decoded->credential.username, credential.username);
+    QCOMPARE(decoded->credential.password, credential.password);
+
+    for (qsizetype size = 0; size < payload.size(); ++size)
+        QVERIFY(!decodeCredentialPayload(payload.first(size)));
+
+    QByteArray impossibleLengthPayload = payload;
+    QVERIFY(impossibleLengthPayload.size() > 12);
+    impossibleLengthPayload.replace(8, 4, QByteArray::fromHex("7fffffff"));
+    QVERIFY(!decodeCredentialPayload(impossibleLengthPayload));
+
+    QByteArray oddStringLengthPayload = payload;
+    oddStringLengthPayload.replace(8, 4, QByteArray::fromHex("00000001"));
+    QVERIFY(!decodeCredentialPayload(oddStringLengthPayload));
+
+    QByteArray oversizedPayload(128 * 1024 + 1, '\0');
+    QVERIFY(!decodeCredentialPayload(oversizedPayload));
+
+    payload.append('x');
+    QVERIFY(!decodeCredentialPayload(payload));
+
+    QByteArray legacyPayload;
+    QDataStream stream(&legacyPayload, QIODevice::WriteOnly);
+    stream.setVersion(QDataStream::Qt_6_0);
+    stream << quint32(0x50424352)
+           << quint16(1)
+           << QStringLiteral("legacy-user")
+           << QStringLiteral("legacy-password");
+    const auto legacy = decodeCredentialPayload(legacyPayload);
+    QVERIFY(legacy);
+    QVERIFY(!legacy->target);
+    QCOMPARE(legacy->credential.username, QStringLiteral("legacy-user"));
+    QCOMPARE(legacy->credential.password, QStringLiteral("legacy-password"));
+
+    CredentialStoreError notFound;
+    notFound.code = CredentialStoreErrorCode::NotFound;
+    QVERIFY(!notFound.shouldReport());
+    notFound.code = CredentialStoreErrorCode::AccessDenied;
+    QVERIFY(notFound.shouldReport());
+    notFound.clear();
+    QCOMPARE(notFound.code, CredentialStoreErrorCode::None);
 }
 
 void NetworkSettingsAndAuthTests::httpAuthenticationAcceptsCredentialsAndSanitizesDisplay()
@@ -904,22 +1000,23 @@ void NetworkSettingsAndAuthTests::manualProxyAuthenticationUsesSavedCredentials(
 
 void NetworkSettingsAndAuthTests::nativeCredentialStoreRoundTripsWhenEnabled()
 {
-#if !defined(Q_OS_MACOS)
-    QSKIP("The first native credential-store integration test is macOS-only");
+#if !defined(Q_OS_MACOS) && !defined(Q_OS_WIN)
+    QSKIP("The native credential-store integration test is macOS/Windows-only");
 #else
-    if (!qEnvironmentVariableIsSet("PANBROWSER_RUN_KEYCHAIN_TESTS")) {
-        QSKIP("Set PANBROWSER_RUN_KEYCHAIN_TESTS=1 to exercise the real macOS Keychain");
+    if (!qEnvironmentVariableIsSet("PANBROWSER_RUN_CREDENTIAL_STORE_TESTS")
+        && !qEnvironmentVariableIsSet("PANBROWSER_RUN_KEYCHAIN_TESTS")) {
+        QSKIP("Set PANBROWSER_RUN_CREDENTIAL_STORE_TESTS=1 to exercise the native credential store");
     }
 
     std::unique_ptr<CredentialStore> store = createSystemCredentialStore();
     QVERIFY(store);
     QVERIFY(store->isAvailable());
-    const QString uniqueHost = QStringLiteral("keychain-test-%1.invalid").arg(
+    const QString uniqueHost = QStringLiteral("credential-store-test-%1.invalid").arg(
         QUuid::createUuid().toString(QUuid::WithoutBraces)
     );
     const auto target = CredentialTarget::forHttpServer(
         QUrl(QStringLiteral("https://%1/").arg(uniqueHost)),
-        QStringLiteral("PanBrowser automated Keychain test")
+        QStringLiteral("PanBrowser automated credential-store test")
     );
     QVERIFY(target);
 
@@ -931,35 +1028,49 @@ void NetworkSettingsAndAuthTests::nativeCredentialStoreRoundTripsWhenEnabled()
         {
             if (!active || !store)
                 return;
-            QString ignoredError;
+            CredentialStoreError ignoredError;
             store->remove(target, &ignoredError);
         }
     } cleanup{store.get(), *target};
 
-    QString error;
+    CredentialStoreError error;
     QVERIFY2(store->write(
         *target,
         StoredCredential{QStringLiteral("test-user"), QStringLiteral("test-password")},
         &error
-    ), qPrintable(error));
+    ), qPrintable(error.message));
     auto loaded = store->read(*target, &error);
-    QVERIFY2(loaded.has_value(), qPrintable(error));
+    QVERIFY2(loaded.has_value(), qPrintable(error.message));
     QCOMPARE(loaded->username, QStringLiteral("test-user"));
     QCOMPARE(loaded->password, QStringLiteral("test-password"));
+
+    const QList<StoredCredentialSummary> initialSummaries = store->list(&error);
+    QVERIFY2(!error.shouldReport(), qPrintable(error.message));
+    const auto initialSummary = std::find_if(
+        initialSummaries.cbegin(),
+        initialSummaries.cend(),
+        [&](const StoredCredentialSummary &summary) {
+            return summary.target.identifier() == target->identifier();
+        }
+    );
+    QVERIFY(initialSummary != initialSummaries.cend());
+    QCOMPARE(initialSummary->username, QStringLiteral("test-user"));
+    QVERIFY(initialSummary->lastModified.isValid());
 
     QVERIFY2(store->write(
         *target,
         StoredCredential{QStringLiteral("updated-user"), QStringLiteral("updated-password")},
         &error
-    ), qPrintable(error));
+    ), qPrintable(error.message));
     loaded = store->read(*target, &error);
-    QVERIFY2(loaded.has_value(), qPrintable(error));
+    QVERIFY2(loaded.has_value(), qPrintable(error.message));
     QCOMPARE(loaded->username, QStringLiteral("updated-user"));
     QCOMPARE(loaded->password, QStringLiteral("updated-password"));
-    QVERIFY2(store->remove(*target, &error), qPrintable(error));
-    cleanup.active = false;
+    QVERIFY2(store->remove(*target, &error), qPrintable(error.message));
     loaded = store->read(*target, &error);
-    QVERIFY2(!loaded.has_value(), qPrintable(error));
+    QVERIFY2(!loaded.has_value(), qPrintable(error.message));
+    QCOMPARE(error.code, CredentialStoreErrorCode::NotFound);
+    cleanup.active = false;
 #endif
 }
 

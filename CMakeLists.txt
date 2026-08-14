@@ -77,6 +77,8 @@ set(PANBROWSER_APP_SOURCES
     src/CredentialPromptDialog.h
     src/CredentialStore.cpp
     src/CredentialStore.h
+    src/CredentialStorePayload.cpp
+    src/CredentialStorePayload.h
     src/CrossDomainPresetCatalog.cpp
     src/CrossDomainPresetCatalog.h
     src/CrossDomainPolicySnapshot.cpp
@@ -215,7 +217,7 @@ if(APPLE)
 elseif(WIN32)
     list(APPEND PANBROWSER_APP_SOURCES
         src/CertificateTrustValidatorWindows.cpp
-        src/CredentialStoreFallback.cpp
+        src/CredentialStoreWindows.cpp
     )
 elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     list(APPEND PANBROWSER_APP_SOURCES
@@ -307,7 +309,7 @@ if(WIN32)
         WINVER=0x0A00
         _WIN32_WINNT=0x0A00
     )
-    target_link_libraries(PanBrowser PRIVATE Crypt32)
+    target_link_libraries(PanBrowser PRIVATE Advapi32 Crypt32)
 endif()
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
@@ -389,6 +391,8 @@ qt_add_executable(PanBrowserTests
     src/CredentialPromptDialog.h
     src/CredentialStore.cpp
     src/CredentialStore.h
+    src/CredentialStorePayload.cpp
+    src/CredentialStorePayload.h
     src/CrossDomainPresetCatalog.cpp
     src/CrossDomainPresetCatalog.h
     src/CrossDomainPolicySnapshot.cpp
@@ -518,6 +522,11 @@ if(APPLE)
     )
     target_link_libraries(PanBrowserTests PRIVATE ${SECURITY_FRAMEWORK})
     add_dependencies(PanBrowserTests PanBrowser)
+elseif(WIN32)
+    target_sources(PanBrowserTests PRIVATE
+        src/CredentialStoreWindows.cpp
+        src/WindowChromePlatform.cpp
+    )
 else()
     target_sources(PanBrowserTests PRIVATE
         src/CredentialStoreFallback.cpp
@@ -534,7 +543,7 @@ if(WIN32)
         WINVER=0x0A00
         _WIN32_WINNT=0x0A00
     )
-    target_link_libraries(PanBrowserTests PRIVATE Crypt32)
+    target_link_libraries(PanBrowserTests PRIVATE Advapi32 Crypt32)
 elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     target_sources(PanBrowserTests PRIVATE src/CertificateTrustValidatorLinux.cpp)
     target_link_libraries(PanBrowserTests PRIVATE OpenSSL::Crypto)

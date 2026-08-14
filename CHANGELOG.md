@@ -31,9 +31,11 @@ tighter page-network controls, and experimental video tooling.
   requests, routes them through proxy and Site Connections policy, and
   requires System DNS.
 - Added opt-in persistence of realm-based HTTPS server and manual HTTP-proxy
-  credentials in the macOS login Keychain. Plain HTTP, System proxy, and
-  unselected prompts remain session-only; rejected saved credentials are
-  removed before PanBrowser falls back to its own prompt.
+  credentials in the macOS login Keychain and Windows Credential Manager.
+  Plain HTTP, System proxy, and unselected prompts remain session-only; rejected
+  saved credentials are removed before PanBrowser falls back to its own prompt.
+- Added a versioned cross-platform credential payload, structured backend error
+  codes, and metadata enumeration for a future saved-credentials settings page.
 
 ## 0.1.0 — 2026-08-10
 

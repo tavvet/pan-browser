@@ -539,10 +539,10 @@ pending, while omitting endpoints and usernames.
 Every page forwards `QWebEnginePage::proxyAuthenticationRequired` to the one
 `ProxyAuthenticationController` owned by the primary window. It asks for
 credentials in a browser-owned modal dialog, pre-fills the configured username,
-and writes the entered values to Qt's request-scoped `QAuthenticator`. On
-macOS, a user may explicitly save credentials for a configured manual HTTP
-proxy in the login Keychain. The opaque Keychain account is derived from the
-normalized proxy host, configured port, and authentication realm; the
+and writes the entered values to Qt's request-scoped `QAuthenticator`. On macOS
+and Windows, a user may explicitly save credentials for a configured manual
+HTTP proxy in the native password manager. The opaque account name is derived
+from the normalized proxy host, configured port, and authentication realm; the
 requesting-site URL is never part of that identity. System proxy endpoints do
 not expose a reliable port through Qt's authentication signal and therefore
 remain session-only. Chromium may cache accepted credentials for the remaining
@@ -780,15 +780,29 @@ origin or manual HTTP-proxy endpoint, and realm to a deterministic opaque
 SHA-256 identifier. It never includes a URL path, query, fragment, or embedded
 user information. Realm-less NTLM/SPNEGO challenges cannot be separated safely
 through Qt's public authentication API and therefore remain session-only. The
-macOS backend stores a versioned username/password payload as a generic password
-in the login Keychain under the `dev.panbrowser.credentials.v1` service. The
-checkbox is off by default. A stored credential is filled synchronously because
-Qt requires the `QAuthenticator` to be completed before the signal handler
-returns. If the same challenge returns, the rejected stored value is deleted and
-suppressed for the rest of the process; the replacement-save checkbox is selected
-in the normal dialog. This prevents an automatic retry loop and avoids retrying a
-known-bad value after the next launch. Windows and Linux currently use an
-unavailable backend and preserve the previous session-only behavior.
+shared payload is versioned and contains the normalized target metadata needed
+for future credential management. Before deserialization, the decoder bounds
+the total payload and validates every serialized string boundary without
+allocating from untrusted length fields. Version 1 macOS payloads remain
+readable and are replaced with the current format on the next explicit save.
+The macOS
+backend stores the payload as a generic password in the login Keychain under the
+`dev.panbrowser.credentials.v1` service. Its list operation first enumerates
+unencrypted item attributes and then reads each matching password separately,
+because Keychain forbids combining password data with an unlimited match query.
+The Windows backend uses a `CRED_TYPE_GENERIC` entry with an opaque prefixed
+target name and `CRED_PERSIST_LOCAL_MACHINE`; its payload is checked against the
+native 2560-byte blob limit and temporary buffers are cleared before release.
+Both backends expose structured not-found, unavailable, denied, invalid,
+too-large, corrupt-data, and platform-error states. Linux currently uses an
+unavailable backend and preserves the previous session-only behavior.
+
+The checkbox is off by default. A stored credential is filled synchronously
+because Qt requires the `QAuthenticator` to be completed before the signal
+handler returns. If the same challenge returns, the rejected stored value is
+deleted and suppressed for the rest of the process; the replacement-save
+checkbox is selected in the normal dialog. This prevents an automatic retry
+loop and avoids retrying a known-bad value after the next launch.
 
 Passwords are never written to settings, session files, diagnostics, history,
 or logs. Chromium may cache accepted HTTP authentication credentials for the
@@ -831,7 +845,7 @@ directory.
 | `session.json` | `SessionStore` | Version 2 stores up to 30 restorable HTTP(S) tabs with title and pin state, atomically written in canonical pinned-first order. Version 1 migrates with all tabs unpinned. URL credentials are removed before persistence and again when legacy data is loaded. |
 | `downloads.json` | `DownloadHistoryStore` | Up to 200 download records; paths and source host, not complete source URLs. |
 | native `QSettings` | `BrowserPreferences`, `PageZoom`, window/download UI | Start page, startup/cookie/history/language/developer-tools choices, per-origin page zoom, window geometry, last download directory, and pending data-reset marker. |
-| macOS login Keychain | `CredentialStore` | Explicitly saved HTTPS server and manual HTTP-proxy usernames/passwords, keyed by an opaque origin/port/realm digest. No PanBrowser JSON file contains the secret. |
+| macOS login Keychain / Windows Credential Manager | `CredentialStore` | Explicitly saved HTTPS server and manual HTTP-proxy usernames/passwords, keyed by an opaque origin/port/realm digest. No PanBrowser JSON file contains the secret. |
 
 Session cookies are discarded by default. Enabling “keep sign-ins” changes the
 profile to `ForcePersistentCookies`; otherwise only cookies explicitly marked
@@ -1040,6 +1054,12 @@ cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug
 cmake --build build --parallel
 ctest --test-dir build --output-on-failure
 ```
+
+Native credential-store round trips are opt-in because they write a temporary
+record to the current user's operating-system password manager. Set
+`PANBROWSER_RUN_CREDENTIAL_STORE_TESTS=1` before running the tests to enable
+them. The Windows bundle workflow enables this automatically; the test removes
+its temporary record even when an assertion fails.
 
 `scripts/build-app.sh` performs a macOS release build in the dedicated
 `build-macos-release/` directory, runs tests, executes `macdeployqt` twice so

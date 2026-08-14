@@ -1,5 +1,7 @@
 #pragma once
 
+#include <QDateTime>
+#include <QList>
 #include <QString>
 
 #include <memory>
@@ -44,6 +46,31 @@ struct StoredCredential {
     QString password;
 };
 
+enum class CredentialStoreErrorCode {
+    None,
+    NotFound,
+    Unavailable,
+    AccessDenied,
+    InvalidTarget,
+    TooLarge,
+    CorruptData,
+    PlatformError,
+};
+
+struct CredentialStoreError {
+    CredentialStoreErrorCode code = CredentialStoreErrorCode::None;
+    QString message;
+
+    void clear();
+    [[nodiscard]] bool shouldReport() const;
+};
+
+struct StoredCredentialSummary {
+    CredentialTarget target;
+    QString username;
+    QDateTime lastModified;
+};
+
 class CredentialStore {
 public:
     virtual ~CredentialStore() = default;
@@ -51,16 +78,19 @@ public:
     [[nodiscard]] virtual bool isAvailable() const = 0;
     [[nodiscard]] virtual std::optional<StoredCredential> read(
         const CredentialTarget &target,
-        QString *error = nullptr
+        CredentialStoreError *error = nullptr
     ) = 0;
     virtual bool write(
         const CredentialTarget &target,
         const StoredCredential &credential,
-        QString *error = nullptr
+        CredentialStoreError *error = nullptr
     ) = 0;
     virtual bool remove(
         const CredentialTarget &target,
-        QString *error = nullptr
+        CredentialStoreError *error = nullptr
+    ) = 0;
+    [[nodiscard]] virtual QList<StoredCredentialSummary> list(
+        CredentialStoreError *error = nullptr
     ) = 0;
 };
 

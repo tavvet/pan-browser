@@ -106,19 +106,19 @@ void ProxyAuthenticationController::requestAuthentication(
         if (m_persistedCredentialAttempts.remove(challengeIdentifier)) {
             rememberChallenge(m_suppressedStoredChallenges, challengeIdentifier);
             savedCredentialRejected = true;
-            QString removeError;
+            CredentialStoreError removeError;
             savedCredentialRemoved = m_credentialStore->remove(
                 *credentialTarget,
                 &removeError
             );
-            if (!savedCredentialRemoved && !removeError.isEmpty()) {
+            if (!savedCredentialRemoved && removeError.shouldReport()) {
                 qWarning().noquote()
                     << "[PanBrowser credentials] Could not remove a rejected proxy credential:"
-                    << removeError;
+                    << removeError.message;
             }
         } else if (!m_suppressedStoredChallenges.contains(challengeIdentifier)
                    && !m_promptedHosts.contains(challengeIdentifier)) {
-            QString readError;
+            CredentialStoreError readError;
             const auto stored = m_credentialStore->read(*credentialTarget, &readError);
             if (stored) {
                 authenticator->setUser(stored->username);
@@ -126,10 +126,10 @@ void ProxyAuthenticationController::requestAuthentication(
                 rememberChallenge(m_persistedCredentialAttempts, challengeIdentifier);
                 return;
             }
-            if (!readError.isEmpty()) {
+            if (readError.shouldReport()) {
                 qWarning().noquote()
                     << "[PanBrowser credentials] Could not read a saved proxy credential:"
-                    << readError;
+                    << readError.message;
             }
         }
     }
@@ -181,7 +181,7 @@ void ProxyAuthenticationController::requestAuthentication(
     authenticator->setUser(dialog.username());
     authenticator->setPassword(dialog.password());
     if (dialog.rememberCredential() && credentialTarget && m_credentialStore) {
-        QString writeError;
+        CredentialStoreError writeError;
         if (!m_credentialStore->write(
                 *credentialTarget,
                 StoredCredential{dialog.username(), dialog.password()},
@@ -200,7 +200,7 @@ void ProxyAuthenticationController::requestAuthentication(
             );
             qWarning().noquote()
                 << "[PanBrowser credentials] Could not save a proxy credential:"
-                << writeError;
+                << writeError.message;
         } else {
             m_suppressedStoredChallenges.remove(challengeIdentifier);
             rememberChallenge(

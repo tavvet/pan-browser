@@ -32,8 +32,9 @@ may be unstable.
   response routing, proxy authentication, and Site Connections enforcement.
 - [ ] Add opt-in persistent realm-based HTTP Basic/Digest and manual HTTP-proxy
   credentials through native operating-system password managers. The macOS
-  Keychain backend and shared controller integration are complete; Windows
-  Credential Manager, Linux Secret Service, and management UI remain pending.
+  Keychain and Windows Credential Manager backends, shared controller
+  integration, and metadata-listing API are complete; Linux Secret Service and
+  the management UI remain pending.
 
 ### Portable app and trust workflows
 

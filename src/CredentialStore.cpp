@@ -33,6 +33,18 @@ bool realmCanBeStored(const QString &realm)
 
 } // namespace
 
+void CredentialStoreError::clear()
+{
+    code = CredentialStoreErrorCode::None;
+    message.clear();
+}
+
+bool CredentialStoreError::shouldReport() const
+{
+    return code != CredentialStoreErrorCode::None
+        && code != CredentialStoreErrorCode::NotFound;
+}
+
 bool CredentialTarget::isValid() const
 {
     if (host.isEmpty() || port < 1 || port > 65535 || !realmCanBeStored(realm))
