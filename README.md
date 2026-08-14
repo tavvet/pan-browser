@@ -119,7 +119,10 @@ platforms use an explicit fail-closed validator boundary.
 ## Build from source
 
 The platform scripts configure a release build, run the automated tests, and
-create a self-contained package under `dist/`.
+create a package under `dist/`. The macOS and Windows packages deploy their
+application runtimes. The Linux archive deploys Qt and Chromium but intentionally
+uses compatible system copies of glibc, OpenSSL, libsecret, and standard desktop
+libraries.
 
 ### macOS
 
@@ -172,8 +175,10 @@ same build and uploads temporary CI artifacts without publishing a release.
 
 ### Linux
 
-Install Qt WebEngine 6.11 development files, OpenSSL development files, CMake,
-Ninja, and a C++20 compiler, then run:
+Install Qt WebEngine 6.11 development files, OpenSSL development files,
+libsecret 0.19 or newer development files, `pkg-config`, CMake, Ninja, and a
+C++20 compiler, then run. On Debian and Ubuntu, the non-Qt packages include
+`libssl-dev`, `libsecret-1-dev`, and `pkg-config`:
 
 ```sh
 ./scripts/build-linux.sh
@@ -187,7 +192,22 @@ QT_ROOT=/path/to/Qt/6.11.1/gcc_64 ./scripts/build-linux.sh
 
 The output is `dist/PanBrowser-linux-<architecture>.tar.gz`. Linux packages
 should be built on the oldest distribution they intend to support because
-glibc remains a host compatibility boundary.
+glibc remains a host compatibility boundary. The target system must provide a
+compatible OpenSSL runtime and libsecret (`libsecret-1-0` on Debian and Ubuntu),
+plus the ordinary desktop libraries reported by `ldd`. The build script rejects
+an archive when any of those dependencies is unresolved on the build host; a
+release candidate still needs a clean-machine smoke test on every supported
+distribution.
+
+To exercise the real Secret Service backend, run the build from an interactive
+desktop session with an available keyring:
+
+```sh
+PANBROWSER_RUN_CREDENTIAL_STORE_TESTS=1 ./scripts/build-linux.sh
+```
+
+The opt-in test stores, updates, lists, and removes one uniquely named temporary
+credential and may ask the desktop to unlock the default collection.
 
 ### Development build and tests
 
@@ -322,9 +342,9 @@ boundary.
   settings are local. PanBrowser does not request online search suggestions.
 - Realm-based HTTP Basic/Digest and manual HTTP-proxy passwords remain
   session-only unless the user explicitly asks PanBrowser to save them. Saved
-  credentials use the macOS login Keychain or Windows Credential Manager and
-  are never written to PanBrowser settings or diagnostics. The Linux Secret
-  Service backend is still pending.
+  credentials use the macOS login Keychain, Windows Credential Manager, or the
+  desktop Secret Service on Linux and are never written to PanBrowser settings
+  or diagnostics.
 - Permission and external-application prompts require a direct action in the
   active tab. Background and cross-origin authentication prompts are rejected.
 - Invalid trust or proxy configuration fails closed. Invalid DNS configuration

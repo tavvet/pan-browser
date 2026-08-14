@@ -204,6 +204,21 @@ the exact linked or bundled OpenSSL version.
 
 Official reference: [OpenSSL licensing](https://openssl-library.org/source/license/index.html).
 
+### libsecret
+
+Linux builds dynamically link to libsecret to access implementations of the
+freedesktop.org Secret Service API. The library is not vendored in this source
+repository. libsecret is distributed under the GNU Lesser General Public
+License, version 2.1 or (at the recipient's option) any later version. Binary
+distributors must satisfy the terms for the exact library they distribute. The
+current PanBrowser Linux tar archive treats libsecret as a documented system
+runtime dependency and does not copy it into the archive.
+
+Official references:
+
+- [libsecret API and project documentation](https://gnome.pages.gitlab.gnome.org/libsecret/)
+- [libsecret source and license](https://gitlab.gnome.org/GNOME/libsecret)
+
 ### Operating-system APIs
 
 PanBrowser uses Security.framework and Core Foundation on macOS and CryptoAPI

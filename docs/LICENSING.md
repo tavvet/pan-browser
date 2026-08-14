@@ -95,6 +95,16 @@ included in a package, include its exact license and notice files. If the
 package relies on a system copy, document that runtime dependency. OpenSSL 3.x
 and 1.1.1 use different licenses.
 
+### libsecret
+
+Linux builds dynamically link to libsecret 0.19 or newer and use the desktop
+Secret Service rather than bundling a password-store implementation. libsecret
+is licensed under LGPL-2.1-or-later. The current Linux tar archive relies on the
+target operating system's copy and documents that runtime requirement rather
+than bundling libsecret. Record the resolved version in build provenance. If a
+future package copies the library, include its matching license material and
+corresponding-source offer obligations in the final package audit.
+
 ### Optional VOT userscript
 
 PanBrowser implements a compatibility and security bridge for the independently
@@ -142,7 +152,7 @@ to another person, and a downloadable CI artifact. The absence of a formal
 - [ ] Retain the matching Qt and Chromium source archives and their checksums
   for the required offer period.
 - [ ] Archive the final package inventory, Qt SBOMs, compiler/toolchain version,
-  Qt version, OpenSSL version on Linux, and bundle audit report.
+  Qt version, OpenSSL and libsecret versions on Linux, and bundle audit report.
 - [ ] Inspect the final package rather than assuming that deployment collected
   the same modules on macOS, Windows, and Linux.
 - [ ] Confirm that pruning locales or plugins did not remove license material.

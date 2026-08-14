@@ -31,6 +31,7 @@ if(APPLE)
 endif()
 
 find_package(Qt6 6.11 REQUIRED COMPONENTS
+    Concurrent
     Core
     Network
     Sql
@@ -41,6 +42,11 @@ find_package(Qt6 6.11 REQUIRED COMPONENTS
 )
 find_package(Qt6WebEngineCore 6.11 REQUIRED)
 find_package(Qt6WebEngineWidgets 6.11 REQUIRED)
+
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(Libsecret REQUIRED IMPORTED_TARGET "libsecret-1>=0.19")
+endif()
 
 set(PANBROWSER_APP_SOURCES
     src/ApplicationLaunch.cpp
@@ -222,7 +228,7 @@ elseif(WIN32)
 elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     list(APPEND PANBROWSER_APP_SOURCES
         src/CertificateTrustValidatorLinux.cpp
-        src/CredentialStoreFallback.cpp
+        src/CredentialStoreLinux.cpp
     )
 else()
     list(APPEND PANBROWSER_APP_SOURCES
@@ -314,7 +320,11 @@ endif()
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     find_package(OpenSSL 1.1.1 REQUIRED COMPONENTS Crypto)
-    target_link_libraries(PanBrowser PRIVATE OpenSSL::Crypto)
+    target_link_libraries(PanBrowser PRIVATE
+        OpenSSL::Crypto
+        PkgConfig::Libsecret
+        Qt6::Concurrent
+    )
     set_target_properties(PanBrowser PROPERTIES
         INSTALL_RPATH "$ORIGIN/../${CMAKE_INSTALL_LIBDIR}"
     )
@@ -526,6 +536,15 @@ elseif(WIN32)
     target_sources(PanBrowserTests PRIVATE
         src/CredentialStoreWindows.cpp
         src/WindowChromePlatform.cpp
+    )
+elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    target_sources(PanBrowserTests PRIVATE
+        src/CredentialStoreLinux.cpp
+        src/WindowChromePlatform.cpp
+    )
+    target_link_libraries(PanBrowserTests PRIVATE
+        PkgConfig::Libsecret
+        Qt6::Concurrent
     )
 else()
     target_sources(PanBrowserTests PRIVATE

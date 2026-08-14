@@ -3,7 +3,10 @@
 PanBrowser packages Qt WebEngine rather than relying on a browser runtime
 installed on the target system. Chromium and its Qt dependencies therefore
 dominate both installed and archive size. Optimizations must preserve a
-self-contained browser and must not silently remove runtime fallbacks.
+self-contained browser runtime and must not silently remove runtime fallbacks.
+Platform packages may still use explicitly documented operating-system
+libraries. In particular, the Linux tar archive relies on compatible system
+copies of glibc, OpenSSL, libsecret, and the standard desktop stack.
 
 ## Audit workflow
 

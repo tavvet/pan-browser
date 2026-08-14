@@ -10,12 +10,17 @@ package_name="PanBrowser-linux-$architecture"
 package_dir="$dist_dir/$package_name"
 archive="$dist_dir/$package_name.tar.gz"
 
-for command_name in cmake ctest ldd ninja; do
+for command_name in cmake ctest ldd ninja pkg-config; do
     if ! command -v "$command_name" >/dev/null 2>&1; then
         echo "Required command not found: $command_name" >&2
         exit 1
     fi
 done
+
+if ! pkg-config --atleast-version=0.19 libsecret-1; then
+    echo "libsecret 0.19 or newer development files are required (pkg-config: libsecret-1)" >&2
+    exit 1
+fi
 
 cmake_arguments=(
     -S "$project_dir"
@@ -61,6 +66,10 @@ dependency_report="$(ldd "$executable")"
 if [[ "$dependency_report" == *"not found"* ]]; then
     echo "Deployment has unresolved runtime dependencies:" >&2
     echo "$dependency_report" >&2
+    exit 1
+fi
+if ! grep -Eq 'libsecret-1\.so' <<<"$dependency_report"; then
+    echo "Deployment does not report the required libsecret runtime dependency" >&2
     exit 1
 fi
 

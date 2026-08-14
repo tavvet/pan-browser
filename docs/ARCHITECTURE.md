@@ -793,16 +793,29 @@ because Keychain forbids combining password data with an unlimited match query.
 The Windows backend uses a `CRED_TYPE_GENERIC` entry with an opaque prefixed
 target name and `CRED_PERSIST_LOCAL_MACHINE`; its payload is checked against the
 native 2560-byte blob limit and temporary buffers are cleared before release.
-Both backends expose structured not-found, unavailable, denied, invalid,
-too-large, corrupt-data, and platform-error states. Linux currently uses an
-unavailable backend and preserves the previous session-only behavior.
+All three backends expose structured not-found, unavailable, denied, invalid,
+too-large, corrupt-data, and platform-error states. The Linux backend uses
+libsecret 0.19+ and its selected password-storage backend, normally the desktop
+Secret Service default collection. Its unencrypted lookup attributes contain
+only a fixed PanBrowser marker and the opaque target digest; normalized target
+metadata and credentials remain in the versioned binary secret. Availability,
+lookup, storage, listing, and removal stay on libsecret's backend-neutral simple
+API. Removal first requests that matching items be unlocked, clears them by
+attributes, and verifies that none remain, so an explicitly rejected stored
+credential is not silently retained. Backend or session D-Bus absence is
+reported as unavailable and preserves session-only behavior.
 
-The checkbox is off by default. A stored credential is filled synchronously
-because Qt requires the `QAuthenticator` to be completed before the signal
-handler returns. If the same challenge returns, the rejected stored value is
-deleted and suppressed for the rest of the process; the replacement-save
-checkbox is selected in the normal dialog. This prevents an automatic retry
-loop and avoids retrying a known-bad value after the next launch.
+The checkbox is off by default. A stored credential must be available before
+the authentication signal handler returns because Qt requires its
+`QAuthenticator` to be completed synchronously. The Linux adapter therefore
+runs each blocking libsecret call in a Qt worker and waits with a nested event
+loop that continues processing non-input GUI events. A `GCancellable` requests
+termination after 30 seconds; successful availability probes are cached, while
+backend failures invalidate the cache. The operation may invoke a desktop prompt
+to unlock the default collection. If the same challenge returns, the rejected
+stored value is deleted and suppressed for the rest of the process; the
+replacement-save checkbox is selected in the normal dialog. This prevents an
+automatic retry loop and avoids retrying a known-bad value after the next launch.
 
 Passwords are never written to settings, session files, diagnostics, history,
 or logs. Chromium may cache accepted HTTP authentication credentials for the
@@ -845,7 +858,7 @@ directory.
 | `session.json` | `SessionStore` | Version 2 stores up to 30 restorable HTTP(S) tabs with title and pin state, atomically written in canonical pinned-first order. Version 1 migrates with all tabs unpinned. URL credentials are removed before persistence and again when legacy data is loaded. |
 | `downloads.json` | `DownloadHistoryStore` | Up to 200 download records; paths and source host, not complete source URLs. |
 | native `QSettings` | `BrowserPreferences`, `PageZoom`, window/download UI | Start page, startup/cookie/history/language/developer-tools choices, per-origin page zoom, window geometry, last download directory, and pending data-reset marker. |
-| macOS login Keychain / Windows Credential Manager | `CredentialStore` | Explicitly saved HTTPS server and manual HTTP-proxy usernames/passwords, keyed by an opaque origin/port/realm digest. No PanBrowser JSON file contains the secret. |
+| macOS login Keychain / Windows Credential Manager / Linux Secret Service | `CredentialStore` | Explicitly saved HTTPS server and manual HTTP-proxy usernames/passwords, keyed by an opaque origin/port/realm digest. No PanBrowser JSON file contains the secret. |
 
 Session cookies are discarded by default. Enabling “keep sign-ins” changes the
 profile to `ForcePersistentCookies`; otherwise only cookies explicitly marked

@@ -1000,8 +1000,8 @@ void NetworkSettingsAndAuthTests::manualProxyAuthenticationUsesSavedCredentials(
 
 void NetworkSettingsAndAuthTests::nativeCredentialStoreRoundTripsWhenEnabled()
 {
-#if !defined(Q_OS_MACOS) && !defined(Q_OS_WIN)
-    QSKIP("The native credential-store integration test is macOS/Windows-only");
+#if !defined(Q_OS_MACOS) && !defined(Q_OS_WIN) && !defined(Q_OS_LINUX)
+    QSKIP("The native credential-store integration test is unavailable on this platform");
 #else
     if (!qEnvironmentVariableIsSet("PANBROWSER_RUN_CREDENTIAL_STORE_TESTS")
         && !qEnvironmentVariableIsSet("PANBROWSER_RUN_KEYCHAIN_TESTS")) {
