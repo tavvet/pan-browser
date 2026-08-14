@@ -810,11 +810,14 @@ the authentication signal handler returns because Qt requires its
 `QAuthenticator` to be completed synchronously. The Linux adapter therefore
 runs each blocking libsecret call in a Qt worker and waits with a nested event
 loop that continues processing non-input GUI events. A `GCancellable` requests
-termination after 30 seconds; successful availability probes are cached, while
-backend failures invalidate the cache. The operation may invoke a desktop prompt
-to unlock the default collection. If the same challenge returns, the rejected
-stored value is deleted and suppressed for the rest of the process; the
-replacement-save checkbox is selected in the normal dialog. This prevents an
+termination at a hard 30-second deadline; PanBrowser then reports the backend as
+unavailable without waiting for the worker to finish. The worker, cancellable,
+native result, and any secret passed to storage retain shared ownership until a
+late completion can be cleaned up safely. Successful availability probes are
+cached, while backend failures invalidate the cache. The operation may invoke a
+desktop prompt to unlock the default collection. If the same challenge returns,
+the rejected stored value is deleted and suppressed for the rest of the process;
+the replacement-save checkbox is selected in the normal dialog. This prevents an
 automatic retry loop and avoids retrying a known-bad value after the next launch.
 
 Passwords are never written to settings, session files, diagnostics, history,

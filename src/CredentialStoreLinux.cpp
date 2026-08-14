@@ -14,8 +14,11 @@
 #include <QtConcurrentRun>
 
 #include <atomic>
+#include <chrono>
+#include <condition_variable>
 #include <limits>
 #include <memory>
+#include <mutex>
 #include <utility>
 
 namespace {
@@ -34,26 +37,122 @@ struct NativeCallResult {
     bool timedOut = false;
 };
 
+template<typename Result>
+void releaseNativeValue(Result &)
+{
+}
+
+template<>
+void releaseNativeValue(SecretValue *&value)
+{
+    if (value) {
+        secret_value_unref(value);
+        value = nullptr;
+    }
+}
+
+template<typename Result>
+class NativeCallState final {
+public:
+    NativeCallState()
+        : m_cancellable(g_cancellable_new())
+    {
+    }
+
+    ~NativeCallState()
+    {
+        releaseNativeValue(m_result.value);
+        if (m_result.error)
+            g_error_free(m_result.error);
+        g_object_unref(m_cancellable);
+    }
+
+    NativeCallState(const NativeCallState &) = delete;
+    NativeCallState &operator=(const NativeCallState &) = delete;
+
+    [[nodiscard]] GCancellable *cancellable() const
+    {
+        return m_cancellable;
+    }
+
+    void complete(NativeCallResult<Result> result)
+    {
+        {
+            const std::lock_guard lock(m_mutex);
+            m_result = std::move(result);
+            m_finished = true;
+        }
+        m_finishedCondition.notify_all();
+    }
+
+    [[nodiscard]] bool isFinished() const
+    {
+        const std::lock_guard lock(m_mutex);
+        return m_finished;
+    }
+
+    [[nodiscard]] bool waitForFinished(std::chrono::milliseconds timeout)
+    {
+        std::unique_lock lock(m_mutex);
+        return m_finishedCondition.wait_for(lock, timeout, [this] {
+            return m_finished;
+        });
+    }
+
+    [[nodiscard]] NativeCallResult<Result> takeResult()
+    {
+        const std::lock_guard lock(m_mutex);
+        NativeCallResult<Result> result = std::move(m_result);
+        m_result.value = Result{};
+        m_result.error = nullptr;
+        return result;
+    }
+
+    void cancel()
+    {
+        g_cancellable_cancel(m_cancellable);
+    }
+
+private:
+    GCancellable *m_cancellable = nullptr;
+    mutable std::mutex m_mutex;
+    std::condition_variable m_finishedCondition;
+    NativeCallResult<Result> m_result;
+    bool m_finished = false;
+};
+
+template<typename Result>
+NativeCallResult<Result> timedOutResult()
+{
+    NativeCallResult<Result> result;
+    result.timedOut = true;
+    return result;
+}
+
 template<typename Result, typename Operation>
 NativeCallResult<Result> runNativeCall(Operation operation)
 {
-    auto invoke = [operation = std::move(operation)](GCancellable *cancellable) mutable {
-        NativeCallResult<Result> result;
-        result.value = operation(cancellable, &result.error);
-        return result;
-    };
-
-    QCoreApplication *application = QCoreApplication::instance();
-    if (!application || QThread::currentThread() != application->thread())
-        return invoke(nullptr);
-
-    GCancellable *cancellable = g_cancellable_new();
-    QFuture<NativeCallResult<Result>> future = QtConcurrent::run(
-        [invoke = std::move(invoke), cancellable]() mutable {
-            return invoke(cancellable);
+    auto state = std::make_shared<NativeCallState<Result>>();
+    QFuture<void> future = QtConcurrent::run(
+        [state, operation = std::move(operation)]() mutable {
+            NativeCallResult<Result> result;
+            result.value = operation(state->cancellable(), &result.error);
+            state->complete(std::move(result));
         }
     );
-    QFutureWatcher<NativeCallResult<Result>> watcher;
+
+    QCoreApplication *application = QCoreApplication::instance();
+    if (!application || QThread::currentThread() != application->thread()) {
+        if (state->waitForFinished(
+                std::chrono::milliseconds(nativeOperationTimeoutMilliseconds)
+            )) {
+            return state->takeResult();
+        }
+        state->cancel();
+        return timedOutResult<Result>();
+    }
+
+    QFutureWatcher<void> watcher;
     QEventLoop loop;
     QTimer timeout;
     timeout.setSingleShot(true);
@@ -65,10 +164,13 @@ NativeCallResult<Result> runNativeCall(Operation operation)
         &QEventLoop::quit
     );
     QObject::connect(&timeout, &QTimer::timeout, &loop, [&] {
-        if (future.isFinished())
+        if (state->isFinished()) {
+            loop.quit();
             return;
+        }
         timedOut = true;
-        g_cancellable_cancel(cancellable);
+        state->cancel();
+        loop.quit();
     });
     watcher.setFuture(future);
     if (!future.isFinished()) {
@@ -77,10 +179,9 @@ NativeCallResult<Result> runNativeCall(Operation operation)
     }
     timeout.stop();
 
-    NativeCallResult<Result> result = future.result();
-    result.timedOut = timedOut;
-    g_object_unref(cancellable);
-    return result;
+    if (timedOut)
+        return timedOutResult<Result>();
+    return state->takeResult();
 }
 
 const SecretSchema *credentialSchema()
@@ -320,8 +421,9 @@ public:
                 return *nativeError == nullptr;
             }
         );
-        if (call.error) {
-            g_error_free(call.error);
+        if (call.timedOut || call.error) {
+            if (call.error)
+                g_error_free(call.error);
             return false;
         }
         if (!call.value)
@@ -361,7 +463,7 @@ public:
             }
         );
         ScopedSecretValue value(call.value);
-        if (call.error) {
+        if (call.timedOut || call.error) {
             m_available.store(false, std::memory_order_release);
             consumeNativeError(
                 error,
@@ -447,8 +549,14 @@ public:
 
         const QByteArray identifier = targetIdentifier(target);
         const QByteArray label = labelForTarget(target).toUtf8();
+        const auto sharedValue = std::shared_ptr<SecretValue>(
+            secret_value_ref(value.get()),
+            [](SecretValue *secret) {
+                secret_value_unref(secret);
+            }
+        );
         NativeCallResult<gboolean> call = runNativeCall<gboolean>(
-            [identifier, label, secret = value.get()](
+            [identifier, label, secret = sharedValue](
                 GCancellable *cancellable,
                 GError **nativeError
             ) {
@@ -456,7 +564,7 @@ public:
                     credentialSchema(),
                     SECRET_COLLECTION_DEFAULT,
                     label.constData(),
-                    secret,
+                    secret.get(),
                     cancellable,
                     nativeError,
                     applicationAttribute,
@@ -467,7 +575,7 @@ public:
                 );
             }
         );
-        if (!call.value) {
+        if (call.timedOut || !call.value) {
             m_available.store(false, std::memory_order_release);
             consumeNativeError(
                 error,
@@ -551,7 +659,7 @@ public:
                     : RemovalResult::Removed;
             }
         );
-        if (call.error) {
+        if (call.timedOut || call.error) {
             m_available.store(false, std::memory_order_release);
             consumeNativeError(
                 error,
@@ -658,7 +766,7 @@ public:
                 return result;
             }
         );
-        if (call.error) {
+        if (call.timedOut || call.error) {
             m_available.store(false, std::memory_order_release);
             consumeNativeError(
                 error,
