@@ -93,15 +93,21 @@ ReaderModeController::ReaderModeController(
     : QObject(parent)
     , m_page(page)
     , m_settings(settings)
-    , m_observedUrl(page->url())
+    , m_loading(page && page->isLoading())
+    , m_observedUrl(page ? page->url() : QUrl())
 {
     Q_ASSERT(page);
     Q_ASSERT(settings);
     m_probeTimer.setSingleShot(true);
     connect(&m_probeTimer, &QTimer::timeout, this, &ReaderModeController::probe);
-    connect(page, &QWebEnginePage::loadStarted, this, &ReaderModeController::resetForNavigation);
+    connect(page, &QWebEnginePage::loadStarted, this, [this] {
+        m_loading = true;
+        resetForNavigation();
+    });
     connect(page, &QWebEnginePage::loadFinished, this, [this](bool ok) {
+        m_loading = false;
         m_probeTimer.stop();
+        ++m_probeRequest;
         if (ok) {
             m_probeAttempts = 0;
             probe();
@@ -111,10 +117,11 @@ ReaderModeController::ReaderModeController(
         }
     });
     connect(page, &QWebEnginePage::urlChanged, this, [this](const QUrl &url) {
-        const QUrl documentUrl = url.adjusted(QUrl::RemoveFragment);
-        if (documentUrl == m_observedUrl.adjusted(QUrl::RemoveFragment))
+        if (url == m_observedUrl)
             return;
         m_observedUrl = url;
+        if (m_loading || (m_page && m_page->isLoading()))
+            return;
         resetForNavigation();
         m_probeTimer.start(probeRetryDelaysMs.front());
     });

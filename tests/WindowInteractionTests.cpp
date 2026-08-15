@@ -1,6 +1,9 @@
 #include "PanBrowserTestCommon.h"
 
+#include <QHostAddress>
 #include <QStyle>
+#include <QTcpServer>
+#include <QTcpSocket>
 
 class UnavailableTestCredentialStore final : public CredentialStore {
 public:
@@ -67,6 +70,7 @@ private slots:
     void pageZoomPersistsAndRemovesDefaults();
     void pageZoomShortcutsAndWheelDeltas();
     void readerModeSettingsAndUrlPolicy();
+    void readerModeWaitsForCompletedLoadsBeforeProbing();
     void readerModeDetectsDelayedSinglePageArticles();
     void readerModeExtractsArticleAndRestoresOriginalPage();
     void readerModeRestoresPageBeforeSameDocumentNavigation();
@@ -858,6 +862,78 @@ void WindowInteractionTests::readerModeSettingsAndUrlPolicy()
     QVERIFY(!ReaderModeController::supportsUrl(QUrl(QStringLiteral("https:///missing-host"))));
 }
 
+void WindowInteractionTests::readerModeWaitsForCompletedLoadsBeforeProbing()
+{
+    QTcpServer server;
+    QList<QPointer<QTcpSocket>> pendingResources;
+    connect(&server, &QTcpServer::newConnection, &server, [&server, &pendingResources] {
+        while (QTcpSocket *socket = server.nextPendingConnection()) {
+            socket->setParent(&server);
+            connect(socket, &QTcpSocket::readyRead, socket, [socket, &pendingResources] {
+                if (socket->property("panbrowserHandled").toBool() || !socket->canReadLine())
+                    return;
+                socket->setProperty("panbrowserHandled", true);
+                const QByteArray requestLine = socket->readLine();
+                socket->readAll();
+                if (requestLine.contains(" /slow-resource ")) {
+                    pendingResources.append(socket);
+                    return;
+                }
+
+                const QByteArray body = QByteArrayLiteral(R"HTML(
+<!doctype html>
+<html>
+<head><title>A deliberately slow article</title></head>
+<body>
+<article>
+  <h1>Reader mode must wait for load completion</h1>
+  <p>This substantial opening paragraph makes the partially loaded document look like a readable article while an intentionally delayed resource keeps the main-frame load active.</p>
+  <p>The second paragraph verifies that URL changes from an ordinary navigation must not trigger the same retry path that is reserved for completed single-page documents.</p>
+  <p>The third paragraph supplies enough editorial prose for the normal readerability heuristic to succeed immediately after the delayed resource has completed.</p>
+  <p>The final paragraph ensures that the fixture remains stable and that Reader Mode becomes available only after QWebEnginePage reports the completed load.</p>
+  <img src="/slow-resource" alt="Delayed test resource">
+</article>
+</body>
+</html>
+)HTML");
+                const QByteArray response = QByteArrayLiteral(
+                    "HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\n"
+                    "Connection: close\r\nContent-Length: "
+                ) + QByteArray::number(body.size()) + QByteArrayLiteral("\r\n\r\n") + body;
+                socket->write(response);
+                socket->disconnectFromHost();
+            });
+        }
+    });
+    QVERIFY(server.listen(QHostAddress::LocalHost));
+
+    BrowserPage page(QWebEngineProfile::defaultProfile());
+    ReaderSettings settings;
+    ReaderModeController controller(&page, &settings);
+    QSignalSpy loadSpy(&page, &QWebEnginePage::loadFinished);
+    page.setUrl(QUrl(QStringLiteral("http://127.0.0.1:%1/article").arg(server.serverPort())));
+
+    QTRY_VERIFY_WITH_TIMEOUT(page.isLoading() && !pendingResources.isEmpty(), 5000);
+    QTest::qWait(1000);
+    QCOMPARE(controller.availability(), ReaderModeController::Availability::Unknown);
+
+    for (const QPointer<QTcpSocket> &socket : std::as_const(pendingResources)) {
+        if (!socket)
+            continue;
+        socket->write(QByteArrayLiteral(
+            "HTTP/1.1 204 No Content\r\nConnection: close\r\nContent-Length: 0\r\n\r\n"
+        ));
+        socket->disconnectFromHost();
+    }
+    QTRY_VERIFY_WITH_TIMEOUT(!loadSpy.isEmpty(), 5000);
+    QVERIFY(loadSpy.constLast().constFirst().toBool());
+    QTRY_COMPARE_WITH_TIMEOUT(
+        controller.availability(),
+        ReaderModeController::Availability::Available,
+        5000
+    );
+}
+
 void WindowInteractionTests::readerModeDetectsDelayedSinglePageArticles()
 {
     BrowserPage page(QWebEngineProfile::defaultProfile());
@@ -881,7 +957,7 @@ setTimeout(() => {
             <p>The second paragraph confirms that a single-page application may replace a loading shell without causing a traditional page load. Reader mode should notice that transition and offer a clean reading presentation.</p>
             <p>The final paragraph supplies additional editorial text and verifies that delayed content is not permanently classified using the empty loading shell that happened to exist at loadFinished time.</p>
         </article>`;
-    history.pushState({}, "", "/article");
+    history.pushState({}, "", "#article");
 }, 1600);
 </script>
 </body>
@@ -896,7 +972,7 @@ setTimeout(() => {
         ReaderModeController::Availability::Available,
         6000
     );
-    QCOMPARE(page.url(), QUrl(QStringLiteral("https://reader.example/article")));
+    QCOMPARE(page.url(), QUrl(QStringLiteral("https://reader.example/feed#article")));
 }
 
 void WindowInteractionTests::readerModeExtractsArticleAndRestoresOriginalPage()
@@ -989,6 +1065,7 @@ true
         href: link ? link.href : "",
         original: document.body.dataset.original,
         overflow: document.body.style.getPropertyValue("overflow"),
+        bodyInert: document.body.inert,
         themeColorScheme: themeSelectStyle ? themeSelectStyle.colorScheme : "",
         themeOptionColor: themeOptionStyle ? themeOptionStyle.color : "",
         themeOptionBackground: themeOptionStyle ? themeOptionStyle.backgroundColor : ""
@@ -1013,6 +1090,7 @@ true
     );
     QCOMPARE(readerObject.value(QStringLiteral("original")).toString(), QStringLiteral("present"));
     QCOMPARE(readerObject.value(QStringLiteral("overflow")).toString(), QStringLiteral("hidden"));
+    QVERIFY(readerObject.value(QStringLiteral("bodyInert")).toBool());
     QVERIFY(readerObject.value(QStringLiteral("themeColorScheme")).toString().contains(
         QStringLiteral("dark")
     ));
@@ -1034,7 +1112,8 @@ true
 JSON.stringify({
     readerPresent: Boolean(globalThis.__panBrowserReader),
     original: document.body.dataset.original,
-    overflow: document.body.style.getPropertyValue("overflow")
+    overflow: document.body.style.getPropertyValue("overflow"),
+    bodyInert: document.body.inert
 })
 )JS"),
         QWebEngineScript::ApplicationWorld,
@@ -1049,6 +1128,7 @@ JSON.stringify({
     QVERIFY(!restoredObject.value(QStringLiteral("readerPresent")).toBool());
     QCOMPARE(restoredObject.value(QStringLiteral("original")).toString(), QStringLiteral("present"));
     QCOMPARE(restoredObject.value(QStringLiteral("overflow")).toString(), QStringLiteral("scroll"));
+    QVERIFY(!restoredObject.value(QStringLiteral("bodyInert")).toBool());
 }
 
 void WindowInteractionTests::readerModeRestoresPageBeforeSameDocumentNavigation()

@@ -253,6 +253,7 @@
         htmlOverflowPriority: html.style.getPropertyPriority("overflow"),
         bodyOverflow: body ? body.style.getPropertyValue("overflow") : "",
         bodyOverflowPriority: body ? body.style.getPropertyPriority("overflow") : "",
+        bodyInert: Boolean(body && body.inert),
         focused: document.activeElement,
         scrollX: window.scrollX,
         scrollY: window.scrollY
@@ -294,6 +295,8 @@
             host.remove();
             restoreProperty(html, "overflow", previous.htmlOverflow, previous.htmlOverflowPriority);
             restoreProperty(body, "overflow", previous.bodyOverflow, previous.bodyOverflowPriority);
+            if (body)
+                body.inert = previous.bodyInert;
             window.scrollTo(previous.scrollX, previous.scrollY);
             if (previous.focused && previous.focused.isConnected) {
                 try {
@@ -319,8 +322,10 @@
     });
     window.addEventListener("keydown", keyHandler, true);
     html.style.setProperty("overflow", "hidden", "important");
-    if (body)
+    if (body) {
         body.style.setProperty("overflow", "hidden", "important");
+        body.inert = true;
+    }
     html.append(host);
     root.focus({ preventScroll: true });
 

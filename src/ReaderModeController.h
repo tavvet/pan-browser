@@ -58,6 +58,7 @@ private:
     Availability m_availability = Availability::Unknown;
     bool m_active = false;
     bool m_activationPending = false;
+    bool m_loading = false;
     int m_probeAttempts = 0;
     QTimer m_probeTimer;
     QUrl m_observedUrl;
