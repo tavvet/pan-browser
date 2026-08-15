@@ -14,6 +14,8 @@ may be unstable.
   context-menu controls, and startup-independent session restoration.
 - [x] Animate new-tab expansion while respecting the active Qt style's
   animation setting and leaving restored sessions static.
+- [x] Add complete keyboard tab navigation, including open, close, reopen,
+  adjacent cycling, and direct numbered selection.
 - [x] Add opt-in developer tools that default to disabled and expose both
   Inspect Element and keyboard shortcuts only while enabled.
 - [ ] Complete favicon support: persist icons received from WebEngine and show

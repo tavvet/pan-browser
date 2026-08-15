@@ -155,6 +155,12 @@ private:
         const QString &restoredTitle = QString(),
         bool pinned = false
     );
+    void openNewTab();
+    void closeCurrentTab();
+    void closeActiveBrowserSurface(QWebEngineView *webView);
+    void reopenLastClosedTab();
+    void activateAdjacentTab(int offset);
+    void activateNumberedTab(int position);
     void closeTab(int index);
     void showTabContextMenu(const QPoint &position);
     void setTabPinned(int index, bool pinned);
@@ -189,6 +195,7 @@ private:
     void restoreAllDetachedVideos();
     void updateCurrentTabUi();
     void updateNavigationActions();
+    void updateTabNavigationActions();
     void updateBookmarkAction();
     void updateAddressPlaceholder();
     void navigateFromAddressBar();
@@ -227,6 +234,8 @@ private:
     void openBookmarks();
     void reloadRules();
     void reloadRulesLocal();
+    void initializePrimaryTabsForExternalContent();
+    void presentPrimaryWindow();
     void restoreInitialTabs();
     void scheduleSessionSave();
     void saveSession();
@@ -289,6 +298,12 @@ private:
     QAction *m_backAction = nullptr;
     QAction *m_forwardAction = nullptr;
     QAction *m_reloadAction = nullptr;
+    QAction *m_newTabAction = nullptr;
+    QAction *m_closeTabAction = nullptr;
+    QAction *m_reopenClosedTabAction = nullptr;
+    QAction *m_nextTabAction = nullptr;
+    QAction *m_previousTabAction = nullptr;
+    QList<QAction *> m_numberedTabActions;
     QAction *m_securityIndicator = nullptr;
     QAction *m_bookmarkAction = nullptr;
     QAction *m_closeFindAction = nullptr;
@@ -299,6 +314,7 @@ private:
     QAction *m_zoomOutAction = nullptr;
     QAction *m_resetZoomAction = nullptr;
     QMenu *m_webAppsMenu = nullptr;
+    QMenu *m_switchToTabMenu = nullptr;
     QMenu *m_zoomMenu = nullptr;
     QLabel *m_trustStatus = nullptr;
     QLabel *m_ruleCount = nullptr;
@@ -307,6 +323,7 @@ private:
     QTimer *m_addressSuggestionTimer = nullptr;
     WindowChromeController *m_windowChromeController = nullptr;
     QHash<QWebEngineView *, BrowserTabState> m_tabStates;
+    QList<SessionTab> m_closedTabs;
     QHash<QString, PendingManifestRequest> m_manifestRequests;
     QHash<QString, CrossDomainPromptRoute> m_crossDomainPromptRoutes;
     BrowserPreferences m_preferences;

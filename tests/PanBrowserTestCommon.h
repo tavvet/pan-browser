@@ -8,6 +8,7 @@
 #include "BrowserPreferences.h"
 #include "BrowserPage.h"
 #include "BrowserShortcut.h"
+#include "TabNavigation.h"
 #include "BrowserFullScreenController.h"
 #include "BrowserTabBar.h"
 #include "CrossDomainPresetCatalog.h"

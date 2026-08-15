@@ -22,6 +22,11 @@ enum class FullScreenRequestAction {
     RestoreDetachedVideo,
 };
 
+enum class BrowserCloseTarget {
+    CurrentTab,
+    DetachedVideo,
+};
+
 struct FullScreenRequestDecision {
     FullScreenRequestAction action = FullScreenRequestAction::Reject;
     QUrl origin;
@@ -72,6 +77,11 @@ private:
     QWebEngineView *activeView,
     QWebEngineView *lastActiveView,
     QWebEngineView *currentView
+);
+
+[[nodiscard]] BrowserCloseTarget browserCloseTarget(
+    const QWidget *activeWindow,
+    const QWidget *detachedVideoWindow
 );
 
 [[nodiscard]] FullScreenRequestDecision decideFullScreenRequest(

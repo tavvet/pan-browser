@@ -81,6 +81,15 @@ Page zoom is available from the application menu and through `Command + Plus`,
 Holding the same modifier while scrolling over the page also changes zoom.
 PanBrowser remembers the selected level separately for each HTTP(S) origin.
 
+Tabs support the familiar browser shortcuts: `Command/Ctrl + T` opens a tab,
+`Command/Ctrl + W` closes it, and `Command/Ctrl + Shift + T` restores the most
+recently closed tab. `Ctrl + Tab` and `Ctrl + Shift + Tab` cycle through tabs;
+`Command + Option + Left/Right`, `Command + Shift + [`, and
+`Command + Shift + ]` are also available on macOS, while
+`Ctrl + Page Up/Page Down` is available on Windows and Linux.
+`Command/Ctrl + 1…8` selects a numbered tab and `Command/Ctrl + 9` selects the
+last tab.
+
 ## Trust model
 
 When Chromium encounters a certificate error, PanBrowser follows this flow:
@@ -395,6 +404,9 @@ the application menu.
 Pinned tabs are stored in `session.json` and reopen on every launch. Ordinary
 tabs are stored only when **Continue with previous tabs** is selected. Closing
 a pinned tab explicitly removes it from the next session.
+
+The recently closed-tab list is kept in memory only, is capped at 25 entries,
+and is discarded when PanBrowser exits.
 
 On macOS, application data is stored under:
 

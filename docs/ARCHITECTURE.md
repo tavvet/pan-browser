@@ -200,9 +200,26 @@ the start-page mode is selected, only pinned tabs are restored from the session
 and the configured start page remains active. Popup and web-app windows do not
 expose pin controls.
 
+`TabNavigation` centralizes an explicit allowlist of platform-aware browser
+shortcuts and the pure index rules
+for adjacent and numbered selection. Adjacent navigation wraps at both ends;
+positions 1 through 8 address those exact tabs, while position 9 always means
+the last tab. `MainWindow` exposes the commands as `QAction`s for menus and
+normal widget focus, then applies the same action shortcuts in its application
+event filter because Chromium can consume key presses while a
+`QWebEngineView` has focus. The fallback accepts only exact registered
+single-stroke sequences and suppresses auto-repeat. Closing a primary-window
+tab records at most 25 URL/title/pin snapshots in memory for reopen; this list
+is intentionally not written to the profile or session file. When a detached
+video window is active, the close shortcut returns that video to its tab rather
+than closing the underlying tab.
+
 Popup tabs are not included in session restoration. Closing the last primary
 tab marks the session as intentionally discarded, clears `session.json`, and
-closes the primary window.
+closes the primary window. If an independent web-app window keeps the process
+alive, reactivating the empty primary window creates the configured start page
+and resumes session persistence. A tab explicitly delegated by an installed web
+app restores pinned tabs but does not insert an additional start-page tab.
 
 ### 3.1 Installed web apps
 

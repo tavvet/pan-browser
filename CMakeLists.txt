@@ -71,6 +71,8 @@ set(PANBROWSER_APP_SOURCES
     src/BrowserInteraction.h
     src/BrowserShortcut.cpp
     src/BrowserShortcut.h
+    src/TabNavigation.cpp
+    src/TabNavigation.h
     src/BrowserFullScreenController.cpp
     src/BrowserFullScreenController.h
     src/BrowserTabBar.cpp
@@ -391,6 +393,8 @@ qt_add_executable(PanBrowserTests
     src/BrowserInteraction.h
     src/BrowserShortcut.cpp
     src/BrowserShortcut.h
+    src/TabNavigation.cpp
+    src/TabNavigation.h
     src/BrowserFullScreenController.cpp
     src/BrowserFullScreenController.h
     src/BrowserTabBar.cpp

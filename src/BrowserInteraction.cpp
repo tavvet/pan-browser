@@ -116,6 +116,16 @@ QWebEngineView *resolveBrowserCommandTarget(
     return lastActiveView ? lastActiveView : currentView;
 }
 
+BrowserCloseTarget browserCloseTarget(
+    const QWidget *activeWindow,
+    const QWidget *detachedVideoWindow
+)
+{
+    return detachedVideoWindow && activeWindow == detachedVideoWindow
+        ? BrowserCloseTarget::DetachedVideo
+        : BrowserCloseTarget::CurrentTab;
+}
+
 FullScreenRequestDecision decideFullScreenRequest(
     bool toggleOn,
     bool interactionActive,

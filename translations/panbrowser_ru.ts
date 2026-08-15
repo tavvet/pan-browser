@@ -2327,8 +2327,8 @@ Decision: %3</source>
     </message>
     <message>
         <location filename="../src/MainWindow.cpp" line="728"/>
-        <source>New Tab (⌘T)</source>
-        <translation>Новая вкладка (⌘T)</translation>
+        <source>New Tab (%1)</source>
+        <translation>Новая вкладка (%1)</translation>
     </message>
     <message>
         <location filename="../src/MainWindow.cpp" line="745"/>
@@ -2405,6 +2405,30 @@ Decision: %3</source>
         <location filename="../src/MainWindow.cpp" line="1342"/>
         <source>Close Tab</source>
         <translation>Закрыть вкладку</translation>
+    </message>
+    <message>
+        <source>Reopen Closed Tab</source>
+        <translation>Восстановить закрытую вкладку</translation>
+    </message>
+    <message>
+        <source>Next Tab</source>
+        <translation>Следующая вкладка</translation>
+    </message>
+    <message>
+        <source>Previous Tab</source>
+        <translation>Предыдущая вкладка</translation>
+    </message>
+    <message>
+        <source>Switch to Tab</source>
+        <translation>Перейти к вкладке</translation>
+    </message>
+    <message>
+        <source>Tab %1</source>
+        <translation>Вкладка %1</translation>
+    </message>
+    <message>
+        <source>Last Tab</source>
+        <translation>Последняя вкладка</translation>
     </message>
     <message>
         <location filename="../src/MainWindow.cpp" line="974"/>

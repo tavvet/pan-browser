@@ -17,6 +17,8 @@ tighter page-network controls, and experimental video tooling.
   on every browser launch, independent of ordinary session-tab settings.
 - Added a short style-aware expansion animation for newly opened tabs while
   keeping startup session restoration static.
+- Added platform-aware keyboard navigation for opening, closing, reopening,
+  cycling through, and directly selecting tabs.
 - Added an opt-in third-party connection firewall with Public Suffix List site
   boundaries, browser-owned prompts, persistent and session decisions, global
   exceptions, and separately managed tracker/CDN recommendations.

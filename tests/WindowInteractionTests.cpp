@@ -61,6 +61,8 @@ private slots:
     void browserTabBarAnimatesNewTabExpansion();
     void developerToolsPreferenceDefaultsToDisabled();
     void browserShortcutFallbackMatchesRegisteredKeys();
+    void tabNavigationWrapsAndTargetsNumberedTabs();
+    void tabNavigationShortcutsMatchRegisteredKeys();
     void pageZoomUsesCanonicalOriginsAndDiscreteLevels();
     void pageZoomPersistsAndRemovesDefaults();
     void pageZoomShortcutsAndWheelDeltas();
@@ -97,8 +99,8 @@ void WindowInteractionTests::browserTabBarKeepsPinnedTabsInTheirGroup()
     tabBar.setTabPinned(1, true);
     tabBar.setTabText(0, QString());
     tabBar.setTabText(1, QString());
-    tabBar.setTabIcon(0, QIcon(QStringLiteral(":/assets/app-icon.svg")));
-    tabBar.setTabIcon(1, QIcon(QStringLiteral(":/assets/app-icon.svg")));
+    tabBar.setTabIcon(0, QIcon(QStringLiteral(":/assets/app-icon.png")));
+    tabBar.setTabIcon(1, QIcon(QStringLiteral(":/assets/app-icon.png")));
 
     QCOMPARE(tabBar.pinnedTabCount(), 2);
     QVERIFY(tabBar.isTabPinned(0));
@@ -152,7 +154,7 @@ void WindowInteractionTests::browserTabBarFitsPinnedOnlyContent()
     tabBar->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Preferred);
 
     const int index = tabBar->addTab(
-        QIcon(QStringLiteral(":/assets/app-icon.svg")),
+        QIcon(QStringLiteral(":/assets/app-icon.png")),
         QString()
     );
     tabBar->setTabPinned(index, true);
@@ -213,7 +215,7 @@ void WindowInteractionTests::browserTabBarAnimatesNewTabExpansion()
     tabBar.setExpanding(false);
     tabBar.resize(640, 40);
     const int pinnedIndex = tabBar.addTab(
-        QIcon(QStringLiteral(":/assets/app-icon.svg")),
+        QIcon(QStringLiteral(":/assets/app-icon.png")),
         QString()
     );
     tabBar.setTabPinned(pinnedIndex, true);
@@ -855,6 +857,105 @@ void WindowInteractionTests::browserShortcutFallbackMatchesRegisteredKeys()
     QVERIFY(!BrowserShortcut::matches(released, shortcuts));
 }
 
+void WindowInteractionTests::tabNavigationWrapsAndTargetsNumberedTabs()
+{
+    QCOMPARE(TabNavigation::adjacentTabIndex(0, 3, -1), 2);
+    QCOMPARE(TabNavigation::adjacentTabIndex(2, 3, 1), 0);
+    QCOMPARE(TabNavigation::adjacentTabIndex(1, 3, 1), 2);
+    QCOMPARE(TabNavigation::adjacentTabIndex(-1, 3, 1), -1);
+    QCOMPARE(TabNavigation::adjacentTabIndex(0, 0, 1), -1);
+
+    QCOMPARE(TabNavigation::numberedTabIndex(1, 12), 0);
+    QCOMPARE(TabNavigation::numberedTabIndex(8, 12), 7);
+    QCOMPARE(TabNavigation::numberedTabIndex(9, 12), 11);
+    QCOMPARE(TabNavigation::numberedTabIndex(3, 2), -1);
+    QCOMPARE(TabNavigation::numberedTabIndex(0, 2), -1);
+}
+
+void WindowInteractionTests::tabNavigationShortcutsMatchRegisteredKeys()
+{
+    const auto eventFor = [](const QKeySequence &shortcut) {
+        const QKeyCombination combination = shortcut[0];
+        return QKeyEvent(
+            QEvent::KeyPress,
+            combination.key(),
+            combination.keyboardModifiers()
+        );
+    };
+
+    const QList<QKeySequence> newTabShortcuts = TabNavigation::newTabShortcuts();
+    const QList<QKeySequence> nextShortcuts = TabNavigation::nextTabShortcuts();
+    const QList<QKeySequence> previousShortcuts = TabNavigation::previousTabShortcuts();
+    const QList<QKeySequence> reopenShortcuts = TabNavigation::reopenClosedTabShortcuts();
+    QVERIFY(!newTabShortcuts.isEmpty());
+    QVERIFY(!nextShortcuts.isEmpty());
+    QVERIFY(!previousShortcuts.isEmpty());
+    QVERIFY(!reopenShortcuts.isEmpty());
+    QVERIFY(!newTabShortcuts.constFirst().toString(QKeySequence::NativeText).isEmpty());
+    QVERIFY(!nextShortcuts.contains(QKeySequence(Qt::Key_Forward)));
+    QVERIFY(!previousShortcuts.contains(QKeySequence(Qt::Key_Back)));
+#if defined(Q_OS_MACOS)
+    QVERIFY(nextShortcuts.contains(QKeySequence(Qt::META | Qt::Key_Tab)));
+    QVERIFY(previousShortcuts.contains(
+        QKeySequence(Qt::META | Qt::SHIFT | Qt::Key_Tab)
+    ));
+    QVERIFY(previousShortcuts.contains(
+        QKeySequence(Qt::META | Qt::SHIFT | Qt::Key_Backtab)
+    ));
+    QVERIFY(nextShortcuts.contains(
+        QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_Right)
+    ));
+    QVERIFY(previousShortcuts.contains(
+        QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_Left)
+    ));
+#else
+    QVERIFY(nextShortcuts.contains(QKeySequence(Qt::CTRL | Qt::Key_Tab)));
+    QVERIFY(previousShortcuts.contains(
+        QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_Tab)
+    ));
+    QVERIFY(previousShortcuts.contains(
+        QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_Backtab)
+    ));
+    QVERIFY(nextShortcuts.contains(QKeySequence(Qt::CTRL | Qt::Key_PageDown)));
+    QVERIFY(previousShortcuts.contains(QKeySequence(Qt::CTRL | Qt::Key_PageUp)));
+#endif
+    QVERIFY(BrowserShortcut::matches(
+        eventFor(newTabShortcuts.constFirst()),
+        newTabShortcuts
+    ));
+    QVERIFY(BrowserShortcut::matches(eventFor(nextShortcuts.constFirst()), nextShortcuts));
+    QVERIFY(BrowserShortcut::matches(
+        eventFor(previousShortcuts.constFirst()),
+        previousShortcuts
+    ));
+    QVERIFY(BrowserShortcut::matches(
+        eventFor(reopenShortcuts.constFirst()),
+        reopenShortcuts
+    ));
+#if defined(Q_OS_MACOS)
+    const Qt::KeyboardModifiers previousModifiers =
+        Qt::MetaModifier | Qt::ShiftModifier;
+#else
+    const Qt::KeyboardModifiers previousModifiers =
+        Qt::ControlModifier | Qt::ShiftModifier;
+#endif
+    const QKeyEvent backtab(
+        QEvent::KeyPress,
+        Qt::Key_Backtab,
+        previousModifiers
+    );
+    QVERIFY(BrowserShortcut::matches(backtab, previousShortcuts));
+
+    const QKeySequence firstTab = TabNavigation::numberedTabShortcut(1);
+    const QKeySequence lastTab = TabNavigation::numberedTabShortcut(9);
+    QVERIFY(!firstTab.isEmpty());
+    QVERIFY(!lastTab.isEmpty());
+    QVERIFY(BrowserShortcut::matches(eventFor(firstTab), {firstTab}));
+    QVERIFY(BrowserShortcut::matches(eventFor(lastTab), {lastTab}));
+    QVERIFY(TabNavigation::numberedTabShortcut(0).isEmpty());
+    QVERIFY(TabNavigation::numberedTabShortcut(10).isEmpty());
+}
+
 void WindowInteractionTests::pageZoomUsesCanonicalOriginsAndDiscreteLevels()
 {
     const QString canonical = pageZoomSiteKey(QUrl(QStringLiteral(
@@ -984,6 +1085,18 @@ void WindowInteractionTests::activeBrowserViewSeparatesDetachedSurfaceFromDialog
     QCOMPARE(
         resolveBrowserCommandTarget(nullptr, nullptr, &currentView),
         &currentView
+    );
+    QCOMPARE(
+        browserCloseTarget(&detachedWindow, &detachedWindow),
+        BrowserCloseTarget::DetachedVideo
+    );
+    QCOMPARE(
+        browserCloseTarget(&mainWindow, &detachedWindow),
+        BrowserCloseTarget::CurrentTab
+    );
+    QCOMPARE(
+        browserCloseTarget(&mainWindow, nullptr),
+        BrowserCloseTarget::CurrentTab
     );
     QVERIFY(!resolveActiveBrowserView(
         &unrelatedWindow,
