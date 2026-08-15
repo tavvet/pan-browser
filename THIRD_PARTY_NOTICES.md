@@ -79,6 +79,34 @@ This Source Code Form is subject to the terms of the Mozilla Public License,
 v. 2.0. If a copy of the MPL was not distributed with this file, You can obtain
 one at https://mozilla.org/MPL/2.0/.
 
+### Mozilla Readability
+
+Reader Mode bundles Mozilla Readability 0.6.0 under
+`src/assets/reader/third_party/readability/`. The package is the standalone
+article-extraction library used by Firefox Reader View. The committed npm
+archive had SHA-512 digest
+`8ee1b9556878a808afcd301e333bd8f71b3d1d8e6b01caf613823bb624920a8911162ed7219080bbdd999124ec223d4e3dc78289f2f77297ed78fde90d3f7f41`.
+
+Copyright (c) 2010 Arc90 Inc
+
+Readability is licensed under the Apache License, Version 2.0. Its upstream
+notice is retained at
+`src/assets/reader/third_party/readability/LICENSE.md`; the complete Apache-2.0
+terms are also present in the repository's top-level `LICENSE` file.
+
+### DOMPurify
+
+Reader Mode bundles the browser build of DOMPurify 3.4.13 under
+`src/assets/reader/third_party/dompurify/`. The committed npm archive had
+SHA-512 digest
+`daf998228aa3cded9dfa46a43fc4bf9d2e6c85fb25e7cee4cf012370695376292c5158051e7142b0b603563fc936a2553906464980539aec9cbf43e87709a731`.
+
+Copyright (c) Cure53 and other contributors
+
+DOMPurify is offered under MPL-2.0 or Apache-2.0; PanBrowser uses the
+Apache-2.0 option. The complete selected license is retained at
+`src/assets/reader/third_party/dompurify/LICENSE`.
+
 ## Optional external code
 
 ### VOT — Voice Over Translation userscript

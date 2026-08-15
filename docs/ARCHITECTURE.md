@@ -50,6 +50,8 @@ flowchart TD
     Tabs --> View["QWebEngineView per tab"]
     View --> Page["BrowserPage per tab"]
     Page --> Profile
+    Page --> Reader["ReaderModeController / isolated overlay"]
+    Reader --> ReaderSettings["ReaderSettings / QSettings"]
 
     MW --> Trust["TrustPolicy"]
     MW --> History["HistoryStore / SQLite"]
@@ -111,6 +113,23 @@ mirrors every accepted tab move in the page stack. Opening animations use a
 stable per-tab identity so a move or pin transition cannot transfer animation
 state to another tab. They follow Qt's widget-animation duration, are capped at
 180 ms, and are not started while a session or hidden window is being built.
+
+Each regular tab also owns a `ReaderModeController`. After a successful HTTP(S)
+HTML load it runs Mozilla's lightweight readerability check in WebEngine's
+isolated application world. Activation clones the DOM, extracts an article with
+Mozilla Readability, sanitizes the result with DOMPurify, and renders it in a
+closed Shadow DOM overlay. The source document, URL, history, and session entry
+remain unchanged; closing the overlay restores the page's prior overflow,
+focus, and scroll state without a reload. Navigation generations discard stale
+asynchronous detection or activation callbacks. A per-page random capability
+authenticates appearance and close messages handled by `BrowserPage`.
+
+Reader Mode is deliberately a presentation boundary, not a new origin or
+privacy boundary: the original document continues running underneath the
+overlay. Remote article images still pass through the ordinary WebEngine
+profile and Site Connections policy. `ReaderSettings` stores only global
+theme, typeface, text-size, and content-width preferences. Reader state itself
+is never persisted or restored.
 
 Normal Fullscreen API requests and video pop-out are deliberately separate.
 `BrowserFullScreenController` keeps the page in its original view, hides only

@@ -35,6 +35,8 @@
 #include "PermissionPolicy.h"
 #include "ProxySettings.h"
 #include "ProxyAuthenticationController.h"
+#include "ReaderModeController.h"
+#include "ReaderSettings.h"
 #include "SessionStore.h"
 #include "SearchSettings.h"
 #include "SettingsDialog.h"

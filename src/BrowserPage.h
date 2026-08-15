@@ -15,6 +15,8 @@ public:
     explicit BrowserPage(QWebEngineProfile *profile, QObject *parent = nullptr);
     [[nodiscard]] QString videoPopoutToken() const;
     [[nodiscard]] QString votNetworkToken() const;
+    [[nodiscard]] QString readerModeToken() const;
+    [[nodiscard]] static QString readerModeMessagePrefix();
     void setWebApp(const WebApp &app);
     void fetchWebAppManifest(
         const QString &requestId,
@@ -29,6 +31,7 @@ signals:
     void mainFrameNavigationRequested(const QUrl &url, int navigationType);
     void videoPopoutRequested(const QUrl &frameUrl, const QSize &videoSize);
     void votNetworkMessage(const QJsonObject &message);
+    void readerModeMessage(const QJsonObject &message);
     void webAppManifestFetched(
         const QString &requestId,
         const QByteArray &contents,
@@ -52,4 +55,5 @@ private:
     std::optional<WebApp> m_webApp;
     QString m_videoPopoutToken;
     QString m_votNetworkToken;
+    QString m_readerModeToken;
 };

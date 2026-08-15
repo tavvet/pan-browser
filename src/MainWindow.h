@@ -5,6 +5,7 @@
 #include "DnsSettings.h"
 #include "HistoryStore.h"
 #include "ProxySettings.h"
+#include "ReaderSettings.h"
 #include "SessionStore.h"
 #include "SearchSettings.h"
 #include "TrustConfiguration.h"
@@ -50,6 +51,7 @@ class PermissionPrompt;
 class CrossDomainPrompt;
 class CrossDomainPromptController;
 class ProxyAuthenticationController;
+class ReaderModeController;
 class QCloseEvent;
 class QWebEngineCertificateError;
 class QWebEngineFullScreenRequest;
@@ -117,6 +119,7 @@ private:
         QPointer<DetachedVideoSession> detachedVideoSession;
         QPointer<DetachedVideoWindow> detachedVideoWindow;
         QPointer<DetachedVideoPlaceholder> detachedVideoPlaceholder;
+        QPointer<ReaderModeController> readerModeController;
     };
 
     struct PendingManifestRequest {
@@ -197,6 +200,7 @@ private:
     void updateNavigationActions();
     void updateTabNavigationActions();
     void updateBookmarkAction();
+    void updateReaderModeAction();
     void updateAddressPlaceholder();
     void navigateFromAddressBar();
     void showAddressSuggestions();
@@ -207,6 +211,10 @@ private:
     void changePageZoomBySteps(QWebEngineView *webView, int steps);
     void setPageZoom(QWebEngineView *webView, double factor);
     void updateZoomActions();
+    void toggleReaderMode(QWebEngineView *webView);
+    [[nodiscard]] ReaderModeController *readerModeControllerForTab(
+        QWebEngineView *webView
+    ) const;
     void showWebContextMenu(
         QWebEngineView *webView,
         QWebEngineView *renderingView,
@@ -306,6 +314,7 @@ private:
     QList<QAction *> m_numberedTabActions;
     QAction *m_securityIndicator = nullptr;
     QAction *m_bookmarkAction = nullptr;
+    QAction *m_readerModeAction = nullptr;
     QAction *m_closeFindAction = nullptr;
     QAction *m_installWebAppAction = nullptr;
     QAction *m_developerToolsAction = nullptr;
@@ -333,6 +342,7 @@ private:
     ProxySettings m_activeProxySettings;
     CrossDomainSettings m_crossDomainSettings;
     VideoTranslationSettings m_videoTranslationSettings;
+    ReaderSettings m_readerSettings;
     SessionStore m_sessionStore;
     TrustPolicy m_trustPolicy;
     QString m_configurationPath;

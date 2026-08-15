@@ -52,7 +52,8 @@ test environments, and other deliberately scoped trust configurations.
   restoration, popup handling, native page fullscreen, frameless and draggable
   always-on-top video pop-out with aspect-ratio-preserving resize, find in
   page, per-site page zoom, local address completion, configurable search
-  engines, and a download manager.
+  engines, a download manager, and a reversible reader mode with persistent
+  typography controls.
 - Browser-owned prompts for camera, microphone, location, external schemes,
   HTTP Basic authentication, and HTTP proxy authentication.
 - Native password-manager integration for explicitly saved website and proxy
@@ -89,6 +90,13 @@ recently closed tab. `Ctrl + Tab` and `Ctrl + Shift + Tab` cycle through tabs;
 `Ctrl + Page Up/Page Down` is available on Windows and Linux.
 `Command/Ctrl + 1…8` selects a numbered tab and `Command/Ctrl + 9` selects the
 last tab.
+
+On article-like HTTP(S) pages, the book button in the address bar opens Reader
+Mode. `F9` toggles it without replacing the source page, changing its URL, or
+adding a history entry. The reader toolbar controls the color theme, serif or
+sans-serif typeface, text size, and content width; those appearance choices are
+kept between launches. Reader Mode is a presentation feature, not a privacy or
+security boundary: the original page remains loaded underneath it.
 
 ## Trust model
 

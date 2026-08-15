@@ -79,6 +79,10 @@ set(PANBROWSER_APP_SOURCES
     src/BrowserTabBar.h
     src/BrowserPage.cpp
     src/BrowserPage.h
+    src/ReaderModeController.cpp
+    src/ReaderModeController.h
+    src/ReaderSettings.cpp
+    src/ReaderSettings.h
     src/PageZoom.cpp
     src/PageZoom.h
     src/CredentialPromptDialog.cpp
@@ -281,6 +285,23 @@ if(APPLE)
     )
     target_sources(PanBrowser PRIVATE ${PANBROWSER_LICENSE_DOCUMENTS})
 
+    set(PANBROWSER_READABILITY_LICENSE
+        src/assets/reader/third_party/readability/LICENSE.md
+    )
+    set(PANBROWSER_DOMPURIFY_LICENSE
+        src/assets/reader/third_party/dompurify/LICENSE
+    )
+    set_source_files_properties(${PANBROWSER_READABILITY_LICENSE} PROPERTIES
+        MACOSX_PACKAGE_LOCATION "Resources/Documentation/ThirdParty/Readability"
+    )
+    set_source_files_properties(${PANBROWSER_DOMPURIFY_LICENSE} PROPERTIES
+        MACOSX_PACKAGE_LOCATION "Resources/Documentation/ThirdParty/DOMPurify"
+    )
+    target_sources(PanBrowser PRIVATE
+        ${PANBROWSER_READABILITY_LICENSE}
+        ${PANBROWSER_DOMPURIFY_LICENSE}
+    )
+
     set_target_properties(PanBrowser PROPERTIES
         MACOSX_BUNDLE_INFO_PLIST ${CMAKE_CURRENT_SOURCE_DIR}/src/Info.plist.in
     )
@@ -342,6 +363,12 @@ if(WIN32 OR CMAKE_SYSTEM_NAME STREQUAL "Linux")
         docs/LICENSING.md docs/RELEASING.md
         DESTINATION ${CMAKE_INSTALL_DATADIR}/doc/PanBrowser
     )
+    install(FILES src/assets/reader/third_party/readability/LICENSE.md
+        DESTINATION ${CMAKE_INSTALL_DATADIR}/doc/PanBrowser/third-party/readability
+    )
+    install(FILES src/assets/reader/third_party/dompurify/LICENSE
+        DESTINATION ${CMAKE_INSTALL_DATADIR}/doc/PanBrowser/third-party/dompurify
+    )
     qt_generate_deploy_app_script(
         TARGET PanBrowser
         OUTPUT_SCRIPT PANBROWSER_DEPLOY_SCRIPT
@@ -401,6 +428,10 @@ qt_add_executable(PanBrowserTests
     src/BrowserTabBar.h
     src/BrowserPage.cpp
     src/BrowserPage.h
+    src/ReaderModeController.cpp
+    src/ReaderModeController.h
+    src/ReaderSettings.cpp
+    src/ReaderSettings.h
     src/PageZoom.cpp
     src/PageZoom.h
     src/CredentialPromptDialog.cpp
@@ -576,12 +607,31 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     target_link_libraries(PanBrowserTests PRIVATE OpenSSL::Crypto)
 endif()
 
+set(PANBROWSER_TRANSLATION_SOURCES ${PANBROWSER_APP_SOURCES})
+list(FILTER PANBROWSER_TRANSLATION_SOURCES INCLUDE REGEX "\\.(cpp|h|mm)$")
+set(PANBROWSER_NON_TRANSLATION_SOURCES
+    src/resources.qrc
+    README.md
+    LICENSE
+    THIRD_PARTY_NOTICES.md
+    docs/LICENSING.md
+    docs/RELEASING.md
+    src/assets/reader/third_party/readability/LICENSE.md
+    src/assets/reader/third_party/dompurify/LICENSE
+)
+set_property(TARGET PanBrowser PROPERTY
+    QT_EXCLUDE_SOURCES_FROM_TRANSLATION "${PANBROWSER_NON_TRANSLATION_SOURCES}"
+)
+set_property(TARGET PanBrowserTests PROPERTY
+    QT_EXCLUDE_SOURCES_FROM_TRANSLATION "src/resources.qrc"
+)
+
 qt_add_translations(
     TARGETS PanBrowser PanBrowserTests
     TS_FILES translations/panbrowser_ru.ts
     PLURALS_TS_FILE translations/panbrowser_en.ts
     SOURCES
-        ${PANBROWSER_APP_SOURCES}
+        ${PANBROWSER_TRANSLATION_SOURCES}
         src/CertificateTrustValidatorFallback.cpp
         src/CertificateTrustValidatorLinux.cpp
         src/CertificateTrustValidatorMac.mm

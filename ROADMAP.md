@@ -16,6 +16,9 @@ may be unstable.
   animation setting and leaving restored sessions static.
 - [x] Add complete keyboard tab navigation, including open, close, reopen,
   adjacent cycling, and direct numbered selection.
+- [x] Add a reversible Reader Mode for article-like pages with Firefox-derived
+  extraction, sanitized isolated rendering, persistent appearance controls,
+  an address-bar action, and an `F9` shortcut.
 - [x] Add opt-in developer tools that default to disabled and expose both
   Inspect Element and keyboard shortcuts only while enabled.
 - [ ] Complete favicon support: persist icons received from WebEngine and show

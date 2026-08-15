@@ -16,7 +16,11 @@ const QString fetchMessagePrefix = QStringLiteral("__PANBROWSER_WEB_APP_FETCH__"
 const QString videoPopoutMessagePrefix = QStringLiteral(
     "__PANBROWSER_VIDEO_POPOUT_REQUEST__"
 );
+const QString readerModeMessagePrefixValue = QStringLiteral(
+    "__PANBROWSER_READER_MODE__"
+);
 constexpr qsizetype maximumVideoPopoutMessageLength = 2048;
+constexpr qsizetype maximumReaderModeMessageLength = 2048;
 constexpr int maximumVideoDimension = 32768;
 constexpr double minimumVideoAspectRatio = 1.0 / 4.0;
 constexpr double maximumVideoAspectRatio = 4.0;
@@ -54,6 +58,7 @@ BrowserPage::BrowserPage(QWebEngineProfile *profile, QObject *parent)
     : QWebEnginePage(profile, parent)
     , m_videoPopoutToken(QUuid::createUuid().toString(QUuid::WithoutBraces))
     , m_votNetworkToken(QUuid::createUuid().toString(QUuid::WithoutBraces))
+    , m_readerModeToken(QUuid::createUuid().toString(QUuid::WithoutBraces))
 {
     settings()->setUnknownUrlSchemePolicy(
         QWebEngineSettings::UnknownUrlSchemePolicy::AllowUnknownUrlSchemesFromUserInteraction
@@ -68,6 +73,16 @@ QString BrowserPage::videoPopoutToken() const
 QString BrowserPage::votNetworkToken() const
 {
     return m_votNetworkToken;
+}
+
+QString BrowserPage::readerModeToken() const
+{
+    return m_readerModeToken;
+}
+
+QString BrowserPage::readerModeMessagePrefix()
+{
+    return readerModeMessagePrefixValue;
 }
 
 void BrowserPage::setWebApp(const WebApp &app)
@@ -212,6 +227,23 @@ void BrowserPage::javaScriptConsoleMessage(
     const QString &sourceId
 )
 {
+    if (message.startsWith(readerModeMessagePrefixValue)) {
+        if (message.size() > maximumReaderModeMessageLength)
+            return;
+        QJsonParseError parseError;
+        const QJsonDocument document = QJsonDocument::fromJson(
+            message.mid(readerModeMessagePrefixValue.size()).toUtf8(),
+            &parseError
+        );
+        if (parseError.error != QJsonParseError::NoError || !document.isObject())
+            return;
+        const QJsonObject object = document.object();
+        if (object.value(QStringLiteral("token")).toString() != m_readerModeToken)
+            return;
+        emit readerModeMessage(object);
+        return;
+    }
+
     const QString votPrefix = VotUserscriptBridge::messagePrefix();
     if (message.startsWith(votPrefix)) {
         if (message.size() > VotUserscriptBridge::maximumMessageLength())

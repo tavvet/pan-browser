@@ -8,7 +8,7 @@ toolchain, and runtime components in each package.
 
 ## 1. Source repository
 
-The repository contains four licensing groups:
+The repository contains five licensing groups:
 
 1. PanBrowser-owned source code, documentation, translations, build scripts,
    and original visual design, licensed under the Apache License 2.0.
@@ -17,7 +17,10 @@ The repository contains four licensing groups:
    [THIRD_PARTY_NOTICES.md](../THIRD_PARTY_NOTICES.md).
 3. The bundled Public Suffix List under `src/assets/`, licensed under MPL-2.0
    and identified in the third-party notices.
-4. References to external build and runtime dependencies and to the optional
+4. Mozilla Readability and DOMPurify source used by Reader Mode. PanBrowser
+   selects their Apache-2.0 licensing terms and retains the upstream notices
+   under `src/assets/reader/third_party/`.
+5. References to external build and runtime dependencies and to the optional
    VOT userscript integration. Qt, Chromium, OpenSSL, and VOT source or binaries
    are not committed to this repository.
 

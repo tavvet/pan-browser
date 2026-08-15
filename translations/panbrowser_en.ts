@@ -20,7 +20,7 @@
 <context>
     <name>CredentialsSettingsPage</name>
     <message numerus="yes">
-        <location filename="../src/CredentialsSettingsPage.cpp" line="307"/>
+        <location filename="../src/CredentialsSettingsPage.cpp" line="316"/>
         <source>%n saved credential(s). Some entries could not be read.</source>
         <translation>
             <numerusform>%n saved credential. Some entries could not be read.</numerusform>
@@ -28,7 +28,7 @@
         </translation>
     </message>
     <message numerus="yes">
-        <location filename="../src/CredentialsSettingsPage.cpp" line="316"/>
+        <location filename="../src/CredentialsSettingsPage.cpp" line="325"/>
         <source>%n saved credential(s)</source>
         <translation>
             <numerusform>%n saved credential</numerusform>
@@ -36,7 +36,7 @@
         </translation>
     </message>
     <message numerus="yes">
-        <location filename="../src/CredentialsSettingsPage.cpp" line="374"/>
+        <location filename="../src/CredentialsSettingsPage.cpp" line="411"/>
         <source>Remove %n selected saved credential(s)? The affected websites and proxies may ask you to sign in again.</source>
         <translation>
             <numerusform>Remove %n selected saved credential? The affected website or proxy may ask you to sign in again.</numerusform>
@@ -44,7 +44,7 @@
         </translation>
     </message>
     <message numerus="yes">
-        <location filename="../src/CredentialsSettingsPage.cpp" line="405"/>
+        <location filename="../src/CredentialsSettingsPage.cpp" line="441"/>
         <source>Remove all %n saved credential(s) managed by PanBrowser? Websites and proxies may ask you to sign in again.</source>
         <translation>
             <numerusform>Remove the %n saved credential managed by PanBrowser? The affected website or proxy may ask you to sign in again.</numerusform>
@@ -85,7 +85,7 @@
 <context>
     <name>MainWindow</name>
     <message numerus="yes">
-        <location filename="../src/MainWindow.cpp" line="3420"/>
+        <location filename="../src/MainWindow.cpp" line="3800"/>
         <source>%n custom rule(s)</source>
         <translation>
             <numerusform>%n custom rule</numerusform>

@@ -66,6 +66,10 @@ private slots:
     void pageZoomUsesCanonicalOriginsAndDiscreteLevels();
     void pageZoomPersistsAndRemovesDefaults();
     void pageZoomShortcutsAndWheelDeltas();
+    void readerModeSettingsAndUrlPolicy();
+    void readerModeDetectsDelayedSinglePageArticles();
+    void readerModeExtractsArticleAndRestoresOriginalPage();
+    void readerModeRestoresPageBeforeSameDocumentNavigation();
     void activeBrowserViewSeparatesDetachedSurfaceFromDialogs();
     void fullScreenRequestPolicyValidatesOriginAndState();
     void videoElementBridgeUsesTrustedOverlayClick();
@@ -824,6 +828,310 @@ void WindowInteractionTests::developerToolsPreferenceDefaultsToDisabled()
 
     preferences.setDeveloperToolsEnabled(true);
     QVERIFY(preferences.developerToolsEnabled());
+}
+
+void WindowInteractionTests::readerModeSettingsAndUrlPolicy()
+{
+    ReaderSettings settings;
+    QCOMPARE(settings.themeName(), QStringLiteral("system"));
+    QCOMPARE(settings.typefaceName(), QStringLiteral("serif"));
+
+    settings.setTextSize(ReaderSettings::minimumTextSize - 50);
+    QCOMPARE(settings.textSize(), ReaderSettings::minimumTextSize);
+    settings.setTextSize(ReaderSettings::maximumTextSize + 50);
+    QCOMPARE(settings.textSize(), ReaderSettings::maximumTextSize);
+    settings.setContentWidth(ReaderSettings::minimumContentWidth - 500);
+    QCOMPARE(settings.contentWidth(), ReaderSettings::minimumContentWidth);
+    settings.setContentWidth(ReaderSettings::maximumContentWidth + 500);
+    QCOMPARE(settings.contentWidth(), ReaderSettings::maximumContentWidth);
+
+    QString error;
+    QVERIFY2(settings.validate(&error), qPrintable(error));
+    QVERIFY(ReaderModeController::supportsUrl(
+        QUrl(QStringLiteral("https://example.com/article#section"))
+    ));
+    QVERIFY(ReaderModeController::supportsUrl(
+        QUrl(QStringLiteral("http://example.com/article"))
+    ));
+    QVERIFY(!ReaderModeController::supportsUrl(QUrl(QStringLiteral("file:///tmp/article"))));
+    QVERIFY(!ReaderModeController::supportsUrl(QUrl(QStringLiteral("data:text/html,article"))));
+    QVERIFY(!ReaderModeController::supportsUrl(QUrl(QStringLiteral("https:///missing-host"))));
+}
+
+void WindowInteractionTests::readerModeDetectsDelayedSinglePageArticles()
+{
+    BrowserPage page(QWebEngineProfile::defaultProfile());
+    ReaderSettings settings;
+    ReaderModeController controller(&page, &settings);
+
+    QSignalSpy loadSpy(&page, &QWebEnginePage::loadFinished);
+    page.setHtml(
+        QStringLiteral(R"HTML(
+<!doctype html>
+<html>
+<head><title>Loading article</title></head>
+<body>
+<main id="content">Loading…</main>
+<script>
+setTimeout(() => {
+    document.querySelector("#content").innerHTML = `
+        <article class="article-presenter__content">
+            <h1>A dynamically rendered article</h1>
+            <p>This substantial opening paragraph represents an article delivered after the initial document load. It contains enough ordinary prose for the readerability heuristic to recognize the page once client-side rendering has completed.</p>
+            <p>The second paragraph confirms that a single-page application may replace a loading shell without causing a traditional page load. Reader mode should notice that transition and offer a clean reading presentation.</p>
+            <p>The final paragraph supplies additional editorial text and verifies that delayed content is not permanently classified using the empty loading shell that happened to exist at loadFinished time.</p>
+        </article>`;
+    history.pushState({}, "", "/article");
+}, 1600);
+</script>
+</body>
+</html>
+)HTML"),
+        QUrl(QStringLiteral("https://reader.example/feed"))
+    );
+    QTRY_VERIFY_WITH_TIMEOUT(!loadSpy.isEmpty(), 5000);
+    QVERIFY(loadSpy.constLast().constFirst().toBool());
+    QTRY_COMPARE_WITH_TIMEOUT(
+        controller.availability(),
+        ReaderModeController::Availability::Available,
+        6000
+    );
+    QCOMPARE(page.url(), QUrl(QStringLiteral("https://reader.example/article")));
+}
+
+void WindowInteractionTests::readerModeExtractsArticleAndRestoresOriginalPage()
+{
+    BrowserPage page(QWebEngineProfile::defaultProfile());
+    ReaderSettings settings;
+    ReaderModeController controller(&page, &settings);
+
+    QSignalSpy loadSpy(&page, &QWebEnginePage::loadFinished);
+    page.setHtml(
+        QStringLiteral(R"HTML(
+<!doctype html>
+<html>
+<head><title>Original document title</title></head>
+<body style="overflow: scroll" data-original="present">
+<nav>Navigation that should not appear in the extracted article.</nav>
+<article>
+  <h1>A useful test article</h1>
+  <p>This is a deliberately substantial opening paragraph. It contains enough prose to make the document a plausible article for reader-mode detection, while retaining a stable phrase for the integration test.</p>
+  <p>The second paragraph continues with ordinary editorial writing. Reader mode should preserve this text, headings, emphasis, and safe links without replacing the underlying page or changing its URL.</p>
+  <p>The third paragraph adds more meaningful content so the readability score crosses its normal threshold. It also includes <a href="/next">a relative article link</a> that should become an absolute HTTPS URL.</p>
+  <p>The fourth paragraph verifies that a longer document remains readable after sanitization. Embedded forms, scripts, frames, and event handlers must never survive in PanBrowser's presentation layer.</p>
+  <p>The fifth paragraph provides a final block of prose. Closing reader mode should reveal this exact original document again without reloading it or losing its body attributes.</p>
+  <div class="toolbar" id="page-controlled" style="position:fixed" tabindex="0">Styled page content.</div>
+  <form action="/submit"><input name="secret" value="unsafe"></form>
+  <iframe src="https://frames.example/"></iframe>
+  <script>globalThis.__readerFixtureScriptRan = true;</script>
+</article>
+</body>
+</html>
+)HTML"),
+        QUrl(QStringLiteral("https://reader.example/article"))
+    );
+    QTRY_VERIFY_WITH_TIMEOUT(!loadSpy.isEmpty(), 5000);
+    QVERIFY(loadSpy.constLast().constFirst().toBool());
+    QTRY_COMPARE_WITH_TIMEOUT(
+        controller.availability(),
+        ReaderModeController::Availability::Available,
+        5000
+    );
+
+    controller.activate();
+    QTRY_VERIFY_WITH_TIMEOUT(controller.isActive(), 5000);
+
+    bool spoofMessageSent = false;
+    page.runJavaScript(
+        QStringLiteral(R"JS(
+console.info("__PANBROWSER_READER_MODE__" + JSON.stringify({
+    token: "page-controlled-token",
+    action: "close",
+    value: null
+}));
+true
+)JS"),
+        [&spoofMessageSent](const QVariant &result) {
+            spoofMessageSent = result.toBool();
+        }
+    );
+    QTRY_VERIFY_WITH_TIMEOUT(spoofMessageSent, 3000);
+    QTest::qWait(50);
+    QVERIFY(controller.isActive());
+
+    QString readerState;
+    page.runJavaScript(
+        QStringLiteral(R"JS(
+(() => {
+    const state = globalThis.__panBrowserReader;
+    if (!state || !state.active)
+        return "";
+    const content = state.root.querySelector(".article");
+    const link = content && content.querySelector("a[href]");
+    const themeSelect = state.root.querySelector(".controls select");
+    const themeOption = themeSelect && themeSelect.querySelector("option");
+    state.applyAppearance({
+        theme: "dark",
+        typeface: "serif",
+        textSize: 20,
+        contentWidth: 720
+    });
+    const themeSelectStyle = themeSelect ? getComputedStyle(themeSelect) : null;
+    const themeOptionStyle = themeOption ? getComputedStyle(themeOption) : null;
+    return JSON.stringify({
+        text: content ? content.textContent : "",
+        unsafeCount: content
+            ? content.querySelectorAll("script, form, input, iframe, object, embed").length
+            : -1,
+        unsafeAttributeCount: content
+            ? content.querySelectorAll("[class], [id], [style], [tabindex]").length
+            : -1,
+        href: link ? link.href : "",
+        original: document.body.dataset.original,
+        overflow: document.body.style.getPropertyValue("overflow"),
+        themeColorScheme: themeSelectStyle ? themeSelectStyle.colorScheme : "",
+        themeOptionColor: themeOptionStyle ? themeOptionStyle.color : "",
+        themeOptionBackground: themeOptionStyle ? themeOptionStyle.backgroundColor : ""
+    });
+})()
+)JS"),
+        QWebEngineScript::ApplicationWorld,
+        [&readerState](const QVariant &result) {
+            readerState = result.toString();
+        }
+    );
+    QTRY_VERIFY_WITH_TIMEOUT(!readerState.isEmpty(), 5000);
+    const QJsonObject readerObject = QJsonDocument::fromJson(readerState.toUtf8()).object();
+    QVERIFY(readerObject.value(QStringLiteral("text")).toString().contains(
+        QStringLiteral("deliberately substantial opening paragraph")
+    ));
+    QCOMPARE(readerObject.value(QStringLiteral("unsafeCount")).toInt(), 0);
+    QCOMPARE(readerObject.value(QStringLiteral("unsafeAttributeCount")).toInt(), 0);
+    QCOMPARE(
+        readerObject.value(QStringLiteral("href")).toString(),
+        QStringLiteral("https://reader.example/next")
+    );
+    QCOMPARE(readerObject.value(QStringLiteral("original")).toString(), QStringLiteral("present"));
+    QCOMPARE(readerObject.value(QStringLiteral("overflow")).toString(), QStringLiteral("hidden"));
+    QVERIFY(readerObject.value(QStringLiteral("themeColorScheme")).toString().contains(
+        QStringLiteral("dark")
+    ));
+    QCOMPARE(
+        readerObject.value(QStringLiteral("themeOptionColor")).toString(),
+        QStringLiteral("rgb(232, 234, 240)")
+    );
+    QCOMPARE(
+        readerObject.value(QStringLiteral("themeOptionBackground")).toString(),
+        QStringLiteral("rgb(34, 38, 45)")
+    );
+    QCOMPARE(page.url(), QUrl(QStringLiteral("https://reader.example/article")));
+
+    controller.deactivate();
+    QTRY_VERIFY_WITH_TIMEOUT(!controller.isActive(), 3000);
+    QString restoredState;
+    page.runJavaScript(
+        QStringLiteral(R"JS(
+JSON.stringify({
+    readerPresent: Boolean(globalThis.__panBrowserReader),
+    original: document.body.dataset.original,
+    overflow: document.body.style.getPropertyValue("overflow")
+})
+)JS"),
+        QWebEngineScript::ApplicationWorld,
+        [&restoredState](const QVariant &result) {
+            restoredState = result.toString();
+        }
+    );
+    QTRY_VERIFY_WITH_TIMEOUT(!restoredState.isEmpty(), 3000);
+    const QJsonObject restoredObject = QJsonDocument::fromJson(
+        restoredState.toUtf8()
+    ).object();
+    QVERIFY(!restoredObject.value(QStringLiteral("readerPresent")).toBool());
+    QCOMPARE(restoredObject.value(QStringLiteral("original")).toString(), QStringLiteral("present"));
+    QCOMPARE(restoredObject.value(QStringLiteral("overflow")).toString(), QStringLiteral("scroll"));
+}
+
+void WindowInteractionTests::readerModeRestoresPageBeforeSameDocumentNavigation()
+{
+    BrowserPage page(QWebEngineProfile::defaultProfile());
+    ReaderSettings settings;
+    ReaderModeController controller(&page, &settings);
+
+    QSignalSpy loadSpy(&page, &QWebEnginePage::loadFinished);
+    page.setHtml(
+        QStringLiteral(R"HTML(
+<!doctype html>
+<html>
+<head><title>Reader navigation test</title></head>
+<body style="overflow: scroll">
+<article>
+  <h1>An article before client-side navigation</h1>
+  <p>This substantial opening paragraph provides enough ordinary prose for reader mode to recognize the document before a client-side route transition occurs.</p>
+  <p>The second paragraph verifies that the extracted presentation can be opened while the original document remains available underneath the isolated overlay.</p>
+  <p>The third paragraph exists so the article comfortably exceeds the extraction threshold and produces a stable reader-mode fixture for this lifecycle test.</p>
+  <p>The final paragraph confirms that changing routes must remove the old presentation and restore the source page before detection begins for the new document state.</p>
+</article>
+</body>
+</html>
+)HTML"),
+        QUrl(QStringLiteral("https://reader.example/article"))
+    );
+    QTRY_VERIFY_WITH_TIMEOUT(!loadSpy.isEmpty(), 5000);
+    QVERIFY(loadSpy.constLast().constFirst().toBool());
+    QTRY_COMPARE_WITH_TIMEOUT(
+        controller.availability(),
+        ReaderModeController::Availability::Available,
+        5000
+    );
+
+    controller.activate();
+    QTRY_VERIFY_WITH_TIMEOUT(controller.isActive(), 5000);
+
+    bool routeChanged = false;
+    page.runJavaScript(
+        QStringLiteral(R"JS(
+(() => {
+    document.querySelector("article").replaceWith(document.createElement("main"));
+    history.pushState({}, "", "/landing");
+    return true;
+})()
+)JS"),
+        [&routeChanged](const QVariant &result) {
+            routeChanged = result.toBool();
+        }
+    );
+    QTRY_VERIFY_WITH_TIMEOUT(routeChanged, 3000);
+    QTRY_COMPARE_WITH_TIMEOUT(
+        page.url(),
+        QUrl(QStringLiteral("https://reader.example/landing")),
+        3000
+    );
+    QTRY_VERIFY_WITH_TIMEOUT(!controller.isActive(), 3000);
+
+    QString restoredState;
+    page.runJavaScript(
+        QStringLiteral(R"JS(
+JSON.stringify({
+    readerPresent: Boolean(globalThis.__panBrowserReader),
+    htmlOverflow: document.documentElement.style.getPropertyValue("overflow"),
+    bodyOverflow: document.body.style.getPropertyValue("overflow")
+})
+)JS"),
+        QWebEngineScript::ApplicationWorld,
+        [&restoredState](const QVariant &result) {
+            restoredState = result.toString();
+        }
+    );
+    QTRY_VERIFY_WITH_TIMEOUT(!restoredState.isEmpty(), 3000);
+    const QJsonObject restoredObject = QJsonDocument::fromJson(
+        restoredState.toUtf8()
+    ).object();
+    QVERIFY(!restoredObject.value(QStringLiteral("readerPresent")).toBool());
+    QCOMPARE(restoredObject.value(QStringLiteral("htmlOverflow")).toString(), QString());
+    QCOMPARE(
+        restoredObject.value(QStringLiteral("bodyOverflow")).toString(),
+        QStringLiteral("scroll")
+    );
 }
 
 void WindowInteractionTests::browserShortcutFallbackMatchesRegisteredKeys()

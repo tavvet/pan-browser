@@ -26,6 +26,7 @@
 #include "PermissionPrompt.h"
 #include "PrivateData.h"
 #include "ProxyAuthenticationController.h"
+#include "ReaderModeController.h"
 #include "SettingsDialog.h"
 #include "SiteDomain.h"
 #include "TabNavigation.h"
@@ -200,6 +201,10 @@ MainWindow::MainWindow(
         );
         if (!m_startupError.isEmpty())
             return;
+        QString readerSettingsError;
+        m_readerSettings = ReaderSettings::load(&readerSettingsError);
+        if (!readerSettingsError.isEmpty())
+            qWarning().noquote() << "[PanBrowser reader settings]" << readerSettingsError;
         initializeSearchSettings();
         initializeDnsSettings();
         initializeProxySettings();
@@ -304,6 +309,7 @@ MainWindow::MainWindow(
         m_activeProxySettings = primaryWindow->m_activeProxySettings;
         m_crossDomainSettings = primaryWindow->m_crossDomainSettings;
         m_videoTranslationSettings = primaryWindow->m_videoTranslationSettings;
+        m_readerSettings = primaryWindow->m_readerSettings;
         m_votUserscriptManager = primaryWindow->m_votUserscriptManager;
         m_proxyConfigurationError = primaryWindow->m_proxyConfigurationError;
         m_networkBlockedByProxyError = primaryWindow->m_networkBlockedByProxyError;
@@ -666,6 +672,14 @@ bool MainWindow::eventFilter(QObject *watched, QEvent *event)
             )) {
             return true;
         }
+        if (triggerShortcutAction(
+                m_readerModeAction,
+                keyEvent,
+                m_readerModeAction && m_readerModeAction->isEnabled(),
+                [this, webView] { toggleReaderMode(webView); }
+            )) {
+            return true;
+        }
     }
 
     if (eventType == QEvent::Wheel) {
@@ -833,6 +847,20 @@ void MainWindow::createInterface()
     );
     m_bookmarkAction->setEnabled(false);
     m_bookmarkAction->setToolTip(tr("Add Bookmark (⌘D)"));
+    m_readerModeAction = new QAction(
+        QIcon(QStringLiteral(":/assets/icons/book-open.svg")),
+        tr("Reader Mode"),
+        this
+    );
+    m_readerModeAction->setCheckable(true);
+    m_readerModeAction->setShortcut(QKeySequence(Qt::Key_F9));
+    m_readerModeAction->setShortcutContext(Qt::WindowShortcut);
+    m_readerModeAction->setAutoRepeat(false);
+    m_readerModeAction->setVisible(false);
+    m_address->addAction(m_readerModeAction, QLineEdit::TrailingPosition);
+    connect(m_readerModeAction, &QAction::triggered, this, [this] {
+        toggleReaderMode(commandTargetWebView());
+    });
     m_addressCompletionPopup = new AddressCompletionPopup(m_address, this);
     m_addressSuggestionTimer = new QTimer(this);
     m_addressSuggestionTimer->setSingleShot(true);
@@ -1098,6 +1126,7 @@ void MainWindow::createInterface()
     connect(m_webAppsMenu, &QMenu::aboutToShow, this, &MainWindow::rebuildWebAppsMenu);
 
     fileMenu->addSeparator();
+    fileMenu->addAction(m_readerModeAction);
     QAction *findAction = fileMenu->addAction(
         QIcon(QStringLiteral(":/assets/icons/search.svg")),
         tr("Find in Page…")
@@ -1251,6 +1280,7 @@ void MainWindow::createInterface()
         bookmarksAction->setVisible(false);
         m_installWebAppAction->setVisible(false);
         m_webAppsMenu->menuAction()->setVisible(false);
+        m_readerModeAction->setVisible(false);
         settingsAction->setVisible(false);
         reloadRulesAction->setVisible(false);
         showConfiguration->setVisible(false);
@@ -1372,12 +1402,64 @@ QWebEngineView *MainWindow::createTab(
         : restoredTitle;
     state.pinned = pinned;
     state.page = page;
+    if (m_windowRole != WindowRole::WebApp) {
+        ReaderSettings *readerSettings = m_primaryWindow
+            ? &m_primaryWindow->m_readerSettings
+            : &m_readerSettings;
+        state.readerModeController = new ReaderModeController(
+            page,
+            readerSettings,
+            webView
+        );
+    }
     state.detachedVideoSession = new DetachedVideoSession(webView);
     if (deferred) {
         state.pendingUrl = url;
         state.suppressNextHistoryVisit = true;
     }
     m_tabStates.insert(webView, state);
+    if (state.readerModeController) {
+        connect(
+            state.readerModeController,
+            &ReaderModeController::stateChanged,
+            this,
+            [this, webView] {
+                if (webView == currentWebView())
+                    updateReaderModeAction();
+            }
+        );
+        connect(
+            state.readerModeController,
+            &ReaderModeController::errorOccurred,
+            this,
+            [this, webView](const QString &message) {
+                if (webView == currentWebView())
+                    statusBar()->showMessage(message, 5000);
+                else
+                    qWarning().noquote() << "[PanBrowser reader mode]" << message;
+            }
+        );
+        connect(
+            state.readerModeController,
+            &ReaderModeController::appearanceChanged,
+            this,
+            [this, source = state.readerModeController.data()] {
+                MainWindow *coordinator = m_primaryWindow ? m_primaryWindow : this;
+                QList<MainWindow *> windows{coordinator};
+                for (MainWindow *window : std::as_const(coordinator->m_popupWindows)) {
+                    if (window)
+                        windows.append(window);
+                }
+                for (MainWindow *window : std::as_const(windows)) {
+                    for (const BrowserTabState &tab : std::as_const(window->m_tabStates)) {
+                        ReaderModeController *controller = tab.readerModeController;
+                        if (controller && controller != source)
+                            controller->refreshAppearance();
+                    }
+                }
+            }
+        );
+    }
     connect(
         state.detachedVideoSession,
         &DetachedVideoSession::exitFullScreenRequested,
@@ -2616,6 +2698,7 @@ void MainWindow::updateCurrentTabUi()
         m_progress->hide();
         updateNavigationActions();
         updateBookmarkAction();
+        updateReaderModeAction();
         updateInstallWebAppAction();
         updateZoomActions();
         return;
@@ -2637,8 +2720,72 @@ void MainWindow::updateCurrentTabUi()
     m_progress->setVisible(state.loading);
     updateNavigationActions();
     updateBookmarkAction();
+    updateReaderModeAction();
     updateInstallWebAppAction();
     updateZoomActions();
+}
+
+ReaderModeController *MainWindow::readerModeControllerForTab(
+    QWebEngineView *webView
+) const
+{
+    const auto state = m_tabStates.constFind(webView);
+    return state == m_tabStates.cend() ? nullptr : state->readerModeController.data();
+}
+
+void MainWindow::toggleReaderMode(QWebEngineView *webView)
+{
+    if (!webView || webView != currentWebView() || m_windowRole == WindowRole::WebApp)
+        return;
+
+    ReaderModeController *controller = readerModeControllerForTab(webView);
+    if (!controller)
+        return;
+    if (controller->isActive()) {
+        controller->deactivate();
+        return;
+    }
+
+    const auto state = m_tabStates.constFind(webView);
+    if (state == m_tabStates.cend()
+        || state->detachedVideoWindow
+        || (m_fullScreenController && m_fullScreenController->isActive())) {
+        return;
+    }
+    controller->activate();
+}
+
+void MainWindow::updateReaderModeAction()
+{
+    if (!m_readerModeAction)
+        return;
+
+    QWebEngineView *webView = currentWebView();
+    ReaderModeController *controller = readerModeControllerForTab(webView);
+    const bool active = controller && controller->isActive();
+    const bool available = controller
+        && (active
+            || controller->availability() == ReaderModeController::Availability::Available);
+    const bool blockedByPresentation = m_fullScreenController
+        && m_fullScreenController->isActive();
+    const auto state = m_tabStates.constFind(webView);
+    const bool blockedByDetachedVideo = state != m_tabStates.cend()
+        && state->detachedVideoWindow;
+
+    m_readerModeAction->setVisible(
+        m_windowRole != WindowRole::WebApp && available
+    );
+    m_readerModeAction->setEnabled(
+        available
+            && !controller->isActivationPending()
+            && (!blockedByPresentation || active)
+            && (!blockedByDetachedVideo || active)
+    );
+    m_readerModeAction->setChecked(active);
+    m_readerModeAction->setText(active ? tr("Exit Reader Mode") : tr("Reader Mode"));
+    m_readerModeAction->setToolTip(
+        active ? tr("Exit Reader Mode (F9)") : tr("Reader Mode (F9)")
+    );
 }
 
 void MainWindow::updateNavigationActions()

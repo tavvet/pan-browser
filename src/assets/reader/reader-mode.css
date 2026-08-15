@@ -1,0 +1,297 @@
+:host {
+    all: initial !important;
+    position: fixed !important;
+    inset: 0 !important;
+    z-index: 2147483647 !important;
+    display: block !important;
+    color-scheme: light dark !important;
+    contain: strict !important;
+}
+
+*, *::before, *::after {
+    box-sizing: border-box;
+}
+
+.reader {
+    --reader-bg: #f7f5ef;
+    --reader-panel: rgba(255, 255, 255, 0.94);
+    --reader-text: #25231f;
+    --reader-muted: #68645d;
+    --reader-border: rgba(37, 35, 31, 0.16);
+    --reader-link: #0969a8;
+    --reader-code: rgba(37, 35, 31, 0.07);
+    --reader-menu-bg: #ffffff;
+    --reader-menu-text: #25231f;
+    --reader-native-color-scheme: only light;
+    --reader-font: ui-serif, Georgia, Cambria, "Times New Roman", serif;
+    position: absolute;
+    inset: 0;
+    overflow: auto;
+    overscroll-behavior: contain;
+    background: var(--reader-bg);
+    color: var(--reader-text);
+    font-family: var(--reader-font);
+    font-size: var(--reader-text-size, 20px);
+    line-height: 1.72;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+}
+
+.reader[data-typeface="sans"] {
+    --reader-font: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.reader[data-theme="light"] {
+    color-scheme: light;
+}
+
+.reader[data-theme="sepia"] {
+    --reader-bg: #f2ead9;
+    --reader-panel: rgba(250, 244, 231, 0.95);
+    --reader-text: #382f25;
+    --reader-muted: #776959;
+    --reader-border: rgba(56, 47, 37, 0.18);
+    --reader-link: #8a4e20;
+    --reader-code: rgba(56, 47, 37, 0.08);
+    --reader-menu-bg: #faf4e7;
+    --reader-menu-text: #382f25;
+    color-scheme: light;
+}
+
+.reader[data-theme="dark"] {
+    --reader-bg: #171a1f;
+    --reader-panel: rgba(34, 38, 45, 0.95);
+    --reader-text: #e8eaf0;
+    --reader-muted: #aeb4bf;
+    --reader-border: rgba(232, 234, 240, 0.16);
+    --reader-link: #74b9ee;
+    --reader-code: rgba(232, 234, 240, 0.08);
+    --reader-menu-bg: #22262d;
+    --reader-menu-text: #e8eaf0;
+    --reader-native-color-scheme: only dark;
+    color-scheme: dark;
+}
+
+@media (prefers-color-scheme: dark) {
+    .reader[data-theme="system"] {
+        --reader-bg: #171a1f;
+        --reader-panel: rgba(34, 38, 45, 0.95);
+        --reader-text: #e8eaf0;
+        --reader-muted: #aeb4bf;
+        --reader-border: rgba(232, 234, 240, 0.16);
+        --reader-link: #74b9ee;
+        --reader-code: rgba(232, 234, 240, 0.08);
+        --reader-menu-bg: #22262d;
+        --reader-menu-text: #e8eaf0;
+        --reader-native-color-scheme: only dark;
+    }
+}
+
+.toolbar {
+    position: sticky;
+    top: 14px;
+    z-index: 2;
+    display: flex;
+    justify-content: flex-end;
+    width: min(calc(100% - 32px), calc(var(--reader-width, 720px) + 220px));
+    margin: 0 auto;
+    pointer-events: none;
+}
+
+.controls {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 6px;
+    border: 1px solid var(--reader-border);
+    border-radius: 12px;
+    background: var(--reader-panel);
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.14);
+    font: 13px/1 ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    pointer-events: auto;
+    backdrop-filter: blur(12px);
+}
+
+.controls button,
+.controls select {
+    min-width: 32px;
+    height: 30px;
+    margin: 0;
+    padding: 0 8px;
+    border: 0;
+    border-radius: 7px;
+    background: transparent;
+    color: var(--reader-text);
+    font: inherit;
+    cursor: pointer;
+}
+
+.controls select {
+    color-scheme: var(--reader-native-color-scheme);
+}
+
+.controls select option {
+    background-color: var(--reader-menu-bg);
+    color: var(--reader-menu-text);
+}
+
+.controls button:hover,
+.controls button:focus-visible,
+.controls select:hover,
+.controls select:focus-visible {
+    outline: none;
+    background: var(--reader-code);
+}
+
+.controls .close {
+    margin-left: 3px;
+    font-size: 18px;
+}
+
+.document {
+    width: min(calc(100% - 48px), var(--reader-width, 720px));
+    margin: 28px auto 96px;
+}
+
+.header {
+    padding-bottom: 24px;
+    border-bottom: 1px solid var(--reader-border);
+}
+
+.title {
+    margin: 0;
+    color: var(--reader-text);
+    font: 700 clamp(2rem, 5vw, 3.4rem)/1.12 var(--reader-font);
+    letter-spacing: -0.025em;
+}
+
+.meta {
+    margin: 14px 0 0;
+    color: var(--reader-muted);
+    font: 0.82em/1.45 ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.article {
+    padding-top: 28px;
+}
+
+.article > :first-child {
+    margin-top: 0;
+}
+
+.article h1,
+.article h2,
+.article h3,
+.article h4,
+.article h5,
+.article h6 {
+    margin: 1.5em 0 0.55em;
+    color: var(--reader-text);
+    font-family: var(--reader-font);
+    line-height: 1.24;
+}
+
+.article p,
+.article ul,
+.article ol,
+.article blockquote,
+.article pre,
+.article figure,
+.article table {
+    margin: 1.05em 0;
+}
+
+.article a {
+    color: var(--reader-link);
+    text-decoration-thickness: 0.08em;
+    text-underline-offset: 0.14em;
+}
+
+.article img {
+    display: block;
+    max-width: 100%;
+    height: auto;
+    margin: 1.4em auto;
+    border-radius: 8px;
+}
+
+.article figure {
+    max-width: 100%;
+}
+
+.article figcaption {
+    margin-top: -0.7em;
+    color: var(--reader-muted);
+    font-size: 0.78em;
+    line-height: 1.45;
+    text-align: center;
+}
+
+.article blockquote {
+    padding-left: 1.1em;
+    border-left: 3px solid var(--reader-border);
+    color: var(--reader-muted);
+}
+
+.article pre,
+.article code {
+    border-radius: 5px;
+    background: var(--reader-code);
+    font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+    font-size: 0.82em;
+}
+
+.article code {
+    padding: 0.12em 0.3em;
+}
+
+.article pre {
+    max-width: 100%;
+    padding: 1em;
+    overflow: auto;
+    white-space: pre-wrap;
+}
+
+.article table {
+    display: block;
+    max-width: 100%;
+    overflow-x: auto;
+    border-collapse: collapse;
+    font-size: 0.86em;
+}
+
+.article th,
+.article td {
+    padding: 0.45em 0.65em;
+    border: 1px solid var(--reader-border);
+}
+
+@media (max-width: 680px) {
+    .toolbar {
+        top: 8px;
+        width: calc(100% - 16px);
+    }
+
+    .controls {
+        max-width: 100%;
+        overflow-x: auto;
+    }
+
+    .document {
+        width: calc(100% - 32px);
+        margin-top: 22px;
+    }
+}
+
+@media print {
+    .toolbar {
+        display: none;
+    }
+
+    .reader {
+        position: static;
+        overflow: visible;
+        background: white;
+        color: black;
+    }
+}
