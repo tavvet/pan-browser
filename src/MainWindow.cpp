@@ -206,6 +206,7 @@ MainWindow::MainWindow(
         if (!readerSettingsError.isEmpty())
             qWarning().noquote() << "[PanBrowser reader settings]" << readerSettingsError;
         initializeSearchSettings();
+        initializeUserAgentSettings();
         initializeDnsSettings();
         initializeProxySettings();
         initializeCrossDomainSettings();
@@ -218,7 +219,8 @@ MainWindow::MainWindow(
             nullptr,
             m_networkBlockedByProxyError,
             m_crossDomainSettings,
-            m_crossDomainConfigurationPath
+            m_crossDomainConfigurationPath,
+            m_activeUserAgentSettings
         );
         m_votUserscriptManager = new VotUserscriptManager(
             QDir(QStandardPaths::writableLocation(QStandardPaths::AppDataLocation))
@@ -296,6 +298,7 @@ MainWindow::MainWindow(
         m_webAppStore = sharedWebAppStore;
         m_configurationPath = primaryWindow->m_configurationPath;
         m_searchConfigurationPath = primaryWindow->m_searchConfigurationPath;
+        m_userAgentConfigurationPath = primaryWindow->m_userAgentConfigurationPath;
         m_dnsConfigurationPath = primaryWindow->m_dnsConfigurationPath;
         m_proxyConfigurationPath = primaryWindow->m_proxyConfigurationPath;
         m_crossDomainConfigurationPath = primaryWindow->m_crossDomainConfigurationPath;
@@ -304,6 +307,8 @@ MainWindow::MainWindow(
         m_trustPolicy = primaryWindow->m_trustPolicy;
         m_preferences = primaryWindow->m_preferences;
         m_searchSettings = primaryWindow->m_searchSettings;
+        m_userAgentSettings = primaryWindow->m_userAgentSettings;
+        m_activeUserAgentSettings = primaryWindow->m_activeUserAgentSettings;
         m_dnsSettings = primaryWindow->m_dnsSettings;
         m_proxySettings = primaryWindow->m_proxySettings;
         m_activeProxySettings = primaryWindow->m_activeProxySettings;
@@ -312,6 +317,7 @@ MainWindow::MainWindow(
         m_readerSettings = primaryWindow->m_readerSettings;
         m_votUserscriptManager = primaryWindow->m_votUserscriptManager;
         m_proxyConfigurationError = primaryWindow->m_proxyConfigurationError;
+        m_userAgentConfigurationError = primaryWindow->m_userAgentConfigurationError;
         m_networkBlockedByProxyError = primaryWindow->m_networkBlockedByProxyError;
         m_proxyAuthenticationController = primaryWindow->m_proxyAuthenticationController;
         m_httpAuthenticationController = primaryWindow->m_httpAuthenticationController;
@@ -3531,6 +3537,7 @@ void MainWindow::openSettingsPage(int page)
     SettingsDialogContext settingsContext;
     settingsContext.trustConfigurationPath = m_configurationPath;
     settingsContext.searchConfigurationPath = m_searchConfigurationPath;
+    settingsContext.userAgentConfigurationPath = m_userAgentConfigurationPath;
     settingsContext.dnsConfigurationPath = m_dnsConfigurationPath;
     settingsContext.proxyConfigurationPath = m_proxyConfigurationPath;
     settingsContext.crossDomainConfigurationPath = m_crossDomainConfigurationPath;
@@ -3538,12 +3545,15 @@ void MainWindow::openSettingsPage(int page)
         m_videoTranslationConfigurationPath;
     settingsContext.preferences = m_preferences;
     settingsContext.searchSettings = m_searchSettings;
+    settingsContext.userAgentSettings = m_userAgentSettings;
+    settingsContext.activeUserAgentSettings = m_activeUserAgentSettings;
     settingsContext.dnsSettings = m_dnsSettings;
     settingsContext.proxySettings = m_proxySettings;
     settingsContext.activeProxySettings = m_activeProxySettings;
     settingsContext.crossDomainSettings = m_profile->crossDomainSettings();
     settingsContext.videoTranslationSettings = m_videoTranslationSettings;
     settingsContext.networkBlockedByProxyError = m_networkBlockedByProxyError;
+    settingsContext.userAgentConfigurationError = m_userAgentConfigurationError;
     settingsContext.profile = m_profile;
     settingsContext.historyStore = m_historyStore;
     settingsContext.webAppStore = m_webAppStore;
@@ -3572,8 +3582,17 @@ void MainWindow::openSettingsPage(int page)
                 dialog.proxySettings(),
                 m_activeProxySettings
             );
+        const bool userAgentRestartRequired =
+            !hasSameEffectiveUserAgentConfiguration(
+                dialog.userAgentSettings(),
+                m_activeUserAgentSettings
+            );
         m_preferences = dialog.preferences();
         m_searchSettings = dialog.searchSettings();
+        m_userAgentSettings = dialog.userAgentSettings();
+        if (!userAgentRestartRequired)
+            m_activeUserAgentSettings = m_userAgentSettings;
+        m_userAgentConfigurationError.clear();
         m_dnsSettings = dialog.dnsSettings();
         m_proxySettings = dialog.proxySettings();
         m_crossDomainSettings = dialog.crossDomainSettings();
@@ -3612,6 +3631,9 @@ void MainWindow::openSettingsPage(int page)
             if (popup) {
                 popup->m_preferences = m_preferences;
                 popup->m_searchSettings = m_searchSettings;
+                popup->m_userAgentSettings = m_userAgentSettings;
+                popup->m_activeUserAgentSettings = m_activeUserAgentSettings;
+                popup->m_userAgentConfigurationError.clear();
                 popup->m_dnsSettings = m_dnsSettings;
                 popup->m_proxySettings = m_proxySettings;
                 popup->m_crossDomainSettings = m_crossDomainSettings;
@@ -3636,19 +3658,17 @@ void MainWindow::openSettingsPage(int page)
         }
         m_crossDomainPromptRoutes.clear();
         reloadRules();
-        if (languageChanged || proxyRestartRequired) {
-            QString restartMessage;
-            if (languageChanged && proxyRestartRequired) {
-                restartMessage = tr(
-                    "Restart PanBrowser to apply the new interface language and proxy settings."
-                );
-            } else if (languageChanged) {
-                restartMessage = tr(
-                    "Restart PanBrowser to apply the new interface language."
-                );
-            } else {
-                restartMessage = tr("Restart PanBrowser to apply the new proxy settings.");
-            }
+        if (languageChanged || proxyRestartRequired || userAgentRestartRequired) {
+            QStringList restartChanges;
+            if (languageChanged)
+                restartChanges.append(tr("Interface language"));
+            if (proxyRestartRequired)
+                restartChanges.append(tr("Proxy settings"));
+            if (userAgentRestartRequired)
+                restartChanges.append(tr("User-Agent profile"));
+            const QString restartMessage = tr(
+                "Restart PanBrowser to apply these changes:\n• %1"
+            ).arg(restartChanges.join(QStringLiteral("\n• ")));
             QMessageBox::information(
                 this,
                 tr("Restart required"),
@@ -3994,6 +4014,35 @@ void MainWindow::initializeSearchSettings()
 
     if (!m_searchSettings.save(m_searchConfigurationPath, &error))
         qWarning().noquote() << "[PanBrowser search settings]" << error;
+}
+
+void MainWindow::initializeUserAgentSettings()
+{
+    const QString directory = QStandardPaths::writableLocation(
+        QStandardPaths::AppDataLocation
+    );
+    QDir().mkpath(directory);
+    m_userAgentConfigurationPath = QDir(directory).filePath(
+        QStringLiteral("user-agents.json")
+    );
+    m_userAgentSettings = UserAgentSettings::defaults();
+    m_userAgentConfigurationError.clear();
+
+    QString error;
+    if (QFile::exists(m_userAgentConfigurationPath)) {
+        UserAgentSettings loaded;
+        if (loaded.load(m_userAgentConfigurationPath, &error)) {
+            m_userAgentSettings = loaded;
+        } else {
+            m_userAgentConfigurationError = error;
+            qWarning().noquote() << "[PanBrowser User-Agent settings]" << error
+                                 << "Using Chromium defaults; the file was not overwritten.";
+        }
+    } else if (!m_userAgentSettings.save(m_userAgentConfigurationPath, &error)) {
+        m_userAgentConfigurationError = error;
+        qWarning().noquote() << "[PanBrowser User-Agent settings]" << error;
+    }
+    m_activeUserAgentSettings = m_userAgentSettings;
 }
 
 void MainWindow::initializeDnsSettings()

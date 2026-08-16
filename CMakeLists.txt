@@ -180,6 +180,10 @@ set(PANBROWSER_APP_SOURCES
     src/SearchSettings.h
     src/SearchSettingsPage.cpp
     src/SearchSettingsPage.h
+    src/UserAgentSettings.cpp
+    src/UserAgentSettings.h
+    src/UserAgentSettingsPage.cpp
+    src/UserAgentSettingsPage.h
     src/SiteDomain.cpp
     src/SiteDomain.h
     src/SettingsDialog.cpp
@@ -518,6 +522,10 @@ qt_add_executable(PanBrowserTests
     src/SearchSettings.h
     src/SearchSettingsPage.cpp
     src/SearchSettingsPage.h
+    src/UserAgentSettings.cpp
+    src/UserAgentSettings.h
+    src/UserAgentSettingsPage.cpp
+    src/UserAgentSettingsPage.h
     src/SiteDomain.cpp
     src/SiteDomain.h
     src/SettingsDialog.cpp

@@ -12,6 +12,7 @@
 #include "SearchSettingsPage.h"
 #include "SettingsSaveTransaction.h"
 #include "TrustRulesSettingsPage.h"
+#include "UserAgentSettingsPage.h"
 #include "VideoTranslationSettingsPage.h"
 #include "WebAppsSettingsPage.h"
 
@@ -76,18 +77,22 @@ SettingsDialog::SettingsDialog(
     : QDialog(parent)
     , m_configurationPath(context.trustConfigurationPath)
     , m_searchConfigurationPath(context.searchConfigurationPath)
+    , m_userAgentConfigurationPath(context.userAgentConfigurationPath)
     , m_dnsConfigurationPath(context.dnsConfigurationPath)
     , m_proxyConfigurationPath(context.proxyConfigurationPath)
     , m_crossDomainConfigurationPath(context.crossDomainConfigurationPath)
     , m_videoTranslationConfigurationPath(context.videoTranslationConfigurationPath)
     , m_preferences(context.preferences)
     , m_searchSettings(context.searchSettings)
+    , m_userAgentSettings(context.userAgentSettings)
+    , m_activeUserAgentSettings(context.activeUserAgentSettings)
     , m_dnsSettings(context.dnsSettings)
     , m_proxySettings(context.proxySettings)
     , m_activeProxySettings(context.activeProxySettings)
     , m_crossDomainSettings(context.crossDomainSettings)
     , m_videoTranslationSettings(context.videoTranslationSettings)
     , m_networkBlockedByProxyError(context.networkBlockedByProxyError)
+    , m_userAgentConfigurationError(context.userAgentConfigurationError)
     , m_profile(context.profile)
     , m_votUserscriptManager(context.votUserscriptManager)
 {
@@ -113,6 +118,11 @@ BrowserPreferences SettingsDialog::preferences() const
 SearchSettings SettingsDialog::searchSettings() const
 {
     return m_searchSettings;
+}
+
+UserAgentSettings SettingsDialog::userAgentSettings() const
+{
+    return m_userAgentSettings;
 }
 
 DnsSettings SettingsDialog::dnsSettings() const
@@ -202,6 +212,18 @@ void SettingsDialog::createInterface(
         QIcon(QStringLiteral(":/assets/icons/search.svg")),
         tr("Search"),
         m_searchPage
+    );
+
+    m_userAgentPage = new UserAgentSettingsPage(
+        m_userAgentSettings,
+        m_profile ? m_profile->defaultHttpUserAgent() : QString(),
+        m_pages
+    );
+    registerPage(
+        Page::UserAgent,
+        QIcon(QStringLiteral(":/assets/icons/scan-face.svg")),
+        tr("User-Agent"),
+        m_userAgentPage
     );
 
     m_historyPage = new HistorySettingsPage(
@@ -312,6 +334,9 @@ void SettingsDialog::createInterface(
         m_activeProxySettings,
         m_proxySettings,
         m_networkBlockedByProxyError,
+        m_activeUserAgentSettings,
+        m_userAgentSettings,
+        m_userAgentConfigurationError,
         m_pages
     );
     registerPage(
@@ -419,6 +444,11 @@ void SettingsDialog::saveAndClose()
         QMessageBox::warning(this, tr("Cannot save search settings"), error);
         return;
     }
+    if (!m_userAgentPage->validate(&error)) {
+        selectPage(Page::UserAgent);
+        QMessageBox::warning(this, tr("Cannot save User-Agent settings"), error);
+        return;
+    }
     if (!m_dnsPage->validate(&error)) {
         selectPage(Page::Dns);
         QMessageBox::warning(this, tr("Cannot save DNS settings"), error);
@@ -444,6 +474,8 @@ void SettingsDialog::saveAndClose()
             {
                 m_searchConfigurationPath,
                 m_searchConfigurationPath + QStringLiteral(".backup"),
+                m_userAgentConfigurationPath,
+                m_userAgentConfigurationPath + QStringLiteral(".backup"),
                 m_dnsConfigurationPath,
                 m_dnsConfigurationPath + QStringLiteral(".backup"),
                 m_proxyConfigurationPath,
@@ -462,6 +494,7 @@ void SettingsDialog::saveAndClose()
     }
 
     SearchSettings searchSettings = m_searchPage->settings();
+    UserAgentSettings userAgentSettings = m_userAgentPage->settings();
     DnsSettings dnsSettings = m_dnsPage->settings();
     ProxySettings proxySettings = m_proxyPage->settings();
     CrossDomainSettings crossDomainSettings = m_crossDomainPage->settings();
@@ -478,6 +511,14 @@ void SettingsDialog::saveAndClose()
         if (!rollbackError.isEmpty())
             error += tr("\n\nRollback was incomplete:\n") + rollbackError;
         QMessageBox::warning(this, tr("Cannot save search settings"), error);
+        return;
+    }
+    if (!userAgentSettings.save(m_userAgentConfigurationPath, &error)) {
+        const QString rollbackError = rollbackSettings(m_preferences, transaction);
+        selectPage(Page::UserAgent);
+        if (!rollbackError.isEmpty())
+            error += tr("\n\nRollback was incomplete:\n") + rollbackError;
+        QMessageBox::warning(this, tr("Cannot save User-Agent settings"), error);
         return;
     }
     if (!dnsSettings.save(m_dnsConfigurationPath, &error)) {
@@ -539,6 +580,7 @@ void SettingsDialog::saveAndClose()
     const QStringList certificateCleanupFailures = m_trustRules->finalizeSave();
     m_preferences = preferences;
     m_searchSettings = searchSettings;
+    m_userAgentSettings = userAgentSettings;
     m_dnsSettings = dnsSettings;
     m_proxySettings = proxySettings;
     m_crossDomainSettings = crossDomainSettings;

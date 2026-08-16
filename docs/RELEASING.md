@@ -166,8 +166,8 @@ Before publishing a candidate:
 5. smoke-test navigation, trust rules, downloads, HTTP authentication and, with
    a disposable entry, the saved-credentials manager,
    camera/microphone/location permissions, Site Connections, animated and
-   pinned tabs, Reader Mode detection/exit and appearance persistence, video
-   pop-out, and an installed web app;
+   pinned tabs, Reader Mode detection/exit and appearance persistence, a custom
+   User-Agent profile after restart, video pop-out, and an installed web app;
 6. when the target version exposes VOT integration, select the exact supported
    upstream userscript from outside the bundle, verify System DNS and
    Site Connections behavior, then confirm that neither that source file nor

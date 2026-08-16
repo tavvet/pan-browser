@@ -690,6 +690,9 @@ void WindowInteractionTests::settingsDialogRegistersEveryPageAndSelectsInitialPa
     SettingsDialogContext context;
     context.trustConfigurationPath = directory.filePath(QStringLiteral("trust.json"));
     context.searchConfigurationPath = directory.filePath(QStringLiteral("search.json"));
+    context.userAgentConfigurationPath = directory.filePath(
+        QStringLiteral("user-agents.json")
+    );
     context.dnsConfigurationPath = directory.filePath(QStringLiteral("dns.json"));
     context.proxyConfigurationPath = directory.filePath(QStringLiteral("proxy.json"));
     context.crossDomainConfigurationPath = directory.filePath(
@@ -713,8 +716,8 @@ void WindowInteractionTests::settingsDialogRegistersEveryPageAndSelectsInitialPa
     auto *pages = dialog.findChild<QStackedWidget *>(QStringLiteral("settingsPages"));
     QVERIFY(sidebar);
     QVERIFY(pages);
-    QCOMPARE(sidebar->count(), 12);
-    QCOMPARE(pages->count(), 12);
+    QCOMPARE(sidebar->count(), 13);
+    QCOMPARE(pages->count(), 13);
     QCOMPARE(
         sidebar->currentItem()->data(Qt::UserRole).toInt(),
         static_cast<int>(SettingsDialog::Page::WebApps)
@@ -730,6 +733,7 @@ void WindowInteractionTests::settingsDialogRegistersEveryPageAndSelectsInitialPa
     const QList<SettingsDialog::Page> expectedPages{
         SettingsDialog::Page::General,
         SettingsDialog::Page::Search,
+        SettingsDialog::Page::UserAgent,
         SettingsDialog::Page::History,
         SettingsDialog::Page::WebApps,
         SettingsDialog::Page::VideoTranslation,
@@ -744,6 +748,7 @@ void WindowInteractionTests::settingsDialogRegistersEveryPageAndSelectsInitialPa
     const QStringList expectedObjectNames{
         QStringLiteral("generalSettingsPage"),
         QStringLiteral("searchSettingsPage"),
+        QStringLiteral("userAgentSettingsPage"),
         QStringLiteral("historySettingsPage"),
         QStringLiteral("webAppsSettingsPage"),
         QStringLiteral("videoTranslationSettingsPage"),

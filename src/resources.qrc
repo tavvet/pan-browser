@@ -30,6 +30,7 @@
         <file>assets/icons/languages.svg</file>
         <file>assets/icons/key-round.svg</file>
         <file>assets/icons/book-open.svg</file>
+        <file>assets/icons/scan-face.svg</file>
         <file>assets/reader/reader-mode.css</file>
         <file>assets/reader/reader-mode.js</file>
         <file>assets/reader/third_party/readability/Readability-readerable.js</file>

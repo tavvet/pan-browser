@@ -80,6 +80,14 @@ QFormLayout *addCard(QVBoxLayout *layout, QWidget *parent)
     return form;
 }
 
+QString selectedUserAgentProfileName(const UserAgentSettings &settings)
+{
+    const UserAgentProfile *profile = settings.selectedProfile();
+    return profile
+        ? profile->name
+        : QCoreApplication::translate("DiagnosticsPage", "Unavailable");
+}
+
 } // namespace
 
 DiagnosticsPage::DiagnosticsPage(
@@ -88,6 +96,9 @@ DiagnosticsPage::DiagnosticsPage(
     const ProxySettings &activeProxySettings,
     const ProxySettings &configuredProxySettings,
     bool networkBlockedByProxyError,
+    const UserAgentSettings &activeUserAgentSettings,
+    const UserAgentSettings &configuredUserAgentSettings,
+    const QString &userAgentConfigurationError,
     QWidget *parent
 )
     : QWidget(parent)
@@ -96,6 +107,9 @@ DiagnosticsPage::DiagnosticsPage(
     , m_activeProxySettings(activeProxySettings)
     , m_configuredProxySettings(configuredProxySettings)
     , m_networkBlockedByProxyError(networkBlockedByProxyError)
+    , m_activeUserAgentSettings(activeUserAgentSettings)
+    , m_configuredUserAgentSettings(configuredUserAgentSettings)
+    , m_userAgentConfigurationError(userAgentConfigurationError)
 {
     setObjectName(QStringLiteral("diagnosticsSettingsPage"));
     auto *rootLayout = new QVBoxLayout(this);
@@ -225,6 +239,35 @@ DiagnosticsPage::DiagnosticsPage(
             this
         )
     );
+    graphics->addRow(
+        tr("Active User-Agent profile"),
+        valueLabel(selectedUserAgentProfileName(m_activeUserAgentSettings), this)
+    );
+    QString configuredUserAgent = selectedUserAgentProfileName(
+        m_configuredUserAgentSettings
+    );
+    if (!m_userAgentConfigurationError.isEmpty()) {
+        configuredUserAgent = tr("%1 — configuration error").arg(configuredUserAgent);
+    } else if (!hasSameEffectiveUserAgentConfiguration(
+                   m_activeUserAgentSettings,
+                   m_configuredUserAgentSettings
+               )) {
+        configuredUserAgent = tr("%1 — pending restart").arg(configuredUserAgent);
+    }
+    graphics->addRow(
+        tr("Configured User-Agent profile"),
+        valueLabel(configuredUserAgent, this)
+    );
+    graphics->addRow(
+        tr("HTTP User-Agent"),
+        valueLabel(m_profile->httpUserAgent(), this)
+    );
+    if (!m_userAgentConfigurationError.isEmpty()) {
+        graphics->addRow(
+            tr("User-Agent settings error"),
+            valueLabel(m_userAgentConfigurationError, this)
+        );
+    }
 
     auto *graphicsHint = new QLabel(
         tr("“Automatic” means Chromium attempts to use the GPU and falls back when necessary. For the exact active GPU and ANGLE/RHI backend, launch PanBrowser with QT_LOGGING_RULES=\"qt.webenginecontext=true;qt.webengine.compositor=true\"."),
@@ -296,8 +339,12 @@ QString DiagnosticsPage::diagnosticReport() const
         "DNS provider: %15\n"
         "Active proxy: %16\n"
         "Configured proxy: %17\n"
-        "Persistent storage: %18\n"
-        "HTTP cache: %19\n"
+        "Active User-Agent profile: %18\n"
+        "Configured User-Agent profile: %19\n"
+        "HTTP User-Agent: %20\n"
+        "User-Agent settings error: %21\n"
+        "Persistent storage: %22\n"
+        "HTTP cache: %23\n"
     ).arg(
         QCoreApplication::applicationVersion(),
         QString::fromLatin1(qVersion()),
@@ -331,6 +378,20 @@ QString DiagnosticsPage::diagnosticReport() const
             ? proxyConfigurationDisplayName(m_configuredProxySettings)
             : proxyConfigurationDisplayName(m_configuredProxySettings)
                 + QStringLiteral(" — pending restart"),
+        selectedUserAgentProfileName(m_activeUserAgentSettings),
+        hasSameEffectiveUserAgentConfiguration(
+            m_activeUserAgentSettings,
+            m_configuredUserAgentSettings
+        ) && m_userAgentConfigurationError.isEmpty()
+            ? selectedUserAgentProfileName(m_configuredUserAgentSettings)
+            : selectedUserAgentProfileName(m_configuredUserAgentSettings)
+                + (m_userAgentConfigurationError.isEmpty()
+                    ? QStringLiteral(" — pending restart")
+                    : QStringLiteral(" — configuration error")),
+        m_profile->httpUserAgent(),
+        m_userAgentConfigurationError.isEmpty()
+            ? QStringLiteral("None")
+            : m_userAgentConfigurationError,
         m_profile->persistentStoragePath(),
         m_profile->cachePath()
     );

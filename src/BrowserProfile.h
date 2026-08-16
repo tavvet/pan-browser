@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CrossDomainSettings.h"
+#include "UserAgentSettings.h"
 
 #include <QWebEngineProfile>
 
@@ -16,7 +17,8 @@ public:
         QObject *parent = nullptr,
         bool blockNetwork = false,
         const CrossDomainSettings &crossDomainSettings = CrossDomainSettings::defaults(),
-        const QString &crossDomainSettingsPath = QString()
+        const QString &crossDomainSettingsPath = QString(),
+        const UserAgentSettings &userAgentSettings = UserAgentSettings::defaults()
     );
 
     static bool applyPendingDataReset(QString *error = nullptr);
@@ -27,6 +29,7 @@ public:
 
     void setPersistSessionCookies(bool persist);
     void clearAllCookies();
+    [[nodiscard]] QString defaultHttpUserAgent() const;
     [[nodiscard]] CrossDomainSettings crossDomainSettings() const;
     bool setCrossDomainSettings(
         const CrossDomainSettings &settings,
@@ -72,4 +75,5 @@ private:
     CrossDomainRequestInterceptor *m_requestInterceptor = nullptr;
     CrossDomainSettings m_crossDomainSettings;
     QString m_crossDomainSettingsPath;
+    QString m_defaultHttpUserAgent;
 };

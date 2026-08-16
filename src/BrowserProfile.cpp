@@ -57,12 +57,14 @@ BrowserProfile::BrowserProfile(
     QObject *parent,
     bool blockNetwork,
     const CrossDomainSettings &crossDomainSettings,
-    const QString &crossDomainSettingsPath
+    const QString &crossDomainSettingsPath,
+    const UserAgentSettings &userAgentSettings
 )
     : QWebEngineProfile(QStringLiteral("PanBrowser"), parent)
     , m_crossDomainSettings(crossDomainSettings)
     , m_crossDomainSettingsPath(crossDomainSettingsPath)
 {
+    m_defaultHttpUserAgent = httpUserAgent();
     const QString storagePath = profilePath();
     const QString cachePath = webEngineCachePath();
 
@@ -77,6 +79,9 @@ BrowserProfile::BrowserProfile(
     setHttpCacheType(QWebEngineProfile::DiskHttpCache);
     setPersistentPermissionsPolicy(QWebEngineProfile::PersistentPermissionsPolicy::AskEveryTime);
     setPersistSessionCookies(persistSessionCookies);
+    QString userAgentError;
+    if (!applyUserAgentSettings(this, userAgentSettings, &userAgentError))
+        qWarning().noquote() << "[PanBrowser User-Agent]" << userAgentError;
     m_requestInterceptor = new CrossDomainRequestInterceptor(
         blockNetwork,
         m_crossDomainSettings,
@@ -151,6 +156,11 @@ void BrowserProfile::setPersistSessionCookies(bool persist)
 void BrowserProfile::clearAllCookies()
 {
     cookieStore()->deleteAllCookies();
+}
+
+QString BrowserProfile::defaultHttpUserAgent() const
+{
+    return m_defaultHttpUserAgent;
 }
 
 CrossDomainSettings BrowserProfile::crossDomainSettings() const

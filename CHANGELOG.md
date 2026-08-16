@@ -47,6 +47,9 @@ experimental video tooling.
   non-secret metadata and supports confirmed individual or namespace deletion.
 - Replaced the earlier trust-themed application artwork with PanBrowser's
   original pangolin icon and aligned Settings navigation icons.
+- Added browser-wide User-Agent profiles with dynamically versioned Chromium
+  presets for Windows, macOS, Linux, and Android, validated custom profiles,
+  reduced Client Hints, restart-safe activation, and Diagnostics visibility.
 
 ## 0.1.0 — 2026-08-10
 

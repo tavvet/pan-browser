@@ -61,6 +61,8 @@ test environments, and other deliberately scoped trust configurations.
   revealing passwords and supports confirmed deletion.
 - Browser-wide System/Direct/HTTP/SOCKS5 proxy modes and configurable
   DNS-over-HTTPS providers.
+- Browser-wide User-Agent profiles with current-Chromium desktop and mobile
+  presets, custom profile management, and aligned platform/mobile Client Hints.
 - An opt-in experimental firewall for third-party page connections, with
   global exceptions and per-site session or persistent decisions.
 - Opt-in integration with the independently maintained VOT userscript for
@@ -72,7 +74,7 @@ test environments, and other deliberately scoped trust configurations.
 - Opt-in developer tools with Inspect Element and familiar keyboard shortcuts;
   disabled by default.
 - Diagnostics for the application, Chromium, graphics, sandbox, profile,
-  DNS, and proxy state.
+  DNS, proxy, and User-Agent state.
 
 See [CHANGELOG.md](CHANGELOG.md) for milestone notes and
 [ROADMAP.md](ROADMAP.md) for planned work.
@@ -81,6 +83,14 @@ Page zoom is available from the application menu and through `Command + Plus`,
 `Command + Minus`, and `Command + 0` on macOS (`Ctrl` on Windows and Linux).
 Holding the same modifier while scrolling over the page also changes zoom.
 PanBrowser remembers the selected level separately for each HTTP(S) origin.
+
+Open **Settings → User-Agent** to select a built-in current-Chromium identity
+or manage custom compatibility profiles. Each profile stores an exact
+User-Agent string plus platform and desktop/mobile metadata. Active-profile
+changes apply after PanBrowser restarts so every tab, popup, and installed web
+app starts with one consistent WebEngine profile. This is a compatibility
+feature, not complete browser or device emulation: JavaScript APIs, supported
+web features, and other Chromium behavior remain visible to websites.
 
 Tabs support the familiar browser shortcuts: `Command/Ctrl + T` opens a tab,
 `Command/Ctrl + W` closes it, and `Command/Ctrl + Shift + T` restores the most
@@ -413,7 +423,9 @@ paths, or use **Show Configuration Folder** in the application menu to open the
 PanBrowser application-data directory. The WebEngine profile contains Chromium
 cookies and site data. The surrounding application-data directory contains
 session, download, history, bookmark, web-app, search, DNS, proxy, trust, and
-feature configuration. It also contains `site-connections.json` with the
+feature configuration. `user-agents.json` stores the active User-Agent profile
+ID and custom profile metadata; it contains no cookies or credentials. The
+directory also contains `site-connections.json` with the
 opt-in firewall mode, global exceptions, and persistent source-to-target
 decisions. Reader Mode theme, typeface, text size, and content width are stored
 with the application's native preferences rather than in the WebEngine profile.

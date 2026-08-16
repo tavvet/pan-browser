@@ -64,6 +64,7 @@ flowchart TD
     ProxyAuth --> CredentialStore
     MW --> VotManager["VotUserscriptManager"]
     Profile --> RequestFilter["CrossDomainRequestInterceptor"]
+    Profile --> UserAgent["UserAgentSettings / user-agents.json"]
     RequestFilter --> ConnectionPolicy["CrossDomainSettings / site-connections.json"]
     ConnectionPolicy --> PSL["Bundled Public Suffix List"]
     MW --> Session["SessionStore"]
@@ -90,6 +91,8 @@ flowchart TD
     TrustEditor --> CertRepo["TrustCertificateRepository"]
     TrustEditor --> CertDetails["CertificateDetailsDialog"]
     Settings --> Search["SearchSettings"]
+    Settings --> UserAgentPage["UserAgentSettingsPage"]
+    UserAgentPage --> UserAgent
     Settings --> Privacy["PrivacyDataSettingsPage"]
     Settings --> DNS["DnsSettings / QWebEngineGlobalSettings"]
     Settings --> Proxy["ProxySettings / QNetworkProxy"]
@@ -106,8 +109,9 @@ flowchart TD
 The primary `MainWindow` is the composition root. It creates and owns the
 shared `BrowserProfile`, `DownloadManager`, `HistoryStore`, `BookmarkStore`,
 `WebAppStore`, and `VotUserscriptManager`. Popup and installed web-app windows
-reuse those objects and the current trust, search, DNS, proxy, video-translation,
-and preference state; they do not create independent browser profiles.
+reuse those objects and the current trust, search, User-Agent, DNS, proxy,
+video-translation, and preference state; they do not create independent browser
+profiles.
 
 Each tab owns one `QWebEngineView` and one `BrowserPage`. `BrowserTabState` in
 `MainWindow` contains UI state that Qt WebEngine does not provide as a single
@@ -618,7 +622,38 @@ application step or use Chromium-supported mechanisms explicitly. Proxy mode
 is not a VPN boundary; external applications and traffic outside Chromium's
 HTTP proxy path are not covered.
 
-### 6.5 Third-party site connections
+### 6.5 User-Agent profiles
+
+`UserAgentSettings` owns one browser-wide active identity. Its immutable
+built-ins use the exact bundled Chromium version and reduced, stable platform
+tokens for Windows, macOS, Linux, and Android; `Chromium default` leaves the
+fresh WebEngine profile untouched. Custom entries store a bounded printable
+ASCII User-Agent string, platform, and mobile flag. IDs are unique; custom
+profile names are unique among custom profiles after case folding, and custom
+IDs cannot use the `builtin-` namespace. The versioned owner-only JSON file is
+atomically replaced with a backup. Built-in display names are deliberately not
+part of custom-name validation because they change with the interface language.
+
+`BrowserProfile` records Qt's original User-Agent and applies the configured
+identity before any page is created. For an override it calls
+`setHttpUserAgent()`, disables optional high-entropy Client Hints, and aligns
+the unavoidable platform and mobile hints through `QWebEngineClientHints`.
+Popup windows and installed web apps share that profile and cannot diverge.
+Settings preserve configured and active snapshots separately; changing only an
+inactive entry takes effect immediately in the catalog, while changing the
+effective identity is marked pending until restart. A malformed file falls back
+to Chromium default in memory, remains untouched for recovery, and is exposed
+in Diagnostics.
+
+This feature is for site compatibility, not complete browser, device, privacy,
+or anti-fingerprinting emulation. Chromium JavaScript APIs, rendering behavior,
+supported features, and some low-entropy signals remain observable. Do not
+implement per-request overrides in `CrossDomainRequestInterceptor`: changing
+only the HTTP header would disagree with `navigator.userAgent`, Client Hints,
+workers, and other profile state. Correct per-site identities would require a
+separate isolation design rather than header rewriting.
+
+### 6.6 Third-party site connections
 
 `CrossDomainRequestInterceptor` is the single interceptor installed on
 `BrowserProfile`. It preserves the existing fail-closed proxy-error path and,
@@ -741,7 +776,7 @@ interceptor. It is not a complete network sandbox: raw WebRTC/STUN/TURN paths,
 some speculative resolution, and Chromium-internal traffic may not be
 represented as interceptable page requests.
 
-### 6.6 Experimental VOT userscript boundary
+### 6.7 Experimental VOT userscript boundary
 
 Video translation is disabled by default and is not a general userscript
 loader. `VideoTranslationSettings` stores only the enabled flag and selected
@@ -805,7 +840,7 @@ scripts. Already executing userscript code cannot be unloaded safely from a
 live document, so the settings UI explicitly requires open video pages to be
 reloaded after enabling, disabling, or replacing the verified source.
 
-### 6.7 HTTP server authentication
+### 6.8 HTTP server authentication
 
 Every page forwards `QWebEnginePage::authenticationRequired` synchronously to
 the primary window, which accepts the challenge only from the current tab in
@@ -930,6 +965,7 @@ directory.
 | `rules.json` | `TrustSettings` / `TrustPolicy` | Versioned trust configuration; atomic write with `.backup`. |
 | `Certificates/` | `TrustCertificateRepository` | Imported CA files referenced by paths relative to `rules.json`. |
 | `search-engines.json` | `SearchSettings` | Versioned engines and default selection; atomic write with `.backup`. |
+| `user-agents.json` | `UserAgentSettings` | Active built-in/custom identity plus bounded custom User-Agent strings and platform/mobile metadata; atomic write with `.backup`. No cookies or credentials. |
 | `dns-settings.json` | `DnsSettings` | Versioned DNS mode, selected provider, and custom HTTPS templates; atomic write with `.backup`. Files use owner-only mode bits on Unix-like systems and inherit the per-user application-data ACL on Windows. |
 | `proxy-settings.json` | `ProxySettings` | Versioned system/direct/manual mode plus proxy type, host, port, and optional HTTP username; no password; atomic write with `.backup` and owner-only mode bits on Unix-like systems. |
 | `site-connections.json` | `CrossDomainSettings` | Disabled-by-default firewall mode, enabled bundled preset IDs, personal global target allow/block lists, and persistent source-site/target-host decisions; atomic write with `.backup`. |
@@ -959,22 +995,23 @@ closing PanBrowser and deleting it from the application-data directory.
 
 ### 7.1 Settings save transaction
 
-The unified Settings dialog spans native `QSettings` and six JSON files, so a
+The unified Settings dialog spans native `QSettings` and seven JSON files, so a
 single filesystem transaction is unavailable. Its save order and rollback are
 therefore deliberate:
 
 1. validate every page without changing persistent state;
-2. snapshot all six JSON files and their backups;
+2. snapshot all seven JSON files and their backups;
 3. save general preferences;
 4. save search settings;
-5. save DNS settings;
-6. save proxy settings;
-7. save site-connection settings;
-8. save video-translation settings;
-9. save trust rules last;
-10. apply the new DNS mode to Qt WebEngine;
-11. finalize imported certificate files only after every save and runtime apply succeeds;
-12. after dialog acceptance, replace the profile's live site-connection policy,
+5. save User-Agent settings;
+6. save DNS settings;
+7. save proxy settings;
+8. save site-connection settings;
+9. save video-translation settings;
+10. save trust rules last;
+11. apply the new DNS mode to Qt WebEngine;
+12. finalize imported certificate files only after every save and runtime apply succeeds;
+13. after dialog acceptance, replace the profile's live site-connection policy,
     re-evaluate VOT against the effective DNS mode, and replace the bridges on
     every open page.
 
@@ -1111,13 +1148,14 @@ Primary-window startup is ordered as follows:
 
 1. ensure `rules.json` and `Certificates/` exist;
 2. load trust rules, browser preferences, and Reader Mode appearance;
-3. load or create search settings;
+3. load or create search and User-Agent settings;
 4. load DNS settings and apply the effective global resolver mode;
 5. load proxy settings and apply the effective application proxy;
 6. load or create Site Connections and video-translation settings;
 7. apply a pending profile reset before Chromium opens the profile;
-8. create the shared browser profile, VOT userscript manager, download manager,
-   history store, bookmark store, and installed web-app store;
+8. create the shared browser profile and apply the active User-Agent before any
+   pages, then create the VOT userscript manager, download manager, history
+   store, bookmark store, and installed web-app store;
 9. validate the configured VOT source and DNS compatibility before any page is
    given a bridge;
 10. create the UI and permission/authentication controllers;
@@ -1231,11 +1269,11 @@ This is evidence for the `aarch64` artifact in that environment, not an x86-64
 validation or a complete X11/Wayland desktop matrix.
 
 The Diagnostics settings page reports application, Qt WebEngine, Chromium,
-security-patch, graphics, sandbox, DNS mode/provider, proxy modes, runtime
-flags, and profile-path information. It infers forced overrides from arguments and
-environment variables; “Automatic” GPU status is not proof of the exact backend
-selected by Chromium. DNS endpoint templates, proxy hosts, and usernames are
-intentionally omitted.
+security-patch, graphics, sandbox, DNS mode/provider, proxy modes, active and
+configured User-Agent identities, runtime flags, and profile-path information.
+It infers forced overrides from arguments and environment variables;
+“Automatic” GPU status is not proof of the exact backend selected by Chromium.
+DNS endpoint templates, proxy hosts, and usernames are intentionally omitted.
 
 ## 13. Tests and change discipline
 
@@ -1248,7 +1286,8 @@ of collecting the entire browser test surface in one QObject:
 - `WindowInteractionTests.cpp` covers browser-window interaction and chrome;
 - `PersistenceAndPolicyTests.cpp` covers stored state, navigation policy, and
   the verified VOT package/storage/native-network boundary;
-- `NetworkSettingsAndAuthTests.cpp` covers DNS, proxy, permissions, and auth;
+- `NetworkSettingsAndAuthTests.cpp` covers DNS, proxy, User-Agent profiles,
+  permissions, and auth;
 - `BrowsingFeaturesTests.cpp` covers address suggestions, history, bookmarks,
   find-in-page, and zoom;
 - `ApplicationAndWebAppTests.cpp` covers launch coordination and web apps.
@@ -1256,12 +1295,12 @@ of collecting the entire browser test surface in one QObject:
 Together these suites cover domains and rule validation, settings backups,
 window placement, sessions, cleanup boundaries, downloads, permissions,
 external navigation, popup geometry, search parsing, history ranking/deletion,
-bookmark CRUD and normalization, combined suggestion ranking, proxy and DNS
-settings, page zoom, Reader Mode detection/extraction/sanitization/navigation,
-corrupt-database behavior, web-app persistence, VOT source hashing, storage,
-redirect credentials, Site Connections enforcement, matching page/subframe
-injection, and native custom-anchor, hostname, and weak-key validation on
-Windows and Linux.
+bookmark CRUD and normalization, combined suggestion ranking, proxy, DNS, and
+User-Agent settings, page zoom, Reader Mode detection, extraction, sanitization,
+and navigation, corrupt-database behavior, web-app persistence, VOT source
+hashing, storage, redirect credentials, Site Connections enforcement, matching
+page/subframe injection, and native custom-anchor, hostname, and weak-key
+validation on Windows and Linux.
 Window-chrome tests verify the macOS safe-area calculations and verify that
 unsupported platforms do not receive expanded-client-area flags.
 
@@ -1301,6 +1340,9 @@ Before merging a change, verify the relevant invariants:
 - custom CA acceptance remains limited to overridable unknown-CA errors and is
   followed by native chain and hostname validation;
 - invalid or ambiguous trust configuration fails closed;
+- User-Agent overrides are applied to the shared profile before pages exist,
+  reject control/non-ASCII header content, and remain documented as
+  compatibility rather than browser or device emulation;
 - external applications and sensitive permissions require browser-owned,
   active-tab user interaction;
 - popup windows retain visible browser chrome and share the isolated profile;

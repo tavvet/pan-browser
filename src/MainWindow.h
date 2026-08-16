@@ -8,6 +8,7 @@
 #include "ReaderSettings.h"
 #include "SessionStore.h"
 #include "SearchSettings.h"
+#include "UserAgentSettings.h"
 #include "TrustConfiguration.h"
 #include "VideoTranslationSettings.h"
 #include "WebAppStore.h"
@@ -259,6 +260,7 @@ private:
     void restoreWindowPlacement();
     QString ensureConfiguration();
     void initializeSearchSettings();
+    void initializeUserAgentSettings();
     void initializeDnsSettings();
     void initializeProxySettings();
     void initializeCrossDomainSettings();
@@ -337,6 +339,8 @@ private:
     QHash<QString, CrossDomainPromptRoute> m_crossDomainPromptRoutes;
     BrowserPreferences m_preferences;
     SearchSettings m_searchSettings;
+    UserAgentSettings m_userAgentSettings;
+    UserAgentSettings m_activeUserAgentSettings;
     DnsSettings m_dnsSettings;
     ProxySettings m_proxySettings;
     ProxySettings m_activeProxySettings;
@@ -347,11 +351,13 @@ private:
     TrustPolicy m_trustPolicy;
     QString m_configurationPath;
     QString m_searchConfigurationPath;
+    QString m_userAgentConfigurationPath;
     QString m_dnsConfigurationPath;
     QString m_proxyConfigurationPath;
     QString m_crossDomainConfigurationPath;
     QString m_videoTranslationConfigurationPath;
     QString m_proxyConfigurationError;
+    QString m_userAgentConfigurationError;
     QString m_crossDomainConfigurationError;
     QString m_historyError;
     QString m_bookmarkError;

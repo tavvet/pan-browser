@@ -46,6 +46,8 @@
 #include "TrustCertificateRepository.h"
 #include "TrustRulesSettingsPage.h"
 #include "TrustSettings.h"
+#include "UserAgentSettings.h"
+#include "UserAgentSettingsPage.h"
 #include "VideoElementBridge.h"
 #include "VideoTranslationSettings.h"
 #include "VideoTranslationSettingsPage.h"
@@ -61,6 +63,7 @@
 #include <QApplication>
 #include <QAuthenticator>
 #include <QCheckBox>
+#include <QComboBox>
 #include <QCloseEvent>
 #include <QDialog>
 #include <QDir>
@@ -94,6 +97,7 @@
 #include <QTranslator>
 #include <QUuid>
 #include <QWebEnginePage>
+#include <QWebEngineClientHints>
 #include <QWebEngineFullScreenRequest>
 #include <QWebEngineProfile>
 #include <QWebEngineScript>

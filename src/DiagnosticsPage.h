@@ -2,6 +2,7 @@
 
 #include "DnsSettings.h"
 #include "ProxySettings.h"
+#include "UserAgentSettings.h"
 
 #include <QWidget>
 
@@ -17,6 +18,9 @@ public:
         const ProxySettings &activeProxySettings,
         const ProxySettings &configuredProxySettings,
         bool networkBlockedByProxyError,
+        const UserAgentSettings &activeUserAgentSettings,
+        const UserAgentSettings &configuredUserAgentSettings,
+        const QString &userAgentConfigurationError,
         QWidget *parent = nullptr
     );
 
@@ -28,4 +32,7 @@ private:
     ProxySettings m_activeProxySettings;
     ProxySettings m_configuredProxySettings;
     bool m_networkBlockedByProxyError = false;
+    UserAgentSettings m_activeUserAgentSettings;
+    UserAgentSettings m_configuredUserAgentSettings;
+    QString m_userAgentConfigurationError;
 };

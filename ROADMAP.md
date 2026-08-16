@@ -27,6 +27,8 @@ may be unstable.
   them in restored tabs, bookmarks, history, and address-bar suggestions.
 - [x] Page zoom controls with keyboard shortcuts, per-site persistence, and
   reset to 100%.
+- [x] Add browser-wide User-Agent profiles with managed built-in and custom
+  identities, platform/mobile Client Hints, and restart-safe activation.
 - [ ] Allow user-initiated `chrome://` navigation from the address bar behind a
   safety warning. Keep redirects, page scripts, and popups blocked; offer a
   per-profile "Don't show again" preference that can be reset in settings.
