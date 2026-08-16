@@ -73,6 +73,7 @@ private slots:
     void readerModeWaitsForCompletedLoadsBeforeProbing();
     void readerModeDetectsDelayedSinglePageArticles();
     void readerModeRejectsOversizedExtractedMarkup();
+    void readerModeBoundsExtractedMetadata();
     void readerModeInvalidatesAvailabilityWhenArticleDisappears();
     void readerModePreservesResponsiveImages();
     void readerModeExtractsArticleAndRestoresOriginalPage();
@@ -1021,6 +1022,94 @@ document.querySelector("#oversized").title = "x".repeat(6100000);
         controller.availability(),
         ReaderModeController::Availability::Unavailable
     );
+}
+
+void WindowInteractionTests::readerModeBoundsExtractedMetadata()
+{
+    BrowserPage page(QWebEngineProfile::defaultProfile());
+    ReaderSettings settings;
+    ReaderModeController controller(&page, &settings);
+
+    QSignalSpy loadSpy(&page, &QWebEnginePage::loadFinished);
+    page.setHtml(
+        QStringLiteral(R"HTML(
+<!doctype html>
+<html lang="en">
+<head>
+  <title>Initial title</title>
+  <meta name="author" content="Initial author">
+  <meta property="og:site_name" content="Initial site">
+  <meta property="article:published_time" content="Initial publication time">
+</head>
+<body>
+<article>
+  <p>This substantial opening paragraph makes the document suitable for Reader Mode while oversized metadata remains outside the extracted article body.</p>
+  <p>The second paragraph confirms that presentation metadata has independent limits and cannot create an unexpectedly large Reader Mode document.</p>
+  <p>The third paragraph supplies enough ordinary editorial prose for reliable readerability detection without contributing unusual markup.</p>
+</article>
+<script>
+document.title = "T".repeat(20000);
+document.querySelector('meta[name="author"]').content = "A".repeat(20000);
+document.querySelector('meta[property="og:site_name"]').content = "S".repeat(20000);
+document.querySelector('meta[property="article:published_time"]').content = "P".repeat(20000);
+document.documentElement.lang = "x".repeat(20000);
+</script>
+</body>
+</html>
+)HTML"),
+        QUrl(QStringLiteral("https://reader.example/metadata"))
+    );
+    QTRY_VERIFY_WITH_TIMEOUT(!loadSpy.isEmpty(), 5000);
+    QVERIFY(loadSpy.constLast().constFirst().toBool());
+    QTRY_COMPARE_WITH_TIMEOUT(
+        controller.availability(),
+        ReaderModeController::Availability::Available,
+        5000
+    );
+
+    controller.activate();
+    QTRY_VERIFY_WITH_TIMEOUT(controller.isActive(), 5000);
+
+    QString readerState;
+    page.runJavaScript(
+        QStringLiteral(R"JS(
+(() => {
+    const state = globalThis.__panBrowserReader;
+    const options = globalThis.__panBrowserReaderOptions;
+    if (!state || !state.active || !options)
+        return "";
+    const title = state.root.querySelector(".title");
+    const metadata = state.root.querySelector(".meta");
+    const content = state.root.querySelector(".article");
+    const metadataText = metadata ? metadata.textContent : "";
+    return JSON.stringify({
+        titleLength: title ? title.textContent.length : -1,
+        titleEndsWithEllipsis: Boolean(title && title.textContent.endsWith("…")),
+        metadataLength: metadataText.length,
+        metadataEllipsisCount: (metadataText.match(/…/g) || []).length,
+        languagePresent: Boolean(content && content.hasAttribute("lang")),
+        maximumTitleLength: options.maximumTitleLength,
+        maximumMetadataLength: options.maximumMetadataLength
+    });
+})()
+)JS"),
+        QWebEngineScript::ApplicationWorld,
+        [&readerState](const QVariant &result) {
+            readerState = result.toString();
+        }
+    );
+    QTRY_VERIFY_WITH_TIMEOUT(!readerState.isEmpty(), 5000);
+    const QJsonObject readerObject = QJsonDocument::fromJson(readerState.toUtf8()).object();
+    const int maximumTitle = readerObject.value(QStringLiteral("maximumTitleLength")).toInt();
+    const int maximumMetadata = readerObject.value(QStringLiteral("maximumMetadataLength")).toInt();
+    QCOMPARE(readerObject.value(QStringLiteral("titleLength")).toInt(), maximumTitle);
+    QVERIFY(readerObject.value(QStringLiteral("titleEndsWithEllipsis")).toBool());
+    QCOMPARE(
+        readerObject.value(QStringLiteral("metadataLength")).toInt(),
+        maximumMetadata * 3 + 6
+    );
+    QCOMPARE(readerObject.value(QStringLiteral("metadataEllipsisCount")).toInt(), 3);
+    QVERIFY(!readerObject.value(QStringLiteral("languagePresent")).toBool());
 }
 
 void WindowInteractionTests::readerModeInvalidatesAvailabilityWhenArticleDisappears()

@@ -293,6 +293,24 @@
     root.setAttribute("role", "document");
     root.tabIndex = -1;
 
+    const boundedDisplayText = (value, maximumLength) => {
+        if (typeof value !== "string" || maximumLength < 2)
+            return "";
+        const truncated = value.length > maximumLength;
+        const limited = value.slice(0, maximumLength).trim();
+        if (!limited)
+            return "";
+        if (!truncated)
+            return limited;
+        return `${limited.slice(0, maximumLength - 1)}…`;
+    };
+    const boundedLanguage = value => {
+        if (typeof value !== "string" || value.length > options.maximumLanguageLength)
+            return "";
+        const language = value.trim();
+        return /^[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*$/.test(language) ? language : "";
+    };
+
     const toolbar = document.createElement("div");
     toolbar.className = "toolbar";
     const controls = document.createElement("div");
@@ -372,12 +390,14 @@
     header.className = "header";
     const title = document.createElement("h1");
     title.className = "title";
-    title.textContent = article.title || document.title || options.labels.untitled;
+    title.textContent = boundedDisplayText(article.title, options.maximumTitleLength)
+        || boundedDisplayText(document.title, options.maximumTitleLength)
+        || options.labels.untitled;
     header.append(title);
 
     const metadata = [article.byline, article.siteName, article.publishedTime]
-        .filter(value => typeof value === "string" && value.trim())
-        .map(value => value.trim());
+        .map(value => boundedDisplayText(value, options.maximumMetadataLength))
+        .filter(Boolean);
     if (metadata.length) {
         const meta = document.createElement("p");
         meta.className = "meta";
@@ -388,8 +408,9 @@
 
     const content = document.createElement("article");
     content.className = "article";
-    if (article.lang)
-        content.lang = article.lang;
+    const language = boundedLanguage(article.lang);
+    if (language)
+        content.lang = language;
     if (article.dir === "rtl" || article.dir === "ltr")
         content.dir = article.dir;
     content.append(sanitizedContent);
