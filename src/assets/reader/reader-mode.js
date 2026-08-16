@@ -39,7 +39,8 @@
         || typeof article.content !== "string"
         || typeof article.textContent !== "string"
         || article.textContent.trim().length < options.minimumArticleLength
-        || article.textContent.length > options.maximumTextLength) {
+        || article.textContent.length > options.maximumTextLength
+        || article.content.length > options.maximumMarkupLength) {
         return { ok: false, error: "article-unavailable" };
     }
 
@@ -59,7 +60,7 @@
             ],
             ALLOWED_ATTR: [
                 "alt", "cite", "colspan", "datetime", "dir", "height",
-                "href", "hreflang", "lang", "loading", "open", "rel",
+                "href", "hreflang", "id", "lang", "loading", "open", "rel",
                 "reversed", "rowspan", "scope", "src", "start", "title",
                 "width"
             ],
@@ -84,6 +85,12 @@
     const safeUrl = (raw, purposes) => {
         if (!raw)
             return null;
+        const isDataImage = purposes === "image" && /^data:image\//i.test(raw);
+        const maximumLength = isDataImage
+            ? options.maximumDataImageLength
+            : options.maximumUrlLength;
+        if (raw.length > maximumLength)
+            return null;
         if (purposes === "link" && raw.startsWith("#"))
             return raw;
         try {
@@ -94,7 +101,7 @@
                 return parsed.href;
             if (purposes === "image"
                 && (parsed.protocol === "blob:"
-                    || (parsed.protocol === "data:" && /^data:image\//i.test(raw)))) {
+                    || (parsed.protocol === "data:" && isDataImage))) {
                 return parsed.href;
             }
         } catch (_) {
@@ -317,8 +324,38 @@
     });
     content.addEventListener("click", event => {
         const target = event.target instanceof Element ? event.target.closest("a[href]") : null;
-        if (target)
-            report("close", null);
+        if (!target
+            || event.defaultPrevented
+            || event.button !== 0
+            || event.altKey
+            || event.ctrlKey
+            || event.metaKey
+            || event.shiftKey) {
+            return;
+        }
+
+        const href = target.getAttribute("href");
+        if (href && href.startsWith("#")) {
+            let fragment = href.slice(1);
+            try {
+                fragment = decodeURIComponent(fragment);
+            } catch (_) {
+            }
+            if (!fragment) {
+                event.preventDefault();
+                root.scrollTo({ top: 0, behavior: "smooth" });
+                return;
+            }
+            const destination = Array.from(content.querySelectorAll("[id]"))
+                .find(element => element.id === fragment);
+            if (destination) {
+                event.preventDefault();
+                destination.scrollIntoView({ behavior: "smooth", block: "start" });
+                return;
+            }
+        }
+
+        report("close", null);
     });
     window.addEventListener("keydown", keyHandler, true);
     html.style.setProperty("overflow", "hidden", "important");

@@ -18,6 +18,9 @@ namespace {
 constexpr int maximumElements = 120000;
 constexpr int minimumArticleLength = 300;
 constexpr int maximumTextLength = 5000000;
+constexpr int maximumMarkupLength = 6000000;
+constexpr int maximumUrlLength = 16384;
+constexpr int maximumDataImageLength = 1000000;
 constexpr std::array<int, 3> probeRetryDelaysMs{600, 1800, 4000};
 
 QString resourceText(const QString &path)
@@ -189,6 +192,7 @@ void ReaderModeController::activate()
             if (response.value(QStringLiteral("ok")).toBool()) {
                 guard->m_active = true;
             } else {
+                guard->m_availability = Availability::Unavailable;
                 qWarning().noquote()
                     << "[PanBrowser reader mode] activation failed:"
                     << response.value(QStringLiteral("error")).toString();
@@ -434,6 +438,9 @@ QString ReaderModeController::activationScript() const
     options.insert(QStringLiteral("maximumElements"), maximumElements);
     options.insert(QStringLiteral("minimumArticleLength"), minimumArticleLength);
     options.insert(QStringLiteral("maximumTextLength"), maximumTextLength);
+    options.insert(QStringLiteral("maximumMarkupLength"), maximumMarkupLength);
+    options.insert(QStringLiteral("maximumUrlLength"), maximumUrlLength);
+    options.insert(QStringLiteral("maximumDataImageLength"), maximumDataImageLength);
     options.insert(QStringLiteral("minimumTextSize"), ReaderSettings::minimumTextSize);
     options.insert(QStringLiteral("maximumTextSize"), ReaderSettings::maximumTextSize);
     options.insert(QStringLiteral("minimumContentWidth"), ReaderSettings::minimumContentWidth);

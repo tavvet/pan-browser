@@ -3467,83 +3467,83 @@ Open Proxy settings, save a valid configuration, and restart PanBrowser.</source
 <context>
     <name>ReaderModeController</name>
     <message>
-        <location filename="../src/ReaderModeController.cpp" line="173"/>
-        <location filename="../src/ReaderModeController.cpp" line="271"/>
+        <location filename="../src/ReaderModeController.cpp" line="176"/>
+        <location filename="../src/ReaderModeController.cpp" line="275"/>
         <source>Reader mode resources are unavailable</source>
         <translation>Ресурсы режима чтения недоступны</translation>
     </message>
     <message>
-        <location filename="../src/ReaderModeController.cpp" line="195"/>
+        <location filename="../src/ReaderModeController.cpp" line="199"/>
         <source>Reader mode is unavailable for this page</source>
         <translation>Режим чтения недоступен для этой страницы</translation>
     </message>
     <message>
-        <location filename="../src/ReaderModeController.cpp" line="399"/>
+        <location filename="../src/ReaderModeController.cpp" line="403"/>
         <source>Reader Mode</source>
         <translation>Режим чтения</translation>
     </message>
     <message>
-        <location filename="../src/ReaderModeController.cpp" line="400"/>
+        <location filename="../src/ReaderModeController.cpp" line="404"/>
         <source>Reading appearance</source>
         <translation>Оформление режима чтения</translation>
     </message>
     <message>
-        <location filename="../src/ReaderModeController.cpp" line="401"/>
+        <location filename="../src/ReaderModeController.cpp" line="405"/>
         <source>Theme</source>
         <translation>Тема</translation>
     </message>
     <message>
-        <location filename="../src/ReaderModeController.cpp" line="402"/>
+        <location filename="../src/ReaderModeController.cpp" line="406"/>
         <source>Switch typeface</source>
         <translation>Сменить шрифт</translation>
     </message>
     <message>
-        <location filename="../src/ReaderModeController.cpp" line="403"/>
+        <location filename="../src/ReaderModeController.cpp" line="407"/>
         <source>Smaller text</source>
         <translation>Уменьшить текст</translation>
     </message>
     <message>
-        <location filename="../src/ReaderModeController.cpp" line="404"/>
+        <location filename="../src/ReaderModeController.cpp" line="408"/>
         <source>Larger text</source>
         <translation>Увеличить текст</translation>
     </message>
     <message>
-        <location filename="../src/ReaderModeController.cpp" line="405"/>
+        <location filename="../src/ReaderModeController.cpp" line="409"/>
         <source>Narrower content</source>
         <translation>Сузить текст</translation>
     </message>
     <message>
-        <location filename="../src/ReaderModeController.cpp" line="406"/>
+        <location filename="../src/ReaderModeController.cpp" line="410"/>
         <source>Wider content</source>
         <translation>Расширить текст</translation>
     </message>
     <message>
-        <location filename="../src/ReaderModeController.cpp" line="407"/>
+        <location filename="../src/ReaderModeController.cpp" line="411"/>
         <source>Exit Reader Mode</source>
         <translation>Выйти из режима чтения</translation>
     </message>
     <message>
-        <location filename="../src/ReaderModeController.cpp" line="408"/>
+        <location filename="../src/ReaderModeController.cpp" line="412"/>
         <source>Untitled article</source>
         <translation>Статья без заголовка</translation>
     </message>
     <message>
-        <location filename="../src/ReaderModeController.cpp" line="412"/>
+        <location filename="../src/ReaderModeController.cpp" line="416"/>
         <source>System</source>
         <translation>Как в системе</translation>
     </message>
     <message>
-        <location filename="../src/ReaderModeController.cpp" line="416"/>
+        <location filename="../src/ReaderModeController.cpp" line="420"/>
         <source>Light</source>
         <translation>Светлая</translation>
     </message>
     <message>
-        <location filename="../src/ReaderModeController.cpp" line="420"/>
+        <location filename="../src/ReaderModeController.cpp" line="424"/>
         <source>Sepia</source>
         <translation>Сепия</translation>
     </message>
     <message>
-        <location filename="../src/ReaderModeController.cpp" line="424"/>
+        <location filename="../src/ReaderModeController.cpp" line="428"/>
         <source>Dark</source>
         <translation>Тёмная</translation>
     </message>

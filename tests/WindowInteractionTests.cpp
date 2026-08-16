@@ -72,6 +72,8 @@ private slots:
     void readerModeSettingsAndUrlPolicy();
     void readerModeWaitsForCompletedLoadsBeforeProbing();
     void readerModeDetectsDelayedSinglePageArticles();
+    void readerModeRejectsOversizedExtractedMarkup();
+    void readerModeInvalidatesAvailabilityWhenArticleDisappears();
     void readerModeExtractsArticleAndRestoresOriginalPage();
     void readerModeRestoresPageBeforeSameDocumentNavigation();
     void activeBrowserViewSeparatesDetachedSurfaceFromDialogs();
@@ -975,6 +977,107 @@ setTimeout(() => {
     QCOMPARE(page.url(), QUrl(QStringLiteral("https://reader.example/feed#article")));
 }
 
+void WindowInteractionTests::readerModeRejectsOversizedExtractedMarkup()
+{
+    BrowserPage page(QWebEngineProfile::defaultProfile());
+    ReaderSettings settings;
+    ReaderModeController controller(&page, &settings);
+
+    QSignalSpy loadSpy(&page, &QWebEnginePage::loadFinished);
+    page.setHtml(
+        QStringLiteral(R"HTML(
+<!doctype html>
+<html>
+<head><title>An oversized extracted article</title></head>
+<body>
+<article>
+  <h1>Reader mode must bound extracted markup</h1>
+  <p>This substantial opening paragraph makes the document readerable before activation while a generated attribute exercises the independent serialized-markup limit.</p>
+  <p>The second paragraph ensures that the lightweight availability probe succeeds without needing to inspect or copy the unusually large attribute value.</p>
+  <p>The third paragraph supplies enough editorial text for a stable readerability score and keeps the test focused on activation rather than initial detection.</p>
+  <a id="oversized" href="#oversized">Oversized metadata</a>
+</article>
+<script>
+document.querySelector("#oversized").title = "x".repeat(6100000);
+</script>
+</body>
+</html>
+)HTML"),
+        QUrl(QStringLiteral("https://reader.example/oversized"))
+    );
+    QTRY_VERIFY_WITH_TIMEOUT(!loadSpy.isEmpty(), 5000);
+    QVERIFY(loadSpy.constLast().constFirst().toBool());
+    QTRY_COMPARE_WITH_TIMEOUT(
+        controller.availability(),
+        ReaderModeController::Availability::Available,
+        5000
+    );
+
+    controller.activate();
+    QTRY_VERIFY_WITH_TIMEOUT(!controller.isActivationPending(), 5000);
+    QVERIFY(!controller.isActive());
+    QCOMPARE(
+        controller.availability(),
+        ReaderModeController::Availability::Unavailable
+    );
+}
+
+void WindowInteractionTests::readerModeInvalidatesAvailabilityWhenArticleDisappears()
+{
+    BrowserPage page(QWebEngineProfile::defaultProfile());
+    ReaderSettings settings;
+    ReaderModeController controller(&page, &settings);
+
+    QSignalSpy loadSpy(&page, &QWebEnginePage::loadFinished);
+    page.setHtml(
+        QStringLiteral(R"HTML(
+<!doctype html>
+<html>
+<head><title>A transient article</title></head>
+<body>
+<article>
+  <h1>An article that disappears before activation</h1>
+  <p>This substantial opening paragraph lets the readerability probe offer Reader Mode before a client-side application replaces the article without changing its URL.</p>
+  <p>The second paragraph provides ordinary editorial prose and confirms that successful detection is only a snapshot of the current document state.</p>
+  <p>The third paragraph ensures the initial page comfortably passes the heuristic before the integration test removes the content.</p>
+</article>
+</body>
+</html>
+)HTML"),
+        QUrl(QStringLiteral("https://reader.example/transient"))
+    );
+    QTRY_VERIFY_WITH_TIMEOUT(!loadSpy.isEmpty(), 5000);
+    QVERIFY(loadSpy.constLast().constFirst().toBool());
+    QTRY_COMPARE_WITH_TIMEOUT(
+        controller.availability(),
+        ReaderModeController::Availability::Available,
+        5000
+    );
+
+    bool articleRemoved = false;
+    page.runJavaScript(
+        QStringLiteral(R"JS(
+(() => {
+    const article = document.querySelector("article");
+    article.replaceChildren(document.createTextNode("Article removed"));
+    return true;
+})()
+)JS"),
+        [&articleRemoved](const QVariant &result) {
+            articleRemoved = result.toBool();
+        }
+    );
+    QTRY_VERIFY_WITH_TIMEOUT(articleRemoved, 3000);
+
+    controller.activate();
+    QTRY_VERIFY_WITH_TIMEOUT(!controller.isActivationPending(), 5000);
+    QVERIFY(!controller.isActive());
+    QCOMPARE(
+        controller.availability(),
+        ReaderModeController::Availability::Unavailable
+    );
+}
+
 void WindowInteractionTests::readerModeExtractsArticleAndRestoresOriginalPage()
 {
     BrowserPage page(QWebEngineProfile::defaultProfile());
@@ -993,14 +1096,21 @@ void WindowInteractionTests::readerModeExtractsArticleAndRestoresOriginalPage()
   <h1>A useful test article</h1>
   <p>This is a deliberately substantial opening paragraph. It contains enough prose to make the document a plausible article for reader-mode detection, while retaining a stable phrase for the integration test.</p>
   <p>The second paragraph continues with ordinary editorial writing. Reader mode should preserve this text, headings, emphasis, and safe links without replacing the underlying page or changing its URL.</p>
-  <p>The third paragraph adds more meaningful content so the readability score crosses its normal threshold. It also includes <a href="/next">a relative article link</a> that should become an absolute HTTPS URL.</p>
+  <p>The third paragraph adds more meaningful content so the readability score crosses its normal threshold. It also includes <a href="/next">a relative article link</a> that should become an absolute HTTPS URL and <a href="#footnote">an internal footnote link</a> that should stay inside Reader Mode.</p>
   <p>The fourth paragraph verifies that a longer document remains readable after sanitization. Embedded forms, scripts, frames, and event handlers must never survive in PanBrowser's presentation layer.</p>
-  <p>The fifth paragraph provides a final block of prose. Closing reader mode should reveal this exact original document again without reloading it or losing its body attributes.</p>
+  <p id="footnote">The fifth paragraph provides a final block of prose. Closing reader mode should reveal this exact original document again without reloading it or losing its body attributes.</p>
+  <a id="oversized-link" href="https://reader.example/oversized">Oversized URL</a>
   <div class="toolbar" id="page-controlled" style="position:fixed" tabindex="0">Styled page content.</div>
   <form action="/submit"><input name="secret" value="unsafe"></form>
   <iframe src="https://frames.example/"></iframe>
   <script>globalThis.__readerFixtureScriptRan = true;</script>
 </article>
+<script>
+document.querySelector("#oversized-link").setAttribute(
+    "href",
+    "https://reader.example/" + "x".repeat(17000)
+);
+</script>
 </body>
 </html>
 )HTML"),
@@ -1043,7 +1153,10 @@ true
     if (!state || !state.active)
         return "";
     const content = state.root.querySelector(".article");
-    const link = content && content.querySelector("a[href]");
+    const link = content && content.querySelector('a[href="https://reader.example/next"]');
+    const internalLink = content && content.querySelector('a[href="#footnote"]');
+    const internalTarget = content && content.querySelector("#footnote");
+    const oversizedLink = content && content.querySelector("#oversized-link");
     const themeSelect = state.root.querySelector(".controls select");
     const themeOption = themeSelect && themeSelect.querySelector("option");
     state.applyAppearance({
@@ -1060,9 +1173,12 @@ true
             ? content.querySelectorAll("script, form, input, iframe, object, embed").length
             : -1,
         unsafeAttributeCount: content
-            ? content.querySelectorAll("[class], [id], [style], [tabindex]").length
+            ? content.querySelectorAll("[class], [style], [tabindex]").length
             : -1,
         href: link ? link.href : "",
+        internalLinkPresent: Boolean(internalLink),
+        internalTargetPresent: Boolean(internalTarget),
+        oversizedHrefPresent: Boolean(oversizedLink && oversizedLink.hasAttribute("href")),
         original: document.body.dataset.original,
         overflow: document.body.style.getPropertyValue("overflow"),
         bodyInert: document.body.inert,
@@ -1088,6 +1204,9 @@ true
         readerObject.value(QStringLiteral("href")).toString(),
         QStringLiteral("https://reader.example/next")
     );
+    QVERIFY(readerObject.value(QStringLiteral("internalLinkPresent")).toBool());
+    QVERIFY(readerObject.value(QStringLiteral("internalTargetPresent")).toBool());
+    QVERIFY(!readerObject.value(QStringLiteral("oversizedHrefPresent")).toBool());
     QCOMPARE(readerObject.value(QStringLiteral("original")).toString(), QStringLiteral("present"));
     QCOMPARE(readerObject.value(QStringLiteral("overflow")).toString(), QStringLiteral("hidden"));
     QVERIFY(readerObject.value(QStringLiteral("bodyInert")).toBool());
@@ -1102,6 +1221,56 @@ true
         readerObject.value(QStringLiteral("themeOptionBackground")).toString(),
         QStringLiteral("rgb(34, 38, 45)")
     );
+    QCOMPARE(page.url(), QUrl(QStringLiteral("https://reader.example/article")));
+
+    bool internalLinkClicked = false;
+    page.runJavaScript(
+        QStringLiteral(R"JS(
+(() => {
+    const reader = globalThis.__panBrowserReader;
+    const link = reader && reader.root.querySelector('a[href="#footnote"]');
+    if (!link)
+        return false;
+    link.click();
+    return true;
+})()
+)JS"),
+        QWebEngineScript::ApplicationWorld,
+        [&internalLinkClicked](const QVariant &result) {
+            internalLinkClicked = result.toBool();
+        }
+    );
+    QTRY_VERIFY_WITH_TIMEOUT(internalLinkClicked, 3000);
+    QTest::qWait(50);
+    QVERIFY(controller.isActive());
+    QCOMPARE(page.url(), QUrl(QStringLiteral("https://reader.example/article")));
+
+    bool modifiedLinkClicked = false;
+    page.runJavaScript(
+        QStringLiteral(R"JS(
+(() => {
+    const reader = globalThis.__panBrowserReader;
+    const link = reader
+        && reader.root.querySelector('a[href="https://reader.example/next"]');
+    if (!link)
+        return false;
+    link.dispatchEvent(new MouseEvent("click", {
+        bubbles: true,
+        cancelable: true,
+        button: 0,
+        metaKey: true
+    }));
+    return true;
+})()
+)JS"),
+        QWebEngineScript::ApplicationWorld,
+        [&modifiedLinkClicked](const QVariant &result) {
+            modifiedLinkClicked = result.toBool();
+        }
+    );
+    QTRY_VERIFY_WITH_TIMEOUT(modifiedLinkClicked, 3000);
+    QTest::qWait(50);
+    QVERIFY(controller.isActive());
     QCOMPARE(page.url(), QUrl(QStringLiteral("https://reader.example/article")));
 
     controller.deactivate();
