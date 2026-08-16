@@ -74,6 +74,7 @@ private slots:
     void readerModeDetectsDelayedSinglePageArticles();
     void readerModeRejectsOversizedExtractedMarkup();
     void readerModeInvalidatesAvailabilityWhenArticleDisappears();
+    void readerModePreservesResponsiveImages();
     void readerModeExtractsArticleAndRestoresOriginalPage();
     void readerModeRestoresPageBeforeSameDocumentNavigation();
     void activeBrowserViewSeparatesDetachedSurfaceFromDialogs();
@@ -1076,6 +1077,91 @@ void WindowInteractionTests::readerModeInvalidatesAvailabilityWhenArticleDisappe
         controller.availability(),
         ReaderModeController::Availability::Unavailable
     );
+}
+
+void WindowInteractionTests::readerModePreservesResponsiveImages()
+{
+    BrowserPage page(QWebEngineProfile::defaultProfile());
+    ReaderSettings settings;
+    ReaderModeController controller(&page, &settings);
+
+    QSignalSpy loadSpy(&page, &QWebEnginePage::loadFinished);
+    page.setHtml(
+        QStringLiteral(R"HTML(
+<!doctype html>
+<html>
+<head><title>An article with responsive images</title></head>
+<body>
+<article>
+  <h1>Responsive images must survive Reader Mode</h1>
+  <p>This substantial opening paragraph represents an ordinary illustrated article. It gives the readerability heuristic enough editorial prose to retain the surrounding content and its responsive image.</p>
+  <img id="srcset-only" alt="Responsive illustration"
+       data-srcset="/images/responsive-small.jpg 1x, /images/responsive-large.jpg 2x">
+  <p>The second paragraph verifies that an image supplied only through a source set remains visible after sanitization instead of being discarded because it lacks a traditional source attribute.</p>
+  <picture id="responsive-picture">
+    <source type="image/gif"
+            srcset="/images/picture-small.gif 1x, /images/picture-large.gif 2x">
+    <img id="picture-image" alt="Picture illustration"
+         src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==#fallback">
+  </picture>
+  <p>The final paragraph exercises a picture element that carries alternative image candidates. Reader Mode should flatten it to one validated image source without retaining browser-controlled source-set markup.</p>
+</article>
+</body>
+</html>
+)HTML"),
+        QUrl(QStringLiteral("https://reader.example/responsive"))
+    );
+    QTRY_VERIFY_WITH_TIMEOUT(!loadSpy.isEmpty(), 5000);
+    QVERIFY(loadSpy.constLast().constFirst().toBool());
+    QTRY_COMPARE_WITH_TIMEOUT(
+        controller.availability(),
+        ReaderModeController::Availability::Available,
+        5000
+    );
+
+    controller.activate();
+    QTRY_VERIFY_WITH_TIMEOUT(controller.isActive(), 5000);
+
+    QString imageState;
+    page.runJavaScript(
+        QStringLiteral(R"JS(
+(() => {
+    const reader = globalThis.__panBrowserReader;
+    const content = reader && reader.root.querySelector(".article");
+    const responsive = content && content.querySelector("#srcset-only");
+    const pictureImage = content && content.querySelector("#picture-image");
+    return JSON.stringify({
+        responsiveSource: responsive ? responsive.getAttribute("src") : "",
+        responsiveHasSrcset: Boolean(responsive && responsive.hasAttribute("srcset")),
+        pictureSource: pictureImage ? pictureImage.getAttribute("src") : "",
+        pictureHasSrcset: Boolean(pictureImage && pictureImage.hasAttribute("srcset")),
+        pictureCount: content ? content.querySelectorAll("picture").length : -1,
+        sourceCount: content ? content.querySelectorAll("source").length : -1
+    });
+})()
+)JS"),
+        QWebEngineScript::ApplicationWorld,
+        [&imageState](const QVariant &result) {
+            imageState = result.toString();
+        }
+    );
+    QTRY_VERIFY_WITH_TIMEOUT(!imageState.isEmpty(), 5000);
+    const QJsonObject imageObject = QJsonDocument::fromJson(imageState.toUtf8()).object();
+    QCOMPARE(
+        imageObject.value(QStringLiteral("responsiveSource")).toString(),
+        QStringLiteral("https://reader.example/images/responsive-large.jpg")
+    );
+    QVERIFY(!imageObject.value(QStringLiteral("responsiveHasSrcset")).toBool());
+    QCOMPARE(
+        imageObject.value(QStringLiteral("pictureSource")).toString(),
+        QStringLiteral("https://reader.example/images/picture-large.gif")
+    );
+    QVERIFY(!imageObject.value(QStringLiteral("pictureHasSrcset")).toBool());
+    QCOMPARE(imageObject.value(QStringLiteral("pictureCount")).toInt(), 0);
+    QCOMPARE(imageObject.value(QStringLiteral("sourceCount")).toInt(), 0);
+
+    controller.deactivate();
+    QTRY_VERIFY_WITH_TIMEOUT(!controller.isActive(), 3000);
 }
 
 void WindowInteractionTests::readerModeExtractsArticleAndRestoresOriginalPage()

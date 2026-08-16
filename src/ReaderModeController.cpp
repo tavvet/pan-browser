@@ -21,6 +21,8 @@ constexpr int maximumTextLength = 5000000;
 constexpr int maximumMarkupLength = 6000000;
 constexpr int maximumUrlLength = 16384;
 constexpr int maximumDataImageLength = 1000000;
+constexpr int maximumSrcsetLength = 1100000;
+constexpr int maximumSrcsetCandidates = 128;
 constexpr std::array<int, 3> probeRetryDelaysMs{600, 1800, 4000};
 
 QString resourceText(const QString &path)
@@ -441,6 +443,8 @@ QString ReaderModeController::activationScript() const
     options.insert(QStringLiteral("maximumMarkupLength"), maximumMarkupLength);
     options.insert(QStringLiteral("maximumUrlLength"), maximumUrlLength);
     options.insert(QStringLiteral("maximumDataImageLength"), maximumDataImageLength);
+    options.insert(QStringLiteral("maximumSrcsetLength"), maximumSrcsetLength);
+    options.insert(QStringLiteral("maximumSrcsetCandidates"), maximumSrcsetCandidates);
     options.insert(QStringLiteral("minimumTextSize"), ReaderSettings::minimumTextSize);
     options.insert(QStringLiteral("maximumTextSize"), ReaderSettings::maximumTextSize);
     options.insert(QStringLiteral("minimumContentWidth"), ReaderSettings::minimumContentWidth);

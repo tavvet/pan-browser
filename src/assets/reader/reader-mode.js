@@ -53,24 +53,25 @@
                 "colgroup", "dd", "del", "details", "dfn", "div", "dl",
                 "dt", "em", "figcaption", "figure", "h1", "h2", "h3",
                 "h4", "h5", "h6", "hr", "i", "img", "ins", "kbd", "li",
-                "main", "mark", "ol", "p", "pre", "q", "rp", "rt",
-                "ruby", "s", "samp", "section", "small", "span", "strong",
-                "sub", "summary", "sup", "table", "tbody", "td", "tfoot",
-                "th", "thead", "time", "tr", "u", "ul", "var", "wbr"
+                "main", "mark", "ol", "p", "picture", "pre", "q", "rp",
+                "rt", "ruby", "s", "samp", "section", "small", "source",
+                "span", "strong", "sub", "summary", "sup", "table", "tbody",
+                "td", "tfoot", "th", "thead", "time", "tr", "u", "ul",
+                "var", "wbr"
             ],
             ALLOWED_ATTR: [
                 "alt", "cite", "colspan", "datetime", "dir", "height",
-                "href", "hreflang", "id", "lang", "loading", "open", "rel",
-                "reversed", "rowspan", "scope", "src", "start", "title",
-                "width"
+                "href", "hreflang", "id", "lang", "loading", "media", "open",
+                "rel", "reversed", "rowspan", "scope", "sizes", "src",
+                "srcset", "start", "title", "type", "width"
             ],
             RETURN_DOM_FRAGMENT: true,
             ALLOW_ARIA_ATTR: false,
             ALLOW_DATA_ATTR: false,
             FORBID_TAGS: [
                 "audio", "button", "canvas", "embed", "form", "iframe",
-                "input", "object", "option", "script", "select", "source",
-                "style", "textarea", "track", "video"
+                "input", "object", "option", "script", "select", "style",
+                "textarea", "track", "video"
             ],
             FORBID_ATTR: [
                 "autofocus", "form", "integrity", "nonce", "srcdoc", "style"
@@ -108,6 +109,98 @@
         }
         return null;
     };
+    const srcsetCandidates = raw => {
+        if (!raw || raw.length > options.maximumSrcsetLength)
+            return [];
+
+        const candidates = [];
+        let parsedCandidates = 0;
+        let position = 0;
+        const isSpace = character => /[\t\n\f\r ]/.test(character);
+        while (position < raw.length
+               && parsedCandidates < options.maximumSrcsetCandidates) {
+            while (position < raw.length
+                   && (isSpace(raw[position]) || raw[position] === ",")) {
+                ++position;
+            }
+            if (position >= raw.length)
+                break;
+
+            const urlStart = position;
+            while (position < raw.length && !isSpace(raw[position]))
+                ++position;
+            let url = raw.slice(urlStart, position);
+            let descriptors = "";
+            if (url.endsWith(",")) {
+                url = url.replace(/,+$/, "");
+            } else {
+                const descriptorStart = position;
+                let parentheses = 0;
+                while (position < raw.length) {
+                    const character = raw[position];
+                    if (character === "(")
+                        ++parentheses;
+                    else if (character === ")" && parentheses > 0)
+                        --parentheses;
+                    else if (character === "," && parentheses === 0) {
+                        descriptors = raw.slice(descriptorStart, position).trim();
+                        ++position;
+                        break;
+                    }
+                    ++position;
+                }
+                if (!descriptors && position >= raw.length)
+                    descriptors = raw.slice(descriptorStart).trim();
+            }
+
+            ++parsedCandidates;
+            const source = safeUrl(url, "image");
+            if (!source)
+                continue;
+
+            let kind = "default";
+            let value = 1;
+            const width = descriptors.match(/^([1-9]\d*)w$/);
+            const density = descriptors.match(/^(?:(\d+(?:\.\d*)?)|(\.\d+))x$/);
+            if (width) {
+                kind = "width";
+                value = Number(width[1]);
+            } else if (density) {
+                kind = "density";
+                value = Number(density[1] || density[2]);
+            }
+            if (Number.isFinite(value) && value > 0)
+                candidates.push({ source, kind, value });
+        }
+        return candidates;
+    };
+    const preferredSrcsetSource = raw => {
+        const candidates = srcsetCandidates(raw);
+        if (!candidates.length)
+            return null;
+        const widths = candidates.filter(candidate => candidate.kind === "width");
+        const densities = candidates.filter(candidate => candidate.kind === "density");
+        const comparable = widths.length ? widths : (densities.length ? densities : candidates);
+        return comparable.reduce((best, candidate) => (
+            candidate.value >= best.value ? candidate : best
+        )).source;
+    };
+    const normalizeImage = (image, preferredSource = null) => {
+        const source = preferredSource
+            || preferredSrcsetSource(image.getAttribute("srcset"))
+            || safeUrl(image.getAttribute("src"), "image");
+        image.removeAttribute("srcset");
+        image.removeAttribute("sizes");
+        image.removeAttribute("usemap");
+        if (!source) {
+            image.remove();
+            return false;
+        }
+        image.setAttribute("src", source);
+        image.setAttribute("loading", "lazy");
+        image.setAttribute("decoding", "async");
+        return true;
+    };
 
     for (const anchor of sanitizedContent.querySelectorAll("a[href]")) {
         const href = safeUrl(anchor.getAttribute("href"), "link");
@@ -118,18 +211,40 @@
         anchor.removeAttribute("target");
         anchor.setAttribute("rel", "noopener noreferrer");
     }
-    for (const image of sanitizedContent.querySelectorAll("img")) {
-        const source = safeUrl(image.getAttribute("src"), "image");
-        image.removeAttribute("srcset");
-        image.removeAttribute("usemap");
-        if (source) {
-            image.setAttribute("src", source);
-            image.setAttribute("loading", "lazy");
-            image.setAttribute("decoding", "async");
-        } else {
-            image.remove();
+    for (const picture of sanitizedContent.querySelectorAll("picture")) {
+        let preferredSource = preferredSrcsetSource(picture.getAttribute("srcset"));
+        for (const source of picture.children) {
+            if (preferredSource || source.tagName !== "SOURCE")
+                continue;
+            const type = source.getAttribute("type");
+            if (type && !/^image\//i.test(type))
+                continue;
+            const media = source.getAttribute("media");
+            if (media) {
+                if (media.length > options.maximumUrlLength)
+                    continue;
+                try {
+                    if (!globalThis.matchMedia(media).matches)
+                        continue;
+                } catch (_) {
+                    continue;
+                }
+            }
+            preferredSource = preferredSrcsetSource(source.getAttribute("srcset"))
+                || safeUrl(source.getAttribute("src"), "image");
         }
+        let image = picture.querySelector("img");
+        if (!image && preferredSource)
+            image = document.createElement("img");
+        if (image && normalizeImage(image, preferredSource))
+            picture.replaceWith(image);
+        else
+            picture.remove();
     }
+    for (const image of sanitizedContent.querySelectorAll("img"))
+        normalizeImage(image);
+    for (const source of sanitizedContent.querySelectorAll("source"))
+        source.remove();
 
     const host = document.createElement("div");
     host.setAttribute("aria-label", options.labels.readerMode);
