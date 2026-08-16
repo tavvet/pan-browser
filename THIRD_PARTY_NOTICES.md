@@ -11,9 +11,9 @@ any packaged application or CI artifact.
 ### Lucide Icons
 
 The SVG files under `src/assets/icons/` are selected and color-adjusted icons
-from [Lucide](https://github.com/lucide-icons/lucide). The shield artwork in
-`src/assets/app-icon.svg`, and therefore `src/assets/PanBrowser.icns`, is based
-on the Lucide `shield-check` icon.
+from [Lucide](https://github.com/lucide-icons/lucide). The pangolin artwork in
+`src/assets/app-icon.png` and `src/assets/PanBrowser.icns` is original
+PanBrowser visual design rather than Lucide or Feather artwork.
 
 ISC License
 
@@ -83,8 +83,8 @@ one at https://mozilla.org/MPL/2.0/.
 
 Reader Mode bundles Mozilla Readability 0.6.0 under
 `src/assets/reader/third_party/readability/`. The package is the standalone
-article-extraction library used by Firefox Reader View. The committed npm
-archive had SHA-512 digest
+article-extraction library used by Firefox Reader View. The upstream npm
+archive used to vendor these files had SHA-512 digest
 `8ee1b9556878a808afcd301e333bd8f71b3d1d8e6b01caf613823bb624920a8911162ed7219080bbdd999124ec223d4e3dc78289f2f77297ed78fde90d3f7f41`.
 
 Copyright (c) 2010 Arc90 Inc
@@ -97,8 +97,8 @@ terms are also present in the repository's top-level `LICENSE` file.
 ### DOMPurify
 
 Reader Mode bundles the browser build of DOMPurify 3.4.13 under
-`src/assets/reader/third_party/dompurify/`. The committed npm archive had
-SHA-512 digest
+`src/assets/reader/third_party/dompurify/`. The upstream npm archive used to
+vendor this file had SHA-512 digest
 `daf998228aa3cded9dfa46a43fc4bf9d2e6c85fb25e7cee4cf012370695376292c5158051e7142b0b603563fc936a2553906464980539aec9cbf43e87709a731`.
 
 Copyright (c) Cure53 and other contributors

@@ -12,8 +12,8 @@ The repository contains five licensing groups:
 
 1. PanBrowser-owned source code, documentation, translations, build scripts,
    and original visual design, licensed under the Apache License 2.0.
-2. Lucide and Feather-derived artwork committed under `src/assets/`. Their ISC
-   and MIT notices are reproduced in
+2. Lucide and Feather-derived interface icons committed under
+   `src/assets/icons/`. Their ISC and MIT notices are reproduced in
    [THIRD_PARTY_NOTICES.md](../THIRD_PARTY_NOTICES.md).
 3. The bundled Public Suffix List under `src/assets/`, licensed under MPL-2.0
    and identified in the third-party notices.
@@ -140,6 +140,8 @@ to another person, and a downloadable CI artifact. The absence of a formal
 - [ ] Include all Qt WebEngine and Chromium notices for the exact Qt version,
   including applicable LGPL-2.1 text and component-specific notices.
 - [ ] Preserve the Lucide ISC and Feather MIT notices.
+- [ ] Preserve the Mozilla Readability and DOMPurify Apache-2.0 notices and
+  bundled license files.
 - [ ] Preserve the Public Suffix List MPL-2.0 notice and make its source form
   available with the distributed version.
 - [ ] If VOT is ever included in a package rather than selected separately by
@@ -167,11 +169,12 @@ The exact license texts, rather than this checklist, control.
 ## 5. Current package status
 
 The generic platform build scripts create local testing packages. They include
-the PanBrowser README, Apache license, third-party notice, and this licensing
-guide, but they do not yet implement the complete binary-distribution checklist
-above. They do not copy a configured VOT userscript or native VOT storage from
-the developer's application-data directory. Windows CI artifacts and Linux
-packages should therefore remain development/test artifacts.
+the PanBrowser README, Apache license, third-party notice, this licensing guide,
+and the bundled Readability and DOMPurify license files, but they do not yet
+implement the complete binary-distribution checklist above. They do not copy a
+configured VOT userscript or native VOT storage from the developer's
+application-data directory. Windows CI artifacts and Linux packages should
+therefore remain development/test artifacts.
 
 The macOS release-candidate script goes further. It collects the installed Qt
 SPDX documents, Chromium's top-level license, exact notices for loose Homebrew

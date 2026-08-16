@@ -16,6 +16,8 @@ may be unstable.
   animation setting and leaving restored sessions static.
 - [x] Add complete keyboard tab navigation, including open, close, reopen,
   adjacent cycling, and direct numbered selection.
+- [x] Replace the placeholder trust-themed artwork with an original pangolin
+  application icon and consistent Settings navigation icons.
 - [x] Add a reversible Reader Mode for article-like pages with Firefox-derived
   extraction, sanitized isolated rendering, persistent appearance controls,
   an address-bar action, and an `F9` shortcut.
@@ -155,8 +157,8 @@ may be unstable.
 - [ ] Evaluate an official or source-built Qt distribution for a macOS
   deployment target older than 26.0; the current Homebrew Qt 6.11.1 frameworks
   require macOS 26.
-- [ ] Publish versioned binary archives and checksums when supported downloads
-  are ready.
+- [ ] Expand versioned binary archives and checksums beyond the existing
+  `v0.1.0` macOS candidate when additional supported downloads are ready.
 
 ### Proxy extensions
 

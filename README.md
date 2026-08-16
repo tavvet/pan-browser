@@ -53,7 +53,7 @@ test environments, and other deliberately scoped trust configurations.
   always-on-top video pop-out with aspect-ratio-preserving resize, find in
   page, per-site page zoom, local address completion, configurable search
   engines, a download manager, and a reversible reader mode with persistent
-  typography controls.
+  appearance controls.
 - Browser-owned prompts for camera, microphone, location, external schemes,
   HTTP Basic authentication, and HTTP proxy authentication.
 - Native password-manager integration for explicitly saved website and proxy
@@ -353,6 +353,22 @@ PanBrowser, has access to every matching video page, and can contact its
 declared service hosts. Keep the feature disabled unless you accept that trust
 boundary.
 
+## Saved authentication credentials
+
+Eligible realm-based HTTPS server and manual HTTP-proxy prompts can remember a
+username and password in the operating system's password manager. Saving is
+always explicit and disabled by default: PanBrowser uses the macOS login
+Keychain, Windows Credential Manager, or the desktop Secret Service on Linux.
+Plain HTTP, System proxy, SOCKS5, realm-less authentication, and prompts where
+the user does not select **Remember** remain session-only.
+
+Open **Settings → Credentials** to review the endpoint, realm, username, and
+modification time of PanBrowser-managed entries or remove them. Password values
+are never displayed. Deletions take effect immediately and are not undone by
+cancelling the Settings dialog. This mechanism handles browser and proxy
+authentication only; it is not HTML form autofill or a general website password
+manager.
+
 ## Security and privacy notes
 
 - Custom trust recovery is limited to unknown-CA errors. Hostname mismatch,
@@ -399,7 +415,8 @@ cookies and site data. The surrounding application-data directory contains
 session, download, history, bookmark, web-app, search, DNS, proxy, trust, and
 feature configuration. It also contains `site-connections.json` with the
 opt-in firewall mode, global exceptions, and persistent source-to-target
-decisions.
+decisions. Reader Mode theme, typeface, text size, and content width are stored
+with the application's native preferences rather than in the WebEngine profile.
 
 Video translation adds `video-translation.json`, which stores whether the
 integration is enabled and the selected userscript path, plus

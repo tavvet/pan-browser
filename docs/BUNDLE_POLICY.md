@@ -73,6 +73,8 @@ Do not remove the following merely to reduce archive size:
   that every supported diagnostics and debugging path works without it;
 - Qt libraries and plugins that appear as binary runtime dependencies, even if
   PanBrowser does not call their APIs directly.
+- the Mozilla Readability and DOMPurify code embedded in PanBrowser resources,
+  together with their packaged license files.
 
 The deployment tools discover transitive Qt dependencies. Removing one after
 deployment can turn an apparent size improvement into a startup failure on a

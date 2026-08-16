@@ -29,11 +29,11 @@ The main goals are:
 - keep security-sensitive decisions visible in browser-owned UI.
 
 Non-goals for the current implementation are a general extension platform,
-arbitrary userscripts, account sync, password management, exclusive certificate
-pinning for chains Chromium already accepts, and silent handling of external
-applications or sensitive permissions. The optional VOT integration is one
-explicitly supported, exact-version userscript boundary rather than a general
-extension mechanism.
+arbitrary userscripts, account sync, HTML form password autofill or a general
+website password manager, exclusive certificate pinning for chains Chromium
+already accepts, and silent handling of external applications or sensitive
+permissions. The optional VOT integration is one explicitly supported,
+exact-version userscript boundary rather than a general extension mechanism.
 
 Qt WebEngine was chosen because it provides a maintained Chromium embedding,
 tabs, cookies, media support, downloads, and a cross-platform API while still
@@ -60,6 +60,8 @@ flowchart TD
     MW --> Permissions["PermissionController"]
     MW --> HttpAuth["HttpAuthenticationController"]
     MW --> ProxyAuth["ProxyAuthenticationController"]
+    HttpAuth --> CredentialStore["CredentialStore / OS password manager"]
+    ProxyAuth --> CredentialStore
     MW --> VotManager["VotUserscriptManager"]
     Profile --> RequestFilter["CrossDomainRequestInterceptor"]
     RequestFilter --> ConnectionPolicy["CrossDomainSettings / site-connections.json"]
@@ -88,8 +90,13 @@ flowchart TD
     TrustEditor --> CertRepo["TrustCertificateRepository"]
     TrustEditor --> CertDetails["CertificateDetailsDialog"]
     Settings --> Search["SearchSettings"]
+    Settings --> Privacy["PrivacyDataSettingsPage"]
     Settings --> DNS["DnsSettings / QWebEngineGlobalSettings"]
     Settings --> Proxy["ProxySettings / QNetworkProxy"]
+    Settings --> Credentials["CredentialsSettingsPage"]
+    Credentials --> CredentialStore
+    Settings --> SiteConnections["CrossDomainSettingsPage"]
+    SiteConnections --> ConnectionPolicy
     Settings --> VotSettings["VideoTranslationSettings"]
     Settings --> History
     Settings --> WebApps
@@ -116,20 +123,28 @@ state to another tab. They follow Qt's widget-animation duration, are capped at
 
 Each regular tab also owns a `ReaderModeController`. After a successful HTTP(S)
 HTML load it runs Mozilla's lightweight readerability check in WebEngine's
-isolated application world. Activation clones the DOM, extracts an article with
-Mozilla Readability, sanitizes the result with DOMPurify, and renders it in a
-closed Shadow DOM overlay. The source document, URL, history, and session entry
-remain unchanged; closing the overlay restores the page's prior overflow,
-focus, and scroll state without a reload. Navigation generations discard stale
-asynchronous detection or activation callbacks. A per-page random capability
-authenticates appearance and close messages handled by `BrowserPage`.
+isolated application world, with bounded delayed retries for client-rendered
+articles. Activation bounds the source element count and extracted text and
+markup, clones the DOM, and extracts an article with Mozilla Readability.
+DOMPurify applies an explicit element and attribute allowlist; PanBrowser then
+revalidates link and image URL schemes and lengths, rebuilds bounded responsive
+image candidates, and bounds header metadata before rendering the result in a
+closed Shadow DOM overlay. Internal fragment links stay inside the overlay;
+ordinary navigation closes it.
+
+The source document, URL, history, and session entry remain unchanged; closing
+the overlay restores the page's prior overflow, focus, and scroll state without
+a reload. Navigation generations discard stale asynchronous detection or
+activation callbacks. A per-page random capability authenticates appearance
+and close messages handled by `BrowserPage`.
 
 Reader Mode is deliberately a presentation boundary, not a new origin or
 privacy boundary: the original document continues running underneath the
 overlay. Remote article images still pass through the ordinary WebEngine
 profile and Site Connections policy. `ReaderSettings` stores only global
-theme, typeface, text-size, and content-width preferences. Reader state itself
-is never persisted or restored.
+theme, typeface, text-size, and content-width preferences in native `QSettings`.
+Toolbar changes are saved immediately and propagated to other active Reader
+Mode tabs; reader state itself is never persisted or restored.
 
 Normal Fullscreen API requests and video pop-out are deliberately separate.
 `BrowserFullScreenController` keeps the page in its original view, hides only
@@ -196,6 +211,9 @@ The primary window owns browser-wide resources:
   use the operating-system credential store after explicit user opt-in.
 - `ProxyAuthenticationController` does the same for a configured manual HTTP
   proxy; System proxy and SOCKS5 credentials remain session-only.
+- `CredentialStore` selects the macOS Keychain, Windows Credential Manager, or
+  Linux Secret Service backend for explicitly saved eligible credentials;
+  passwords never enter PanBrowser settings or data files.
 - `VotUserscriptManager` owns the verified userscript package state and one
   native script-scoped store. It creates a per-page `VotUserscriptBridge` only
   while the opt-in integration is ready.
@@ -575,14 +593,15 @@ pending, while omitting endpoints and usernames.
 Every page forwards `QWebEnginePage::proxyAuthenticationRequired` to the one
 `ProxyAuthenticationController` owned by the primary window. It asks for
 credentials in a browser-owned modal dialog, pre-fills the configured username,
-and writes the entered values to Qt's request-scoped `QAuthenticator`. On macOS
-and Windows, a user may explicitly save credentials for a configured manual
-HTTP proxy in the native password manager. The opaque account name is derived
-from the normalized proxy host, configured port, and authentication realm; the
-requesting-site URL is never part of that identity. System proxy endpoints do
-not expose a reliable port through Qt's authentication signal and therefore
-remain session-only. Chromium may cache accepted credentials for the remaining
-process lifetime; a rejection causes the next challenge to show a retry message.
+and writes the entered values to Qt's request-scoped `QAuthenticator`. On
+macOS, Windows, and Linux, a user may explicitly save credentials for a
+configured manual HTTP proxy in the native password manager. The opaque
+account name is derived from the normalized proxy host, configured port, and
+authentication realm; the requesting-site URL is never part of that identity.
+System proxy endpoints do not expose a reliable port through Qt's
+authentication signal and therefore remain session-only. Chromium may cache
+accepted credentials for the remaining process lifetime; a rejection causes
+the next challenge to show a retry message.
 
 An absent configuration means the explicit System default. An existing but
 unreadable, malformed, or inapplicable configuration is different: falling
@@ -816,8 +835,8 @@ origin or manual HTTP-proxy endpoint, and realm to a deterministic opaque
 SHA-256 identifier. It never includes a URL path, query, fragment, or embedded
 user information. Realm-less NTLM/SPNEGO challenges cannot be separated safely
 through Qt's public authentication API and therefore remain session-only. The
-shared payload is versioned and contains the normalized target metadata needed
-for future credential management. Before deserialization, the decoder bounds
+shared payload is versioned and contains the normalized target metadata used by
+the credential-management UI. Before deserialization, the decoder bounds
 the total payload and validates every serialized string boundary without
 allocating from untrusted length fields. Version 1 macOS payloads remain
 readable and are replaced with the current format on the next explicit save.
@@ -923,7 +942,7 @@ directory.
 | `~/Applications/PanBrowser Apps/*.app` | `WebAppShortcutManager` | macOS-only signed launchers; each deletion target is verified by its embedded app ID. |
 | `session.json` | `SessionStore` | Version 2 stores up to 30 restorable HTTP(S) tabs with title and pin state, atomically written in canonical pinned-first order. Version 1 migrates with all tabs unpinned. URL credentials are removed before persistence and again when legacy data is loaded. |
 | `downloads.json` | `DownloadHistoryStore` | Up to 200 download records; paths and source host, not complete source URLs. |
-| native `QSettings` | `BrowserPreferences`, `PageZoom`, window/download UI | Start page, startup/cookie/history/language/developer-tools choices, per-origin page zoom, window geometry, last download directory, and pending data-reset marker. |
+| native `QSettings` | `BrowserPreferences`, `ReaderSettings`, `PageZoom`, window/download UI | Start page, startup/cookie/history/language/developer-tools choices, Reader Mode appearance, per-origin page zoom, window geometry, last download directory, and pending data-reset marker. |
 | macOS login Keychain / Windows Credential Manager / Linux Secret Service | `CredentialStore` | Explicitly saved HTTPS server and manual HTTP-proxy usernames/passwords, keyed by an opaque origin/port/realm digest. No PanBrowser JSON file contains the secret. |
 
 Session cookies are discarded by default. Enabling “keep sign-ins” changes the
@@ -1091,7 +1110,7 @@ Linux. Every platform string has an explicit Russian translation.
 Primary-window startup is ordered as follows:
 
 1. ensure `rules.json` and `Certificates/` exist;
-2. load trust rules and preferences;
+2. load trust rules, browser preferences, and Reader Mode appearance;
 3. load or create search settings;
 4. load DNS settings and apply the effective global resolver mode;
 5. load proxy settings and apply the effective application proxy;
@@ -1238,19 +1257,21 @@ Together these suites cover domains and rule validation, settings backups,
 window placement, sessions, cleanup boundaries, downloads, permissions,
 external navigation, popup geometry, search parsing, history ranking/deletion,
 bookmark CRUD and normalization, combined suggestion ranking, proxy and DNS
-settings, page zoom, corrupt-database behavior, web-app persistence, VOT source
-hashing, storage, redirect credentials, Site Connections enforcement, matching
-page/subframe injection, and native custom-anchor, hostname, and weak-key
-validation on Windows and Linux.
+settings, page zoom, Reader Mode detection/extraction/sanitization/navigation,
+corrupt-database behavior, web-app persistence, VOT source hashing, storage,
+redirect credentials, Site Connections enforcement, matching page/subframe
+injection, and native custom-anchor, hostname, and weak-key validation on
+Windows and Linux.
 Window-chrome tests verify the macOS safe-area calculations and verify that
 unsupported platforms do not receive expanded-client-area flags.
 
 The test target deliberately excludes `MainWindow`, so its final signal wiring
 and visual state still need a short manual smoke test after security- or
-lifecycle-sensitive changes. Most suites remain pure Qt tests, but focused VOT
-bridge tests start `BrowserPage`, a live WebEngine renderer, and a local HTTP
-server to verify isolated-world and subframe injection. They therefore require
-the same GUI/process environment as other WebEngine tests.
+lifecycle-sensitive changes. Most suites remain pure Qt tests, but focused
+Reader Mode and VOT bridge tests start `BrowserPage`, a live WebEngine renderer,
+and, where required, a local HTTP server to verify isolated-world behavior,
+extraction, navigation, and subframe injection. They therefore require the same
+GUI/process environment as other WebEngine tests.
 
 Recommended pre-commit checks:
 
@@ -1314,6 +1335,10 @@ Before merging a change, verify the relevant invariants:
   evaluated by Site Connections, and disabled outside System DNS mode;
 - VOT frame replies remain bound to the random identity of the requesting live
   frame, and its native storage never falls back to page `localStorage`;
+- Reader Mode keeps extraction and metadata size-bounded, removes executable,
+  form, and embedded content, revalidates retained URLs, restores the source page
+  on exit or navigation, and remains documented as presentation rather than a
+  privacy boundary;
 - diagnostics do not expose custom DNS templates, proxy hosts, or usernames;
 - new persistent data is documented in both this file and the README data tree.
 

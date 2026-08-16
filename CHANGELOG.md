@@ -7,7 +7,8 @@ general-purpose browser.
 ## 0.2.0 — Unreleased
 
 Development continues on `main`. The current scope focuses on browser polish,
-tighter page-network controls, and experimental video tooling.
+tighter page-network controls, native credential storage, Reader Mode, and
+experimental video tooling.
 
 - Added opt-in developer tools with a profile preference that defaults to off,
   an Inspect Element context action, and platform-appropriate shortcuts.
@@ -19,6 +20,10 @@ tighter page-network controls, and experimental video tooling.
   keeping startup session restoration static.
 - Added platform-aware keyboard navigation for opening, closing, reopening,
   cycling through, and directly selecting tabs.
+- Added Reader Mode for article-like HTTP(S) pages. It uses Mozilla Readability
+  for extraction, DOMPurify and a closed Shadow DOM for bounded isolated
+  presentation, preserves responsive images and safe links, restores the
+  original page without navigation, and persists its appearance controls.
 - Added an opt-in third-party connection firewall with Public Suffix List site
   boundaries, browser-owned prompts, persistent and session decisions, global
   exceptions, and separately managed tracker/CDN recommendations.
@@ -33,11 +38,15 @@ tighter page-network controls, and experimental video tooling.
   requests, routes them through proxy and Site Connections policy, and
   requires System DNS.
 - Added opt-in persistence of realm-based HTTPS server and manual HTTP-proxy
-  credentials in the macOS login Keychain and Windows Credential Manager.
-  Plain HTTP, System proxy, and unselected prompts remain session-only; rejected
-  saved credentials are removed before PanBrowser falls back to its own prompt.
+  credentials in the macOS login Keychain, Windows Credential Manager, and
+  Linux Secret Service. Plain HTTP, System proxy, SOCKS5, and unselected prompts
+  remain session-only; rejected saved credentials are removed before PanBrowser
+  falls back to its own prompt.
 - Added a versioned cross-platform credential payload, structured backend error
-  codes, and metadata enumeration for a future saved-credentials settings page.
+  codes, bounded asynchronous native operations, and a Settings page that lists
+  non-secret metadata and supports confirmed individual or namespace deletion.
+- Replaced the earlier trust-themed application artwork with PanBrowser's
+  original pangolin icon and aligned Settings navigation icons.
 
 ## 0.1.0 — 2026-08-10
 
