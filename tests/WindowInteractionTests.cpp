@@ -1096,15 +1096,18 @@ void WindowInteractionTests::readerModePreservesResponsiveImages()
   <h1>Responsive images must survive Reader Mode</h1>
   <p>This substantial opening paragraph represents an ordinary illustrated article. It gives the readerability heuristic enough editorial prose to retain the surrounding content and its responsive image.</p>
   <img id="srcset-only" alt="Responsive illustration"
+       sizes="(max-width: 900px) 90vw, 720px"
        data-srcset="/images/responsive-small.jpg 1x, /images/responsive-large.jpg 2x">
   <p>The second paragraph verifies that an image supplied only through a source set remains visible after sanitization instead of being discarded because it lacks a traditional source attribute.</p>
   <picture id="responsive-picture">
+    <source type="image/x-panbrowser-unsupported"
+            srcset="/images/picture-future.gif 1x">
     <source type="image/gif"
             srcset="/images/picture-small.gif 1x, /images/picture-large.gif 2x">
     <img id="picture-image" alt="Picture illustration"
          src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==#fallback">
   </picture>
-  <p>The final paragraph exercises a picture element that carries alternative image candidates. Reader Mode should flatten it to one validated image source without retaining browser-controlled source-set markup.</p>
+  <p>The final paragraph exercises a picture element that carries alternative image candidates. Reader Mode should retain validated responsive markup so Chromium can select a supported format and an appropriately sized resource.</p>
 </article>
 </body>
 </html>
@@ -1129,12 +1132,22 @@ void WindowInteractionTests::readerModePreservesResponsiveImages()
     const reader = globalThis.__panBrowserReader;
     const content = reader && reader.root.querySelector(".article");
     const responsive = content && content.querySelector("#srcset-only");
+    const picture = content && content.querySelector("#responsive-picture");
     const pictureImage = content && content.querySelector("#picture-image");
+    const pictureSources = picture ? Array.from(picture.querySelectorAll(":scope > source")) : [];
     return JSON.stringify({
         responsiveSource: responsive ? responsive.getAttribute("src") : "",
-        responsiveHasSrcset: Boolean(responsive && responsive.hasAttribute("srcset")),
+        responsiveSrcset: responsive ? responsive.getAttribute("srcset") : "",
+        responsiveSizes: responsive ? responsive.getAttribute("sizes") : "",
         pictureSource: pictureImage ? pictureImage.getAttribute("src") : "",
-        pictureHasSrcset: Boolean(pictureImage && pictureImage.hasAttribute("srcset")),
+        firstPictureType: pictureSources[0] ? pictureSources[0].getAttribute("type") : "",
+        firstPictureSrcset: pictureSources[0]
+            ? pictureSources[0].getAttribute("srcset")
+            : "",
+        secondPictureType: pictureSources[1] ? pictureSources[1].getAttribute("type") : "",
+        secondPictureSrcset: pictureSources[1]
+            ? pictureSources[1].getAttribute("srcset")
+            : "",
         pictureCount: content ? content.querySelectorAll("picture").length : -1,
         sourceCount: content ? content.querySelectorAll("source").length : -1
     });
@@ -1149,16 +1162,47 @@ void WindowInteractionTests::readerModePreservesResponsiveImages()
     const QJsonObject imageObject = QJsonDocument::fromJson(imageState.toUtf8()).object();
     QCOMPARE(
         imageObject.value(QStringLiteral("responsiveSource")).toString(),
-        QStringLiteral("https://reader.example/images/responsive-large.jpg")
+        QString()
     );
-    QVERIFY(!imageObject.value(QStringLiteral("responsiveHasSrcset")).toBool());
+    QCOMPARE(
+        imageObject.value(QStringLiteral("responsiveSrcset")).toString(),
+        QStringLiteral(
+            "https://reader.example/images/responsive-small.jpg 1x, "
+            "https://reader.example/images/responsive-large.jpg 2x"
+        )
+    );
+    QCOMPARE(
+        imageObject.value(QStringLiteral("responsiveSizes")).toString(),
+        QStringLiteral("(max-width: 900px) 90vw, 720px")
+    );
     QCOMPARE(
         imageObject.value(QStringLiteral("pictureSource")).toString(),
-        QStringLiteral("https://reader.example/images/picture-large.gif")
+        QStringLiteral(
+            "data:image/gif;base64,"
+            "R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==#fallback"
+        )
     );
-    QVERIFY(!imageObject.value(QStringLiteral("pictureHasSrcset")).toBool());
-    QCOMPARE(imageObject.value(QStringLiteral("pictureCount")).toInt(), 0);
-    QCOMPARE(imageObject.value(QStringLiteral("sourceCount")).toInt(), 0);
+    QCOMPARE(
+        imageObject.value(QStringLiteral("firstPictureType")).toString(),
+        QStringLiteral("image/x-panbrowser-unsupported")
+    );
+    QCOMPARE(
+        imageObject.value(QStringLiteral("firstPictureSrcset")).toString(),
+        QStringLiteral("https://reader.example/images/picture-future.gif 1x")
+    );
+    QCOMPARE(
+        imageObject.value(QStringLiteral("secondPictureType")).toString(),
+        QStringLiteral("image/gif")
+    );
+    QCOMPARE(
+        imageObject.value(QStringLiteral("secondPictureSrcset")).toString(),
+        QStringLiteral(
+            "https://reader.example/images/picture-small.gif 1x, "
+            "https://reader.example/images/picture-large.gif 2x"
+        )
+    );
+    QCOMPARE(imageObject.value(QStringLiteral("pictureCount")).toInt(), 1);
+    QCOMPARE(imageObject.value(QStringLiteral("sourceCount")).toInt(), 2);
 
     controller.deactivate();
     QTRY_VERIFY_WITH_TIMEOUT(!controller.isActive(), 3000);

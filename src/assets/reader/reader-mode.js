@@ -109,9 +109,9 @@
         }
         return null;
     };
-    const srcsetCandidates = raw => {
+    const sanitizedSrcset = raw => {
         if (!raw || raw.length > options.maximumSrcsetLength)
-            return [];
+            return null;
 
         const candidates = [];
         let parsedCandidates = 0;
@@ -158,45 +158,53 @@
             if (!source)
                 continue;
 
-            let kind = "default";
-            let value = 1;
+            let descriptor = "";
             const width = descriptors.match(/^([1-9]\d*)w$/);
             const density = descriptors.match(/^(?:(\d+(?:\.\d*)?)|(\.\d+))x$/);
             if (width) {
-                kind = "width";
-                value = Number(width[1]);
+                descriptor = width[0];
             } else if (density) {
-                kind = "density";
-                value = Number(density[1] || density[2]);
+                const value = Number(density[1] || density[2]);
+                if (!Number.isFinite(value) || value <= 0)
+                    continue;
+                descriptor = density[0];
+            } else if (descriptors) {
+                continue;
             }
-            if (Number.isFinite(value) && value > 0)
-                candidates.push({ source, kind, value });
+            candidates.push(descriptor ? `${source} ${descriptor}` : source);
         }
-        return candidates;
+        return candidates.length ? candidates.join(", ") : null;
     };
-    const preferredSrcsetSource = raw => {
-        const candidates = srcsetCandidates(raw);
-        if (!candidates.length)
-            return null;
-        const widths = candidates.filter(candidate => candidate.kind === "width");
-        const densities = candidates.filter(candidate => candidate.kind === "density");
-        const comparable = widths.length ? widths : (densities.length ? densities : candidates);
-        return comparable.reduce((best, candidate) => (
-            candidate.value >= best.value ? candidate : best
-        )).source;
+    const preserveBoundedAttribute = (element, name, maximumLength) => {
+        const value = element.getAttribute(name);
+        if (!value || value.length > maximumLength) {
+            element.removeAttribute(name);
+            return;
+        }
+        element.setAttribute(name, value.trim());
     };
-    const normalizeImage = (image, preferredSource = null) => {
-        const source = preferredSource
-            || preferredSrcsetSource(image.getAttribute("srcset"))
-            || safeUrl(image.getAttribute("src"), "image");
-        image.removeAttribute("srcset");
-        image.removeAttribute("sizes");
+    const normalizeImage = (image, allowSourceFromPicture = false) => {
+        const sourceSet = sanitizedSrcset(image.getAttribute("srcset"));
+        const source = safeUrl(image.getAttribute("src"), "image");
+        if (sourceSet)
+            image.setAttribute("srcset", sourceSet);
+        else
+            image.removeAttribute("srcset");
+        if (sourceSet)
+            preserveBoundedAttribute(image, "sizes", options.maximumUrlLength);
+        else
+            image.removeAttribute("sizes");
+        if (source)
+            image.setAttribute("src", source);
+        else
+            image.removeAttribute("src");
         image.removeAttribute("usemap");
-        if (!source) {
+        image.removeAttribute("media");
+        image.removeAttribute("type");
+        if (!source && !sourceSet && !allowSourceFromPicture) {
             image.remove();
             return false;
         }
-        image.setAttribute("src", source);
         image.setAttribute("loading", "lazy");
         image.setAttribute("decoding", "async");
         return true;
@@ -212,39 +220,60 @@
         anchor.setAttribute("rel", "noopener noreferrer");
     }
     for (const picture of sanitizedContent.querySelectorAll("picture")) {
-        let preferredSource = preferredSrcsetSource(picture.getAttribute("srcset"));
-        for (const source of picture.children) {
-            if (preferredSource || source.tagName !== "SOURCE")
+        const inferredSourceSet = sanitizedSrcset(picture.getAttribute("srcset"));
+        const inferredSource = safeUrl(picture.getAttribute("src"), "image");
+        const inferredSizes = picture.getAttribute("sizes");
+        picture.removeAttribute("srcset");
+        picture.removeAttribute("src");
+        picture.removeAttribute("sizes");
+        picture.removeAttribute("media");
+        picture.removeAttribute("type");
+
+        let validSources = 0;
+        for (const source of Array.from(picture.children)) {
+            if (source.tagName !== "SOURCE")
                 continue;
-            const type = source.getAttribute("type");
-            if (type && !/^image\//i.test(type))
+            const sourceSet = sanitizedSrcset(source.getAttribute("srcset"));
+            source.removeAttribute("src");
+            if (!sourceSet) {
+                source.remove();
                 continue;
-            const media = source.getAttribute("media");
-            if (media) {
-                if (media.length > options.maximumUrlLength)
-                    continue;
-                try {
-                    if (!globalThis.matchMedia(media).matches)
-                        continue;
-                } catch (_) {
-                    continue;
-                }
             }
-            preferredSource = preferredSrcsetSource(source.getAttribute("srcset"))
-                || safeUrl(source.getAttribute("src"), "image");
+            source.setAttribute("srcset", sourceSet);
+            preserveBoundedAttribute(source, "sizes", options.maximumUrlLength);
+            preserveBoundedAttribute(source, "media", options.maximumUrlLength);
+            preserveBoundedAttribute(source, "type", 256);
+            ++validSources;
         }
         let image = picture.querySelector("img");
-        if (!image && preferredSource)
+        if (!image && (validSources || inferredSourceSet || inferredSource))
             image = document.createElement("img");
-        if (image && normalizeImage(image, preferredSource))
-            picture.replaceWith(image);
-        else
+        if (image) {
+            if (!image.hasAttribute("srcset") && inferredSourceSet)
+                image.setAttribute("srcset", inferredSourceSet);
+            if (!image.hasAttribute("src") && inferredSource)
+                image.setAttribute("src", inferredSource);
+            if (!image.hasAttribute("sizes") && inferredSizes)
+                image.setAttribute("sizes", inferredSizes);
+        }
+        if (!image || !normalizeImage(image, validSources > 0))
             picture.remove();
     }
-    for (const image of sanitizedContent.querySelectorAll("img"))
-        normalizeImage(image);
+    for (const image of sanitizedContent.querySelectorAll("img")) {
+        if (!image.closest("picture"))
+            normalizeImage(image);
+    }
     for (const source of sanitizedContent.querySelectorAll("source"))
-        source.remove();
+        if (!source.closest("picture"))
+            source.remove();
+    for (const element of sanitizedContent.querySelectorAll("[srcset], [sizes], [media], [type]")) {
+        if (element.tagName === "IMG" || element.tagName === "SOURCE")
+            continue;
+        element.removeAttribute("srcset");
+        element.removeAttribute("sizes");
+        element.removeAttribute("media");
+        element.removeAttribute("type");
+    }
 
     const host = document.createElement("div");
     host.setAttribute("aria-label", options.labels.readerMode);
