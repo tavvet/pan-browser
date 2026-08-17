@@ -21,8 +21,10 @@ The repository contains five licensing groups:
    selects their Apache-2.0 licensing terms and retains the upstream notices
    under `src/assets/reader/third_party/`.
 5. References to external build and runtime dependencies and to the optional
-   VOT userscript integration. Qt, Chromium, OpenSSL, and VOT source or binaries
-   are not committed to this repository.
+   VOT userscript integration. Qt, Chromium, OpenSSL, and the upstream VOT
+   userscript source or binaries are not committed to this repository. The
+   PanBrowser-authored VOT bridge and isolated Chromium transport belong to
+   group 1.
 
 Publishing a source tag does not require publishing a GitHub Release or a
 binary package. The source tag should contain the PanBrowser project license,
@@ -110,18 +112,21 @@ corresponding-source offer obligations in the final package audit.
 
 ### Optional VOT userscript
 
-PanBrowser implements a compatibility and security bridge for the independently
-maintained VOT userscript. The application does not bundle, download, modify,
-or redistribute VOT. A user supplies the supported upstream `vot.user.js`, and
+PanBrowser implements its own compatibility/security bridge and isolated
+Chromium network transport for the independently maintained VOT userscript.
+Those PanBrowser-authored components are Apache-2.0 project code. The
+application does not bundle, download, modify, or redistribute the upstream VOT
+userscript. A user supplies the supported upstream `vot.user.js`, and
 PanBrowser verifies its exact version, metadata, and SHA-256 digest before
 execution. The upstream project is MIT-licensed; its notice is reproduced in
 [THIRD_PARTY_NOTICES.md](../THIRD_PARTY_NOTICES.md).
 
-Because the current source and binary packages contain no VOT code, the
-userscript is not part of PanBrowser's distributed binary inventory. If a
-future package downloads, embeds, mirrors, or modifies it, that distribution
-must preserve the upstream MIT notice and update the package inventory,
-security documentation, source handling, and update policy before release.
+Because the current source and binary packages contain no upstream VOT
+userscript code, that userscript is not part of PanBrowser's distributed binary
+inventory. If a future package downloads, embeds, mirrors, or modifies it, that
+distribution must preserve the upstream MIT notice and update the package
+inventory, security documentation, source handling, and update policy before
+release.
 
 ## 4. Checklist before sharing any binary
 
@@ -171,10 +176,11 @@ The exact license texts, rather than this checklist, control.
 The generic platform build scripts create local testing packages. They include
 the PanBrowser README, Apache license, third-party notice, this licensing guide,
 and the bundled Readability and DOMPurify license files, but they do not yet
-implement the complete binary-distribution checklist above. They do not copy a
-configured VOT userscript or native VOT storage from the developer's
-application-data directory. Windows CI artifacts and Linux packages should
-therefore remain development/test artifacts.
+implement the complete binary-distribution checklist above. They package the
+PanBrowser-authored VOT bridge and network-transport resources but do not copy
+a configured upstream VOT userscript or its native GM storage from the
+developer's application-data directory. Windows CI artifacts and Linux
+packages should therefore remain development/test artifacts.
 
 The macOS release-candidate script goes further. It collects the installed Qt
 SPDX documents, Chromium's top-level license, exact notices for loose Homebrew

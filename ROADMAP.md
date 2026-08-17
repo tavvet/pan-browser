@@ -37,8 +37,10 @@ may be unstable.
   session and persistent decisions, browser-owned prompts, and separately
   managed PanBrowser tracker/CDN recommendation sets.
 - [x] Add opt-in integration with the exact hash-verified VOT 1.11.8
-  userscript, isolated native storage, bounded HTTPS networking, iframe-aware
-  response routing, proxy authentication, and Site Connections enforcement.
+  userscript, isolated native storage, an isolated Chromium transport that
+  follows the active DNS and proxy configuration, bounded HTTPS networking,
+  iframe-aware response routing, proxy authentication, and Site Connections
+  enforcement.
 - [x] Add opt-in persistent realm-based HTTP Basic/Digest and manual HTTP-proxy
   credentials through native operating-system password managers. The macOS
   Keychain, Windows Credential Manager, and Linux Secret Service backends,

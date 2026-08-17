@@ -111,8 +111,10 @@ Apache-2.0 option. The complete selected license is retained at
 
 ### VOT — Voice Over Translation userscript
 
-PanBrowser contains an opt-in compatibility bridge for
-[VOT](https://github.com/ilyhalight/voice-over-translation). The VOT source is
+PanBrowser contains its own opt-in compatibility bridge and isolated Chromium
+network transport for
+[VOT](https://github.com/ilyhalight/voice-over-translation). Those PanBrowser
+components are original Apache-2.0 project code. The upstream VOT userscript is
 not committed to this repository, copied into PanBrowser packages, or
 downloaded by the application. A user must obtain the supported `vot.user.js`
 independently, and PanBrowser accepts only the exact upstream `1.11.8` file

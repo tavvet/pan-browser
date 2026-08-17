@@ -338,8 +338,8 @@ blocked until a valid configuration is saved.
 
 Open **Settings → Video Translation** to enable the experimental integration
 with [VOT — Voice Over Translation](https://github.com/ilyhalight/voice-over-translation).
-PanBrowser does not download or bundle third-party script code. Download the
-official
+PanBrowser does not download or bundle the upstream VOT userscript. Download
+the official
 [`vot.user.js`](https://github.com/ilyhalight/voice-over-translation/releases/download/1.11.8/vot.user.js)
 from the VOT `1.11.8` release, select it in Settings, and reload already open
 video pages. The file is accepted only when its exact SHA-256 hash and metadata
@@ -361,10 +361,10 @@ request to an unknown translation or media host is blocked and produces the
 ordinary PanBrowser allow/block prompt; allowing it reloads the affected page.
 The internal extension has no background worker or content scripts and is not
 a general extension platform. VOT service requests do not use a tab's
-custom-CA recovery callback. VOT is third-party code maintained outside
-PanBrowser, has access to every matching video page, and can contact its
-declared service hosts. Keep the feature disabled unless you accept that trust
-boundary.
+custom-CA recovery callback. The upstream VOT userscript is third-party code
+maintained outside PanBrowser, has access to every matching video page, and can
+contact its declared service hosts. Keep the feature disabled unless you accept
+that trust boundary.
 
 ## Saved authentication credentials
 
@@ -405,9 +405,9 @@ manager.
   WebEngine. It is not a complete network sandbox and does not claim to block
   every WebRTC, DNS-prefetch, or internal Chromium connection.
 - The optional VOT integration executes one exact, hash-verified third-party
-  userscript. PanBrowser provides only the compatibility bridge; it does not
-  audit or control the translation service, page-processing logic, or future
-  upstream releases.
+  userscript. PanBrowser provides the compatibility bridge and an isolated
+  Chromium network transport; it does not audit or control the translation
+  service, page-processing logic, or future upstream releases.
 - Installed web apps currently share the main PanBrowser profile, including
   cookies, permissions, proxy, DNS, trust rules, and the site-connection
   firewall.

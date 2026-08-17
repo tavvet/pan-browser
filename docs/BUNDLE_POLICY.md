@@ -75,14 +75,18 @@ Do not remove the following merely to reduce archive size:
   PanBrowser does not call their APIs directly.
 - the Mozilla Readability and DOMPurify code embedded in PanBrowser resources,
   together with their packaged license files.
+- the PanBrowser-authored VOT compatibility bridge and built-in Chromium
+  transport extension resources.
 
 The deployment tools discover transitive Qt dependencies. Removing one after
 deployment can turn an apparent size improvement into a startup failure on a
 different machine.
 
-The optional VOT userscript and `vot-storage.json` are user data, not bundle
-inputs. Packaging must never copy either from a developer profile into
-`dist/`. If PanBrowser ever starts distributing VOT itself, treat that as a new
+The optional upstream VOT userscript and `vot-storage.json` are user data, not
+bundle inputs. Packaging must never copy either from a developer profile into
+`dist/`. The PanBrowser-authored bridge and inert network-transport extension
+are ordinary application resources and do belong in the package. If PanBrowser
+ever starts distributing the upstream userscript itself, treat that as a new
 runtime component requiring an explicit size, security, update, and licensing
 review rather than an ordinary bundle-pruning change.
 

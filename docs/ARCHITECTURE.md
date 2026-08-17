@@ -820,6 +820,14 @@ The extension has no background worker, content scripts, external messaging,
 or remotely supplied code; its hidden page is opened only by PanBrowser. It is
 not a general extension platform.
 
+`VotUserscriptManager` installs page bridges while that transport is still
+loading so the userscript is present in the initial document rather than only
+after a reload. Requests created during initialization keep their own bounded
+timeout and remain queued until the extension control page is ready. A
+transport initialization failure completes every active request with an error
+and removes the bridges from configured pages; it never falls back to a native
+resolver or a less restricted network path.
+
 The extension manifest must declare a broad HTTPS host permission because
 Chromium does not support changing host permissions per request. PanBrowser
 therefore adds a second, fail-closed boundary in native code. Every request
@@ -989,6 +997,8 @@ directory.
 | `site_connection_presets.json` | `CrossDomainPresetCatalog` | Immutable versioned tracker/CDN recommendation catalog bundled in Qt resources; never modified at runtime. |
 | `video-translation.json` | `VideoTranslationSettings` | Disabled-by-default VOT flag and normalized path to the externally obtained, verified userscript; atomically written. |
 | `vot-storage.json` | `VotUserscriptStore` | Versioned, size-bounded native GM values shared only by the verified VOT integration; atomically written and not exposed as page storage. |
+| cache `InternalExtensions/vot-network-v1/` | `VotChromiumNetworkTransport` | Generated copy of the PanBrowser-authored inert MV3 transport resources; contains no upstream userscript and is recreated from bundled resources as needed. |
+| cache `InternalProfiles/VotNetwork/` | `VotChromiumNetworkTransport` | Isolated Chromium transport profile with no persistent cookies or disk HTTP cache; does not share browsing-profile website credentials. |
 | `history.sqlite` | `HistoryStore` | WAL-mode SQLite browsing history, limited to 50,000 visits. |
 | `bookmarks.sqlite` | `BookmarkStore` | WAL-mode SQLite bookmarks with normalized URL and title fields for local lookup. |
 | `web-apps.json` | `WebAppStore` | Validated installed-app metadata and bounded page icons, atomically written. |
@@ -1170,15 +1180,19 @@ Primary-window startup is ordered as follows:
 6. load or create Site Connections and video-translation settings;
 7. apply a pending profile reset before Chromium opens the profile;
 8. create the shared browser profile and apply the active User-Agent before any
-   pages, then create the VOT userscript manager, download manager, history
-   store, bookmark store, and installed web-app store;
-9. validate the configured VOT source and prepare its isolated Chromium
-   transport before any page is given a bridge;
-10. create the UI and permission/authentication controllers;
-11. restore safe window geometry;
-12. reload runtime trust rules;
-13. restore pinned tabs and then the start page, or restore the complete lazy
-    session when that startup mode is enabled.
+   pages, then create the VOT userscript manager, validate the configured
+   source, begin preparing its isolated Chromium transport, and create the
+   download manager, history store, bookmark store, and installed web-app
+   store, followed by the shared HTTP and proxy authentication controllers;
+9. create the UI, fullscreen controller, permission controller, and Site
+   Connections prompt controller, then connect shared policy and prompt
+   routing;
+10. restore safe window geometry;
+11. reload runtime trust rules;
+12. restore pinned tabs and then the start page, or restore the complete lazy
+    session when that startup mode is enabled. Each created page receives its
+    VOT bridge even if the transport is still preparing; network requests stay
+    queued and bounded until it becomes ready.
 
 On close, the primary window always saves pinned tabs and includes regular tabs
 only when session restoration is enabled. It then persists geometry, closes
@@ -1301,7 +1315,7 @@ of collecting the entire browser test surface in one QObject:
   platform-only `certificate-validator` suites;
 - `WindowInteractionTests.cpp` covers browser-window interaction and chrome;
 - `PersistenceAndPolicyTests.cpp` covers stored state, navigation policy, and
-  the verified VOT package/storage/native-network boundary;
+  the verified VOT package/storage/Chromium-network boundary;
 - `NetworkSettingsAndAuthTests.cpp` covers DNS, proxy, User-Agent profiles,
   permissions, and auth;
 - `BrowsingFeaturesTests.cpp` covers address suggestions, history, bookmarks,
