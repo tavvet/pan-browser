@@ -1,6 +1,8 @@
 #include "VotUserscriptManager.h"
 
 #include "BrowserPage.h"
+#include "BrowserProfile.h"
+#include "VotChromiumNetworkTransport.h"
 #include "VotUserscriptBridge.h"
 
 #include <QWebEngineScriptCollection>
@@ -9,24 +11,27 @@
 
 VotUserscriptManager::VotUserscriptManager(
     const QString &storagePath,
-    DnsResolutionMode dnsResolutionMode,
+    BrowserProfile *profile,
     QObject *parent
 )
     : QObject(parent)
     , m_store(storagePath)
-    , m_dnsResolutionMode(dnsResolutionMode)
+    , m_transport(new VotChromiumNetworkTransport(profile, this))
 {
+    Q_ASSERT(profile);
     m_store.load(&m_storageError);
-}
-
-bool VotUserscriptManager::supportsDnsResolutionMode(DnsResolutionMode mode)
-{
-    return mode == DnsResolutionMode::System;
-}
-
-void VotUserscriptManager::setDnsResolutionMode(DnsResolutionMode mode)
-{
-    m_dnsResolutionMode = mode;
+    connect(
+        m_transport,
+        &VotChromiumNetworkTransport::stateChanged,
+        this,
+        &VotUserscriptManager::handleTransportStateChanged
+    );
+    connect(
+        m_transport,
+        &VotChromiumNetworkTransport::proxyAuthenticationRequired,
+        this,
+        &VotUserscriptManager::proxyAuthenticationRequired
+    );
 }
 
 void VotUserscriptManager::applySettings(
@@ -45,13 +50,6 @@ void VotUserscriptManager::applySettings(
         setState(VotUserscriptState::Error, m_storageError);
         return;
     }
-    if (!supportsDnsResolutionMode(m_dnsResolutionMode)) {
-        setState(
-            VotUserscriptState::Error,
-            tr("Video translation is unavailable while Secure DNS is enabled")
-        );
-        return;
-    }
     QString validationError;
     if (!settings.validate(&validationError)) {
         setState(VotUserscriptState::Error, validationError);
@@ -67,13 +65,19 @@ void VotUserscriptManager::applySettings(
         return;
     }
     m_userscript = std::move(userscript);
-    setState(VotUserscriptState::Ready);
+    m_transport->ensureReady();
+    handleTransportStateChanged();
 }
 
 void VotUserscriptManager::configurePage(BrowserPage *page)
 {
     if (!page)
         return;
+    m_pages.removeIf([](const QPointer<BrowserPage> &candidate) {
+        return candidate.isNull();
+    });
+    if (!m_pages.contains(page))
+        m_pages.append(page);
     const QList<QWebEngineScript> oldScripts = page->scripts().find(
         VotUserscriptBridge::scriptName()
     );
@@ -86,13 +90,15 @@ void VotUserscriptManager::configurePage(BrowserPage *page)
     for (VotUserscriptBridge *bridge : oldBridges)
         delete bridge;
 
-    if (m_state == VotUserscriptState::Ready && m_userscript) {
-        auto *bridge = new VotUserscriptBridge(page, *m_userscript, &m_store, page);
-        connect(
-            bridge,
-            &VotUserscriptBridge::proxyAuthenticationRequired,
-            this,
-            &VotUserscriptManager::proxyAuthenticationRequired
+    if ((m_state == VotUserscriptState::Preparing
+            || m_state == VotUserscriptState::Ready)
+        && m_userscript) {
+        new VotUserscriptBridge(
+            page,
+            *m_userscript,
+            &m_store,
+            m_transport,
+            page
         );
     }
 }
@@ -116,12 +122,44 @@ QString VotUserscriptManager::statusText() const
         return tr("Disabled");
     case VotUserscriptState::NotConfigured:
         return tr("Choose the verified VOT userscript");
+    case VotUserscriptState::Preparing:
+        return tr("Preparing Chromium network transport…");
     case VotUserscriptState::Ready:
         return tr("Ready — reload open video pages to apply");
     case VotUserscriptState::Error:
         return tr("Userscript error");
     }
     return {};
+}
+
+void VotUserscriptManager::handleTransportStateChanged()
+{
+    if (!m_settings.enabled() || !m_userscript)
+        return;
+    switch (m_transport->state()) {
+    case VotChromiumTransportState::Uninitialized:
+    case VotChromiumTransportState::Loading:
+        setState(VotUserscriptState::Preparing);
+        reconfigurePages();
+        break;
+    case VotChromiumTransportState::Ready:
+        setState(VotUserscriptState::Ready);
+        reconfigurePages();
+        break;
+    case VotChromiumTransportState::Error:
+        setState(VotUserscriptState::Error, m_transport->errorString());
+        reconfigurePages();
+        break;
+    }
+}
+
+void VotUserscriptManager::reconfigurePages()
+{
+    const QList<QPointer<BrowserPage>> pages = m_pages;
+    for (const QPointer<BrowserPage> &page : pages) {
+        if (page)
+            configurePage(page);
+    }
 }
 
 void VotUserscriptManager::setState(

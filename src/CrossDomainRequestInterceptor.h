@@ -8,6 +8,8 @@
 #include <QSet>
 #include <QWebEngineUrlRequestInterceptor>
 
+#include <functional>
+
 struct CrossDomainResolvedSource {
     QUrl url;
     bool originOnly = false;
@@ -53,6 +55,8 @@ class CrossDomainRequestInterceptor final : public QWebEngineUrlRequestIntercept
     Q_OBJECT
 
 public:
+    using VotTransportAuthorizer = std::function<bool(const QUrl &, int)>;
+
     explicit CrossDomainRequestInterceptor(
         bool blockNetwork,
         const CrossDomainSettings &settings,
@@ -60,6 +64,16 @@ public:
     );
 
     void interceptRequest(QWebEngineUrlRequestInfo &info) override;
+    static QString votTransportRequestId(
+        const QUrl &firstPartyUrl,
+        const QString &extensionId
+    );
+    void setVotTransportExtensionId(const QString &extensionId);
+    bool registerVotTransportRequest(
+        const QString &requestId,
+        VotTransportAuthorizer authorizer
+    );
+    void unregisterVotTransportRequest(const QString &requestId);
     [[nodiscard]] bool allowRequest(
         const QUrl &sourceUrl,
         const QUrl &targetUrl,
@@ -101,13 +115,24 @@ signals:
     );
 
 private:
+    struct VotTransportRequestAuthorization final {
+        VotTransportAuthorizer authorizer;
+        qsizetype countedRequestAttempts = 0;
+    };
+
     static QString requestKey(const QString &sourceSite, const QString &targetHost);
+    [[nodiscard]] bool interceptVotTransportRequest(
+        QWebEngineUrlRequestInfo &info,
+        bool *handled
+    );
 
     const bool m_blockNetwork = false;
     mutable QReadWriteLock m_lock;
     CrossDomainPolicySnapshot m_policy;
     QHash<QString, CrossDomainRuleDecision> m_sessionDecisions;
     CrossDomainPendingRequestTracker m_pendingRequests;
+    QString m_votTransportExtensionId;
+    QHash<QString, VotTransportRequestAuthorization> m_votTransportRequests;
 };
 
 [[nodiscard]] QString crossDomainResourceTypeDisplayName(int resourceType);

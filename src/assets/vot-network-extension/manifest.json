@@ -1,0 +1,12 @@
+{
+  "manifest_version": 3,
+  "name": "PanBrowser VOT Network Transport",
+  "version": "1.0.0",
+  "description": "Internal Chromium network transport for the optional VOT integration.",
+  "host_permissions": [
+    "https://*/*"
+  ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'none'; connect-src https:"
+  }
+}

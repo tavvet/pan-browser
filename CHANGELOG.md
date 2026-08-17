@@ -34,9 +34,10 @@ experimental video tooling.
   preserve the selected video's intrinsic aspect ratio.
 - Added opt-in integration with the independently maintained VOT 1.11.8
   userscript. PanBrowser verifies the exact upstream file, injects it only on
-  declared pages, keeps its GM values outside page storage, bounds native HTTPS
-  requests, routes them through proxy and Site Connections policy, and
-  requires System DNS.
+  declared pages, keeps its GM values outside page storage, and bounds HTTPS
+  requests through an isolated Chromium transport profile. Requests use the
+  active Chromium DNS and proxy configuration while remaining subject to
+  verified `@connect` hosts and Site Connections policy.
 - Added opt-in persistence of realm-based HTTPS server and manual HTTP-proxy
   credentials in the macOS login Keychain, Windows Credential Manager, and
   Linux Secret Service. Plain HTTP, System proxy, SOCKS5, and unselected prompts

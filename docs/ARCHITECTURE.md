@@ -73,8 +73,10 @@ flowchart TD
     Page --> VotBridge["VotUserscriptBridge / isolated world"]
     VotManager --> VotStore["VotUserscriptStore / vot-storage.json"]
     VotManager --> VotBridge
-    VotBridge --> NativeNetwork["Qt Network / bounded HTTPS"]
-    NativeNetwork --> RequestFilter
+    VotBridge --> VotTransport["VotChromiumNetworkTransport / isolated profile"]
+    VotTransport --> InternalExtension["Built-in inert MV3 transport extension"]
+    InternalExtension --> VotRequestFilter["Fail-closed VOT request interceptor"]
+    VotRequestFilter --> RequestFilter
 
     Popup["Popup MainWindow"] --> Profile
     Popup --> History
@@ -809,31 +811,46 @@ script. The store can contain third-party preferences and service state, is not
 part of Chromium site data, and is not removed by the WebEngine profile-reset
 action.
 
-`GM_xmlhttpRequest` is implemented with one `QNetworkAccessManager` per bridge.
-It is deliberately narrower than a general userscript manager:
+`GM_xmlhttpRequest` is implemented by one shared
+`VotChromiumNetworkTransport`. It creates a dedicated Chromium profile through
+`QWebEngineProfileBuilder`, with its persistent path fixed before Chromium
+initialization, no disk HTTP cache, and no persistent cookies. A generated,
+built-in Manifest V3 extension provides the cross-origin `fetch` capability.
+The extension has no background worker, content scripts, external messaging,
+or remotely supplied code; its hidden page is opened only by PanBrowser. It is
+not a general extension platform.
+
+The extension manifest must declare a broad HTTPS host permission because
+Chromium does not support changing host permissions per request. PanBrowser
+therefore adds a second, fail-closed boundary in native code. Every request
+uses a short-lived internal extension page whose local URL contains an
+unguessable active request ID registered by its bridge. That ID is never added
+to the outbound HTTP request. The dedicated profile's interceptor rejects
+missing, unknown, duplicate, expired, or extension-external IDs and invokes
+the per-request authorizer for the initial URL and each redirect. A native
+timeout and renderer-termination handler complete every request even if its
+hidden page stops responding. The transport is deliberately narrower than a
+general userscript manager:
 
 - destinations must be HTTPS and match a verified `@connect` host;
 - methods, headers, request and response sizes, timeouts, redirect depth, and
   concurrent requests are bounded;
-- cookies and proxy credentials supplied as raw request headers are rejected;
-- `Authorization` and cookie headers are stripped when a redirect changes
-  scheme, hostname, or effective port;
+- cookies and proxy credentials supplied as raw request headers are rejected,
+  and Chromium `fetch` uses `credentials: "omit"`;
 - each initial destination and redirect is evaluated by the shared Site
   Connections policy using the attributable top-level page, with the verified
   frame URL only as a fallback;
-- invalid proxy configuration blocks native VOT traffic through the same
-  fail-closed policy used by WebEngine;
-- the application proxy and existing browser-owned HTTP proxy authentication
-  dialog are reused.
+- invalid proxy configuration blocks VOT traffic through the same fail-closed
+  policy used by the browsing profile;
+- Chromium Secure DNS, direct/system/manual proxy selection, and the existing
+  browser-owned HTTP proxy authentication dialog are reused.
 
-The native network manager does not share Chromium cookies, WebEngine Secure
-DNS, or the `BrowserPage` custom-CA recovery callback. It uses Qt Network's
-system TLS and resolver behavior. `VotUserscriptManager` therefore refuses to
-activate while either Chromium Secure DNS mode is configured and reports the
-reason in Settings. Custom trust rules still apply to the video page itself,
-but not to VOT's native service requests. Unknown Site Connections requests
-cannot wait for a prompt; they fail immediately, and an allow decision reloads
-the matching page through the existing prompt controller.
+The isolated transport profile does not share website cookies or disk cache
+with the browsing profile. It uses ordinary Chromium TLS validation but not a
+`BrowserPage` custom-CA recovery callback, so custom trust rules still apply to
+the video page itself but not to VOT service requests. Unknown Site Connections
+requests cannot wait for a prompt; they fail immediately, and an allow decision
+reloads the matching page through the existing prompt controller.
 
 Changing the setting replaces page bridges and installed future-document
 scripts. Already executing userscript code cannot be unloaded safely from a
@@ -1011,9 +1028,8 @@ therefore deliberate:
 10. save trust rules last;
 11. apply the new DNS mode to Qt WebEngine;
 12. finalize imported certificate files only after every save and runtime apply succeeds;
-13. after dialog acceptance, replace the profile's live site-connection policy,
-    re-evaluate VOT against the effective DNS mode, and replace the bridges on
-    every open page.
+13. after dialog acceptance, replace the profile's live site-connection policy
+    and replace the VOT bridges on every open page.
 
 If a later step fails, earlier preferences and files are restored from their
 snapshots. If rollback itself is incomplete, the error dialog says so rather
@@ -1156,8 +1172,8 @@ Primary-window startup is ordered as follows:
 8. create the shared browser profile and apply the active User-Agent before any
    pages, then create the VOT userscript manager, download manager, history
    store, bookmark store, and installed web-app store;
-9. validate the configured VOT source and DNS compatibility before any page is
-   given a bridge;
+9. validate the configured VOT source and prepare its isolated Chromium
+   transport before any page is given a bridge;
 10. create the UI and permission/authentication controllers;
 11. restore safe window geometry;
 12. reload runtime trust rules;
@@ -1373,8 +1389,9 @@ Before merging a change, verify the relevant invariants:
   Suffix List rather than textual suffixes;
 - only the pinned, hash-verified VOT source may receive the isolated-world GM
   bridge; arbitrary userscripts remain unsupported;
-- native VOT requests remain HTTPS-only, bounded by verified `@connect` hosts,
-  evaluated by Site Connections, and disabled outside System DNS mode;
+- VOT requests remain HTTPS-only, bounded by verified `@connect` hosts and a
+  per-request native capability, re-evaluated on redirects, and evaluated by
+  Site Connections while using Chromium DNS and proxy configuration;
 - VOT frame replies remain bound to the random identity of the requesting live
   frame, and its native storage never falls back to page `localStorage`;
 - Reader Mode keeps extraction and metadata size-bounded, removes executable,

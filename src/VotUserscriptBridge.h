@@ -4,27 +4,15 @@
 
 #include <QHash>
 #include <QJsonObject>
-#include <QNetworkAccessManager>
 #include <QObject>
 #include <QPointer>
 #include <QSharedPointer>
 #include <QWebEngineFrame>
 
 class BrowserPage;
-class QAuthenticator;
 class QJsonObject;
-class QNetworkReply;
+class VotChromiumNetworkTransport;
 class VotUserscriptStore;
-
-namespace VotNetworkPolicy {
-
-[[nodiscard]] bool mayForwardHeaderAcrossRedirect(
-    const QByteArray &name,
-    const QUrl &source,
-    const QUrl &target
-);
-
-} // namespace VotNetworkPolicy
 
 class VotUserscriptBridge final : public QObject {
     Q_OBJECT
@@ -34,8 +22,10 @@ public:
         BrowserPage *page,
         const VotUserscript &userscript,
         VotUserscriptStore *store = nullptr,
+        VotChromiumNetworkTransport *transport = nullptr,
         QObject *parent = nullptr
     );
+    ~VotUserscriptBridge() override;
 
     static QString scriptName();
     static QString messagePrefix();
@@ -46,23 +36,11 @@ public:
         const QJsonObject &storedValues = {}
     );
 
-signals:
-    void proxyAuthenticationRequired(
-        BrowserPage *page,
-        const QUrl &requestUrl,
-        QAuthenticator *authenticator,
-        const QString &proxyHost
-    );
-
 private:
     struct RequestState;
 
     void handleMessage(const QJsonObject &message);
-    void beginRequest(const QSharedPointer<RequestState> &state, const QUrl &url);
-    void finishRequest(
-        const QSharedPointer<RequestState> &state,
-        QNetworkReply *reply
-    );
+    void handleTransportResponse(const QJsonObject &message);
     void abortRequest(const QString &id);
     void installScript();
     void broadcastStorageUpdate(
@@ -83,7 +61,7 @@ private:
     QPointer<BrowserPage> m_page;
     VotUserscript m_userscript;
     VotUserscriptStore *m_store = nullptr;
-    QNetworkAccessManager m_network;
+    VotChromiumNetworkTransport *m_transport = nullptr;
     QHash<QString, QSharedPointer<RequestState>> m_requests;
     QHash<QString, QWebEngineFrame> m_frames;
 };

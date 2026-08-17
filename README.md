@@ -348,17 +348,20 @@ builds are rejected.
 
 The userscript runs at document-ready time in an isolated JavaScript world and
 only on URLs declared by its verified `@match` metadata. Its GM storage is kept
-in a PanBrowser-owned file instead of page `localStorage`. Native VOT requests
-are limited to HTTPS hosts declared by the verified `@connect` metadata, use
-the active application proxy, and pass through the Site Connections policy.
-When that firewall is enabled, the first request to an unknown translation or
-media host is blocked and produces the ordinary PanBrowser allow/block prompt;
-allowing it reloads the affected page.
+in a PanBrowser-owned file instead of page `localStorage`. VOT requests use an
+internal, inert Manifest V3 extension on a separate Chromium profile, so they
+follow PanBrowser's active Chromium DNS and proxy configuration. The transport
+profile has no disk HTTP cache or persistent cookies, and requests explicitly
+omit website credentials.
 
-VOT currently requires **System DNS** because its native Qt Network requests
-cannot use Chromium's Secure DNS resolver. Those requests do not share
-Chromium cookies or PanBrowser's custom-CA recovery path and instead use Qt
-Network's system TLS validation. VOT is third-party code maintained outside
+Every destination and redirect must remain HTTPS, match the verified
+`@connect` metadata, carry a registered one-request capability, and pass
+through the Site Connections policy. When that firewall is enabled, the first
+request to an unknown translation or media host is blocked and produces the
+ordinary PanBrowser allow/block prompt; allowing it reloads the affected page.
+The internal extension has no background worker or content scripts and is not
+a general extension platform. VOT service requests do not use a tab's
+custom-CA recovery callback. VOT is third-party code maintained outside
 PanBrowser, has access to every matching video page, and can contact its
 declared service hosts. Keep the feature disabled unless you accept that trust
 boundary.
@@ -433,6 +436,10 @@ with the application's native preferences rather than in the WebEngine profile.
 Video translation adds `video-translation.json`, which stores whether the
 integration is enabled and the selected userscript path, plus
 `vot-storage.json`, which stores script-managed preferences and service state.
+Its generated internal extension and isolated network profile live below the
+platform cache directory and are recreated from bundled resources as needed.
+That profile has no persistent cookies or disk HTTP cache, and neither cache
+artifact contains the selected userscript.
 Disabling VOT or resetting WebEngine site data does not delete that native
 script storage. To remove it completely, close PanBrowser and delete
 `vot-storage.json` from the folder opened by **Show Configuration Folder** in

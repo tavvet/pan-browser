@@ -36,5 +36,8 @@
         <file>assets/reader/third_party/readability/Readability-readerable.js</file>
         <file>assets/reader/third_party/readability/Readability.js</file>
         <file>assets/reader/third_party/dompurify/purify.min.js</file>
+        <file>assets/vot-network-extension/manifest.json</file>
+        <file>assets/vot-network-extension/transport.html</file>
+        <file>assets/vot-network-extension/transport.js</file>
     </qresource>
 </RCC>

@@ -125,6 +125,8 @@ set(PANBROWSER_APP_SOURCES
     src/VideoTranslationSettings.h
     src/VideoTranslationSettingsPage.cpp
     src/VideoTranslationSettingsPage.h
+    src/VotChromiumNetworkTransport.cpp
+    src/VotChromiumNetworkTransport.h
     src/VotUserscriptBridge.cpp
     src/VotUserscriptBridge.h
     src/VotUserscriptManager.cpp
@@ -476,6 +478,8 @@ qt_add_executable(PanBrowserTests
     src/VideoTranslationSettings.h
     src/VideoTranslationSettingsPage.cpp
     src/VideoTranslationSettingsPage.h
+    src/VotChromiumNetworkTransport.cpp
+    src/VotChromiumNetworkTransport.h
     src/VotUserscriptBridge.cpp
     src/VotUserscriptBridge.h
     src/VotUserscriptManager.cpp

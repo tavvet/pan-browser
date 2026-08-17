@@ -225,7 +225,7 @@ MainWindow::MainWindow(
         m_votUserscriptManager = new VotUserscriptManager(
             QDir(QStandardPaths::writableLocation(QStandardPaths::AppDataLocation))
                 .filePath(QStringLiteral("vot-storage.json")),
-            m_dnsSettings.mode(),
+            m_profile,
             m_profile
         );
         connect(
@@ -334,11 +334,14 @@ MainWindow::MainWindow(
                 BrowserPage *page,
                 const QUrl &requestUrl,
                 QAuthenticator *authenticator,
-                const QString &proxyHost
+                const QString &proxyHost,
+                bool *handled
             ) {
                 QWebEngineView *webView = webViewForPage(page);
                 if (!webView)
                     return;
+                if (handled)
+                    *handled = true;
                 if (m_proxyAuthenticationController) {
                     m_proxyAuthenticationController->requestAuthentication(
                         interactionParentForTab(webView),
@@ -3610,7 +3613,6 @@ void MainWindow::openSettingsPage(int page)
         }
         m_crossDomainPromptController->reset();
         if (m_votUserscriptManager) {
-            m_votUserscriptManager->setDnsResolutionMode(m_dnsSettings.mode());
             m_votUserscriptManager->applySettings(m_videoTranslationSettings);
             for (auto iterator = m_tabStates.cbegin(); iterator != m_tabStates.cend(); ++iterator) {
                 m_votUserscriptManager->configurePage(

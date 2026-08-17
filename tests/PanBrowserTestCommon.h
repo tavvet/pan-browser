@@ -51,6 +51,7 @@
 #include "VideoElementBridge.h"
 #include "VideoTranslationSettings.h"
 #include "VideoTranslationSettingsPage.h"
+#include "VotChromiumNetworkTransport.h"
 #include "VotUserscriptBridge.h"
 #include "VotUserscriptManager.h"
 #include "VotUserscriptPackage.h"

@@ -3,14 +3,12 @@
 #include "BrowserPage.h"
 #include "BrowserProfile.h"
 #include "CrossDomainRequestInterceptor.h"
+#include "VotChromiumNetworkTransport.h"
 #include "VotUserscriptStore.h"
 
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
-#include <QNetworkProxy>
-#include <QNetworkReply>
-#include <QNetworkRequest>
 #include <QWebEngineScript>
 #include <QWebEngineScriptCollection>
 #include <QWebEngineUrlRequestInfo>
@@ -21,7 +19,6 @@ namespace {
 
 constexpr qsizetype maximumRequestBodySize = 32 * 1024 * 1024;
 constexpr qsizetype maximumResponseBodySize = 32 * 1024 * 1024;
-constexpr int maximumRedirects = 5;
 constexpr int defaultTimeoutMilliseconds = 30'000;
 constexpr int maximumTimeoutMilliseconds = 180'000;
 constexpr qsizetype maximumConcurrentRequests = 16;
@@ -50,75 +47,28 @@ bool isBlockedRequestHeader(const QByteArray &name)
         || lower == QByteArrayLiteral("upgrade");
 }
 
-QString responseHeaders(QNetworkReply *reply)
-{
-    QStringList lines;
-    for (const auto &[name, value] : reply->rawHeaderPairs()) {
-        if (name.compare(QByteArrayLiteral("set-cookie"), Qt::CaseInsensitive) == 0)
-            continue;
-        lines.append(QString::fromLatin1(name + QByteArrayLiteral(": ") + value));
-    }
-    return lines.join(QStringLiteral("\r\n"));
-}
-
 } // namespace
-
-namespace VotNetworkPolicy {
-
-bool mayForwardHeaderAcrossRedirect(
-    const QByteArray &name,
-    const QUrl &source,
-    const QUrl &target
-)
-{
-    const auto effectivePort = [](const QUrl &url) {
-        if (url.port() >= 0)
-            return url.port();
-        return url.scheme().compare(QStringLiteral("https"), Qt::CaseInsensitive) == 0
-            ? 443
-            : 80;
-    };
-    const bool sameOrigin = source.scheme().compare(
-        target.scheme(),
-        Qt::CaseInsensitive
-    ) == 0
-        && source.host().compare(target.host(), Qt::CaseInsensitive) == 0
-        && effectivePort(source) == effectivePort(target);
-    if (sameOrigin)
-        return true;
-    const QByteArray lower = name.trimmed().toLower();
-    return lower != QByteArrayLiteral("authorization")
-        && lower != QByteArrayLiteral("cookie")
-        && lower != QByteArrayLiteral("cookie2");
-}
-
-} // namespace VotNetworkPolicy
 
 struct VotUserscriptBridge::RequestState final {
     QString id;
     QString frameToken;
     QUrl sourceUrl;
     bool sourceUrlIsOriginOnly = false;
-    QByteArray method;
-    QByteArray body;
-    QList<QPair<QByteArray, QByteArray>> headers;
-    int timeoutMilliseconds = defaultTimeoutMilliseconds;
-    int redirectCount = 0;
     bool aborted = false;
-    bool responseTooLarge = false;
-    QPointer<QNetworkReply> reply;
 };
 
 VotUserscriptBridge::VotUserscriptBridge(
     BrowserPage *page,
     const VotUserscript &userscript,
     VotUserscriptStore *store,
+    VotChromiumNetworkTransport *transport,
     QObject *parent
 )
     : QObject(parent ? parent : page)
     , m_page(page)
     , m_userscript(userscript)
     , m_store(store)
+    , m_transport(transport)
 {
     setObjectName(QStringLiteral("panBrowserVotUserscriptBridge"));
     Q_ASSERT(page);
@@ -131,19 +81,14 @@ VotUserscriptBridge::VotUserscriptBridge(
     connect(page, &QWebEnginePage::loadStarted, this, [this] {
         m_frames.clear();
     });
-    connect(
-        &m_network,
-        &QNetworkAccessManager::proxyAuthenticationRequired,
-        this,
-        [this](const QNetworkProxy &proxy, QAuthenticator *authenticator) {
-            emit proxyAuthenticationRequired(
-                m_page,
-                m_page ? m_page->url() : QUrl(),
-                authenticator,
-                proxy.hostName()
-            );
-        }
-    );
+    if (m_transport) {
+        connect(
+            m_transport,
+            &VotChromiumNetworkTransport::responseReady,
+            this,
+            &VotUserscriptBridge::handleTransportResponse
+        );
+    }
 
     if (m_store) {
         connect(
@@ -157,6 +102,20 @@ VotUserscriptBridge::VotUserscriptBridge(
         );
     }
     installScript();
+}
+
+VotUserscriptBridge::~VotUserscriptBridge()
+{
+    if (m_transport)
+        disconnect(m_transport, nullptr, this, nullptr);
+    const QStringList requestIds = m_requests.keys();
+    m_requests.clear();
+    for (const QString &id : requestIds) {
+        if (m_transport) {
+            m_transport->unregisterRequestAuthorizer(id);
+            m_transport->abortRequest(id);
+        }
+    }
 }
 
 QString VotUserscriptBridge::scriptName()
@@ -355,7 +314,8 @@ QString VotUserscriptBridge::injectedSource(
                     method: String(details.method || "GET"),
                     headers: normalizedHeaders(details.headers),
                     body,
-                    timeout: Number(details.timeout) || 0
+                    timeout: Number(details.timeout) || 0,
+                    redirect: String(details.redirect || "follow")
                 });
             })
             .catch(error => {
@@ -388,6 +348,14 @@ QString VotUserscriptBridge::injectedSource(
                 status: Number(message.status) || 0,
                 statusText: String(message.error || "Network request failed"),
                 error: String(message.error || "Network request failed")
+            });
+            return;
+        }
+        if (message.type === "timeout") {
+            details.ontimeout?.({
+                status: 0,
+                statusText: String(message.error || "Request timed out"),
+                error: String(message.error || "Request timed out")
             });
             return;
         }
@@ -554,7 +522,9 @@ void VotUserscriptBridge::handleMessage(const QJsonObject &message)
         message.value(QStringLiteral("body")).toString().toLatin1(),
         QByteArray::AbortOnBase64DecodingErrors
     );
-    if (body.size() > maximumRequestBodySize) {
+    if (body.size() > maximumRequestBodySize
+        || (!message.value(QStringLiteral("body")).toString().isEmpty()
+            && body.isEmpty())) {
         deliver({
             {QStringLiteral("id"), id},
             {QStringLiteral("type"), QStringLiteral("error")},
@@ -568,10 +538,8 @@ void VotUserscriptBridge::handleMessage(const QJsonObject &message)
     state->frameToken = frameToken;
     state->sourceUrl = policySource.url;
     state->sourceUrlIsOriginOnly = policySource.originOnly;
-    state->method = method;
-    state->body = body;
     const int requestedTimeout = message.value(QStringLiteral("timeout")).toInt();
-    state->timeoutMilliseconds = qBound(
+    const int timeoutMilliseconds = qBound(
         1,
         requestedTimeout > 0 ? requestedTimeout : defaultTimeoutMilliseconds,
         maximumTimeoutMilliseconds
@@ -585,173 +553,131 @@ void VotUserscriptBridge::handleMessage(const QJsonObject &message)
         }, frameToken);
         return;
     }
+    QJsonObject forwardedHeaders;
     for (auto iterator = headers.constBegin(); iterator != headers.constEnd(); ++iterator) {
         const QByteArray name = iterator.key().trimmed().toLatin1();
         const QByteArray value = iterator.value().toString().toUtf8();
-        if (name.size() > 128 || value.size() > 8192 || isBlockedRequestHeader(name))
+        if (name.size() > 128
+            || value.size() > 8192
+            || isBlockedRequestHeader(name)) {
             continue;
-        state->headers.append({name, value});
+        }
+        forwardedHeaders.insert(
+            QString::fromLatin1(name),
+            QString::fromUtf8(value)
+        );
+    }
+
+    if (!m_transport || !profile) {
+        deliver({
+            {QStringLiteral("id"), id},
+            {QStringLiteral("type"), QStringLiteral("error")},
+            {QStringLiteral("error"), QStringLiteral("Chromium VOT network transport is unavailable")},
+        }, frameToken);
+        return;
+    }
+    const QWeakPointer<RequestState> weakState(state);
+    const QStringList connectHosts = m_userscript.connectHosts;
+    if (!m_transport->registerRequestAuthorizer(
+            id,
+            [weakState, profile, connectHosts](const QUrl &target, int resourceType) {
+                const QSharedPointer<RequestState> current = weakState.toStrongRef();
+                if (!current
+                    || !VotUserscriptPackage::isAllowedConnectUrl(
+                        connectHosts,
+                        target
+                    )) {
+                    return false;
+                }
+                return profile->allowCrossDomainRequest(
+                    current->sourceUrl,
+                    target,
+                    resourceType,
+                    current->sourceUrlIsOriginOnly
+                );
+            }
+        )) {
+        deliver({
+            {QStringLiteral("id"), id},
+            {QStringLiteral("type"), QStringLiteral("error")},
+            {QStringLiteral("error"), QStringLiteral("Cannot authorize the Chromium VOT request")},
+        }, frameToken);
+        return;
     }
 
     m_requests.insert(id, state);
-    beginRequest(state, url);
-}
-
-void VotUserscriptBridge::beginRequest(
-    const QSharedPointer<RequestState> &state,
-    const QUrl &url
-)
-{
-    if (!state || state->aborted || !m_requests.contains(state->id))
-        return;
-    QNetworkRequest request(url);
-    request.setAttribute(
-        QNetworkRequest::RedirectPolicyAttribute,
-        QNetworkRequest::ManualRedirectPolicy
-    );
-    request.setTransferTimeout(state->timeoutMilliseconds);
-    for (const auto &[name, value] : std::as_const(state->headers))
-        request.setRawHeader(name, value);
-
-    QNetworkReply *reply = m_network.sendCustomRequest(
-        request,
-        state->method,
-        state->body
-    );
-    state->reply = reply;
-    connect(reply, &QNetworkReply::readyRead, this, [state, reply] {
-        if (reply->bytesAvailable() <= maximumResponseBodySize)
-            return;
-        state->responseTooLarge = true;
-        reply->abort();
-    });
-    connect(reply, &QNetworkReply::finished, this, [this, state, reply] {
-        finishRequest(state, reply);
+    const QString redirectMode = message.value(QStringLiteral("redirect"))
+        .toString(QStringLiteral("follow")).toLower();
+    m_transport->sendRequest({
+        id,
+        url,
+        method,
+        body,
+        forwardedHeaders,
+        redirectMode,
+        timeoutMilliseconds,
+        m_page,
     });
 }
 
-void VotUserscriptBridge::finishRequest(
-    const QSharedPointer<RequestState> &state,
-    QNetworkReply *reply
+void VotUserscriptBridge::handleTransportResponse(
+    const QJsonObject &message
 )
 {
-    if (!state || !reply)
+    const QString id = message.value(QStringLiteral("id")).toString();
+    const QSharedPointer<RequestState> state = m_requests.value(id);
+    if (!state)
         return;
-    const bool currentReply = state->reply == reply;
-    if (!currentReply) {
-        reply->deleteLater();
-        return;
-    }
+    if (m_transport)
+        m_transport->unregisterRequestAuthorizer(id);
+    m_requests.remove(id);
 
     if (state->aborted) {
-        m_requests.remove(state->id);
         deliver({
-            {QStringLiteral("id"), state->id},
+            {QStringLiteral("id"), id},
             {QStringLiteral("type"), QStringLiteral("abort")},
         }, state->frameToken);
-        reply->deleteLater();
         return;
     }
-    if (state->responseTooLarge) {
-        m_requests.remove(state->id);
-        deliver({
-            {QStringLiteral("id"), state->id},
-            {QStringLiteral("type"), QStringLiteral("error")},
-            {QStringLiteral("error"), QStringLiteral("Response body is too large")},
-        }, state->frameToken);
-        reply->deleteLater();
-        return;
-    }
-
-    const QUrl redirect = reply->attribute(
-        QNetworkRequest::RedirectionTargetAttribute
-    ).toUrl();
-    if (redirect.isValid()) {
-        const QUrl target = reply->url().resolved(redirect);
-        if (state->redirectCount >= maximumRedirects
-            || !VotUserscriptPackage::isAllowedConnectUrl(
+    const QString type = message.value(QStringLiteral("type")).toString();
+    if (type == QStringLiteral("load")) {
+        const QUrl finalUrl(message.value(QStringLiteral("finalUrl")).toString());
+        const QByteArray encodedBody = message.value(QStringLiteral("body"))
+            .toString().toLatin1();
+        const QByteArray decodedBody = QByteArray::fromBase64(
+            encodedBody,
+            QByteArray::AbortOnBase64DecodingErrors
+        );
+        const QString responseHeaders = message.value(
+            QStringLiteral("responseHeaders")
+        ).toString();
+        if (!VotUserscriptPackage::isAllowedConnectUrl(
                 m_userscript.connectHosts,
-                target
+                finalUrl
             )
-            || !m_page
-            || !qobject_cast<BrowserProfile *>(m_page->profile())
-            || !qobject_cast<BrowserProfile *>(m_page->profile())
-                    ->allowCrossDomainRequest(
-                        state->sourceUrl,
-                        target,
-                        static_cast<int>(QWebEngineUrlRequestInfo::ResourceTypeXhr),
-                        state->sourceUrlIsOriginOnly
-                    )) {
-            m_requests.remove(state->id);
+            || decodedBody.size() > maximumResponseBodySize
+            || (!encodedBody.isEmpty() && decodedBody.isEmpty())
+            || responseHeaders.size() > 256 * 1024) {
             deliver({
-                {QStringLiteral("id"), state->id},
+                {QStringLiteral("id"), id},
                 {QStringLiteral("type"), QStringLiteral("error")},
-                {QStringLiteral("error"), QStringLiteral("Redirect destination is not permitted")},
+                {QStringLiteral("error"), QStringLiteral("Invalid Chromium VOT response")},
             }, state->frameToken);
-            reply->deleteLater();
             return;
         }
-        const int status = reply->attribute(
-            QNetworkRequest::HttpStatusCodeAttribute
-        ).toInt();
-        const QUrl redirectSource = reply->url();
-        state->headers.removeIf([&redirectSource, &target](const auto &header) {
-            return !VotNetworkPolicy::mayForwardHeaderAcrossRedirect(
-                header.first,
-                redirectSource,
-                target
-            );
-        });
-        if (status == 303
-            || ((status == 301 || status == 302)
-                && state->method != QByteArrayLiteral("GET")
-                && state->method != QByteArrayLiteral("HEAD"))) {
-            state->method = QByteArrayLiteral("GET");
-            state->body.clear();
-            state->headers.removeIf([](const auto &header) {
-                const QByteArray name = header.first.toLower();
-                return name == QByteArrayLiteral("content-type")
-                    || name == QByteArrayLiteral("content-encoding");
-            });
-        }
-        ++state->redirectCount;
-        state->reply.clear();
-        reply->deleteLater();
-        beginRequest(state, target);
-        return;
     }
-
-    const QVariant statusAttribute = reply->attribute(
-        QNetworkRequest::HttpStatusCodeAttribute
-    );
-    const int status = statusAttribute.toInt();
-    if (reply->error() != QNetworkReply::NoError && !statusAttribute.isValid()) {
-        m_requests.remove(state->id);
+    if (type != QStringLiteral("load")
+        && type != QStringLiteral("error")
+        && type != QStringLiteral("abort")
+        && type != QStringLiteral("timeout")) {
         deliver({
-            {QStringLiteral("id"), state->id},
+            {QStringLiteral("id"), id},
             {QStringLiteral("type"), QStringLiteral("error")},
-            {QStringLiteral("status"), status},
-            {QStringLiteral("error"), reply->errorString()},
+            {QStringLiteral("error"), QStringLiteral("Invalid Chromium VOT response")},
         }, state->frameToken);
-        reply->deleteLater();
         return;
     }
-
-    const QByteArray body = reply->readAll();
-    m_requests.remove(state->id);
-    deliver({
-        {QStringLiteral("id"), state->id},
-        {QStringLiteral("type"), QStringLiteral("load")},
-        {QStringLiteral("status"), status},
-        {
-            QStringLiteral("statusText"),
-            reply->attribute(QNetworkRequest::HttpReasonPhraseAttribute).toString()
-        },
-        {QStringLiteral("finalUrl"), reply->url().toString(QUrl::FullyEncoded)},
-        {QStringLiteral("responseHeaders"), responseHeaders(reply)},
-        {QStringLiteral("body"), QString::fromLatin1(body.toBase64())},
-    }, state->frameToken);
-    reply->deleteLater();
+    deliver(message, state->frameToken);
 }
 
 void VotUserscriptBridge::abortRequest(const QString &id)
@@ -760,8 +686,8 @@ void VotUserscriptBridge::abortRequest(const QString &id)
     if (!state)
         return;
     state->aborted = true;
-    if (state->reply)
-        state->reply->abort();
+    if (m_transport)
+        m_transport->abortRequest(id);
 }
 
 void VotUserscriptBridge::installScript()

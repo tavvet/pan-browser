@@ -169,9 +169,9 @@ Before publishing a candidate:
    pinned tabs, Reader Mode detection/exit and appearance persistence, a custom
    User-Agent profile after restart, video pop-out, and an installed web app;
 6. when the target version exposes VOT integration, select the exact supported
-   upstream userscript from outside the bundle, verify System DNS and
-   Site Connections behavior, then confirm that neither that source file nor
-   `vot-storage.json` was copied into the release archive;
+   upstream userscript from outside the bundle, verify both System and Secure
+   DNS plus Site Connections behavior, then confirm that neither that source
+   file nor `vot-storage.json` was copied into the release archive;
 7. compare the ZIP checksum with the committed or published checksum;
 8. create and push the annotated `v<version>` tag only after verification.
 

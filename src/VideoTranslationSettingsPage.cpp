@@ -102,7 +102,7 @@ VideoTranslationSettingsPage::VideoTranslationSettingsPage(
     extensionLayout->addWidget(sourceHint);
 
     auto *privacyHint = new QLabel(
-        tr("VOT can read supported video pages and contact the HTTPS hosts declared by its verified @connect metadata. Its code and network behavior are maintained outside PanBrowser. Video translation currently requires System DNS because Qt Network cannot use Chromium Secure DNS."),
+        tr("VOT can read supported video pages and contact only the HTTPS hosts declared by its verified @connect metadata. Those requests use PanBrowser's Chromium DNS and proxy settings but do not include website cookies. VOT code and network behavior are maintained outside PanBrowser."),
         extensionCard
     );
     privacyHint->setObjectName(QStringLiteral("fieldHint"));

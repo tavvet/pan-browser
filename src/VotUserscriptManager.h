@@ -1,21 +1,25 @@
 #pragma once
 
-#include "DnsSettings.h"
 #include "VideoTranslationSettings.h"
 #include "VotUserscriptPackage.h"
 #include "VotUserscriptStore.h"
 
 #include <QObject>
+#include <QList>
+#include <QPointer>
 
 #include <optional>
 
 class BrowserPage;
+class BrowserProfile;
 class QAuthenticator;
 class QUrl;
+class VotChromiumNetworkTransport;
 
 enum class VotUserscriptState {
     Disabled,
     NotConfigured,
+    Preparing,
     Ready,
     Error,
 };
@@ -26,12 +30,10 @@ class VotUserscriptManager final : public QObject {
 public:
     explicit VotUserscriptManager(
         const QString &storagePath,
-        DnsResolutionMode dnsResolutionMode,
+        BrowserProfile *profile,
         QObject *parent = nullptr
     );
 
-    static bool supportsDnsResolutionMode(DnsResolutionMode mode);
-    void setDnsResolutionMode(DnsResolutionMode mode);
     void applySettings(const VideoTranslationSettings &settings);
     void configurePage(BrowserPage *page);
 
@@ -46,16 +48,20 @@ signals:
         BrowserPage *page,
         const QUrl &requestUrl,
         QAuthenticator *authenticator,
-        const QString &proxyHost
+        const QString &proxyHost,
+        bool *handled
     );
 
 private:
+    void handleTransportStateChanged();
+    void reconfigurePages();
     void setState(VotUserscriptState state, const QString &detail = QString());
 
     VideoTranslationSettings m_settings;
     VotUserscriptStore m_store;
     QString m_storageError;
-    DnsResolutionMode m_dnsResolutionMode = DnsResolutionMode::System;
+    VotChromiumNetworkTransport *m_transport = nullptr;
+    QList<QPointer<BrowserPage>> m_pages;
     std::optional<VotUserscript> m_userscript;
     VotUserscriptState m_state = VotUserscriptState::Disabled;
     QString m_stateDetail;
