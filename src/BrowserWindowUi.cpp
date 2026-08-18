@@ -45,7 +45,6 @@
 #include <QWebEngineView>
 #include <QWidget>
 
-
 void BrowserWindowUi::build(MainWindow *window)
 {
     QFile themeFile(QStringLiteral(":/assets/theme.qss"));
@@ -68,7 +67,7 @@ void BrowserWindowUi::build(MainWindow *window)
     tabStack->setObjectName(QStringLiteral("browserTabs"));
     window->setCentralWidget(tabStack);
 
-    QToolBar *tabsToolbar = new QToolBar(window->tr("Tabs"), window);
+    QToolBar *tabsToolbar = new QToolBar(MainWindow::tr("Tabs"), window);
     tabsToolbar->setObjectName(QStringLiteral("tabsBar"));
     tabsToolbar->setMovable(false);
     tabsToolbar->setFloatable(false);
@@ -104,8 +103,8 @@ void BrowserWindowUi::build(MainWindow *window)
         : newTabShortcuts.constFirst().toString(QKeySequence::NativeText);
     newTabButton->setToolTip(
         newTabShortcutText.isEmpty()
-            ? window->tr("New Tab")
-            : window->tr("New Tab (%1)").arg(newTabShortcutText)
+            ? MainWindow::tr("New Tab")
+            : MainWindow::tr("New Tab (%1)").arg(newTabShortcutText)
     );
     tabsLayout->addWidget(newTabButton, 0, Qt::AlignBottom);
     tabsLayout->addStretch(1);
@@ -123,7 +122,7 @@ void BrowserWindowUi::build(MainWindow *window)
     window->addToolBar(Qt::TopToolBarArea, tabsToolbar);
     window->addToolBarBreak(Qt::TopToolBarArea);
 
-    QToolBar *toolbar = new QToolBar(window->tr("Navigation"), window);
+    QToolBar *toolbar = new QToolBar(MainWindow::tr("Navigation"), window);
     toolbar->setObjectName(QStringLiteral("navigationBar"));
     toolbar->setMovable(false);
     toolbar->setFloatable(false);
@@ -132,15 +131,15 @@ void BrowserWindowUi::build(MainWindow *window)
 
     backAction = toolbar->addAction(
         QIcon(QStringLiteral(":/assets/icons/arrow-left.svg")),
-        window->tr("Back")
+        MainWindow::tr("Back")
     );
     forwardAction = toolbar->addAction(
         QIcon(QStringLiteral(":/assets/icons/arrow-right.svg")),
-        window->tr("Forward")
+        MainWindow::tr("Forward")
     );
     reloadAction = toolbar->addAction(
         QIcon(QStringLiteral(":/assets/icons/rotate-cw.svg")),
-        window->tr("Reload")
+        MainWindow::tr("Reload")
     );
     backAction->setEnabled(false);
     forwardAction->setEnabled(false);
@@ -159,10 +158,10 @@ void BrowserWindowUi::build(MainWindow *window)
         QLineEdit::TrailingPosition
     );
     bookmarkAction->setEnabled(false);
-    bookmarkAction->setToolTip(window->tr("Add Bookmark (⌘D)"));
+    bookmarkAction->setToolTip(MainWindow::tr("Add Bookmark (⌘D)"));
     readerModeAction = new QAction(
         QIcon(QStringLiteral(":/assets/icons/book-open.svg")),
-        window->tr("Reader Mode"),
+        MainWindow::tr("Reader Mode"),
         window
     );
     readerModeAction->setCheckable(true);
@@ -181,17 +180,17 @@ void BrowserWindowUi::build(MainWindow *window)
     QAction *addressWidgetAction = toolbar->addWidget(address);
     QAction *go = toolbar->addAction(
         QIcon(QStringLiteral(":/assets/icons/arrow-right.svg")),
-        window->tr("Go")
+        MainWindow::tr("Go")
     );
     downloadButton = new DownloadButton(toolbar);
     downloadButton->setObjectName(QStringLiteral("downloadsButton"));
     downloadButton->setIcon(QIcon(QStringLiteral(":/assets/icons/download.svg")));
-    downloadButton->setToolTip(window->tr("Downloads"));
+    downloadButton->setToolTip(MainWindow::tr("Downloads"));
     toolbar->addWidget(downloadButton);
     window->addToolBar(Qt::TopToolBarArea, toolbar);
 
     window->addToolBarBreak(Qt::TopToolBarArea);
-    findToolbar = new QToolBar(window->tr("Find in page"), window);
+    findToolbar = new QToolBar(MainWindow::tr("Find in page"), window);
     findToolbar->setObjectName(QStringLiteral("findBar"));
     findToolbar->setMovable(false);
     findToolbar->setFloatable(false);
@@ -201,7 +200,10 @@ void BrowserWindowUi::build(MainWindow *window)
     findToolbar->hide();
 
     window->addToolBarBreak(Qt::TopToolBarArea);
-    QToolBar *permissionToolbar = new QToolBar(window->tr("Permission request"), window);
+    QToolBar *permissionToolbar = new QToolBar(
+        MainWindow::tr("Permission request"),
+        window
+    );
     permissionToolbar->setObjectName(QStringLiteral("permissionBar"));
     permissionToolbar->setMovable(false);
     permissionToolbar->setFloatable(false);
@@ -211,7 +213,10 @@ void BrowserWindowUi::build(MainWindow *window)
     permissionToolbar->hide();
 
     window->addToolBarBreak(Qt::TopToolBarArea);
-    QToolBar *crossDomainToolbar = new QToolBar(window->tr("Site connection request"), window);
+    QToolBar *crossDomainToolbar = new QToolBar(
+        MainWindow::tr("Site connection request"),
+        window
+    );
     crossDomainToolbar->setObjectName(QStringLiteral("crossDomainBar"));
     crossDomainToolbar->setMovable(false);
     crossDomainToolbar->setFloatable(false);
@@ -363,20 +368,20 @@ void BrowserWindowUi::build(MainWindow *window)
     QObject::connect(window->m_bookmarkStore, &BookmarkStore::bookmarksChanged, window, &MainWindow::updateBookmarkAction);
 
 #if defined(Q_OS_MACOS)
-    QMenu *fileMenu = window->menuBar()->addMenu(window->tr("Browser"));
+    QMenu *fileMenu = window->menuBar()->addMenu(MainWindow::tr("Browser"));
 #else
-    auto *fileMenu = new QMenu(window->tr("PanBrowser"), window);
+    auto *fileMenu = new QMenu(MainWindow::tr("PanBrowser"), window);
 #endif
     newTabAction = fileMenu->addAction(
         QIcon(QStringLiteral(":/assets/icons/plus.svg")),
-        window->tr("New Tab")
+        MainWindow::tr("New Tab")
     );
     newTabAction->setShortcuts(TabNavigation::newTabShortcuts());
     newTabAction->setShortcutContext(Qt::WindowShortcut);
     newTabAction->setAutoRepeat(false);
     QObject::connect(newTabAction, &QAction::triggered, window, &MainWindow::openNewTab);
 
-    closeTabAction = fileMenu->addAction(window->tr("Close Tab"));
+    closeTabAction = fileMenu->addAction(MainWindow::tr("Close Tab"));
     closeTabAction->setShortcuts(TabNavigation::closeTabShortcuts());
     closeTabAction->setShortcutContext(Qt::WindowShortcut);
     closeTabAction->setAutoRepeat(false);
@@ -384,7 +389,7 @@ void BrowserWindowUi::build(MainWindow *window)
         window->closeActiveBrowserSurface(window->commandTargetWebView());
     });
 
-    reopenClosedTabAction = fileMenu->addAction(window->tr("Reopen Closed Tab"));
+    reopenClosedTabAction = fileMenu->addAction(MainWindow::tr("Reopen Closed Tab"));
     reopenClosedTabAction->setShortcuts(TabNavigation::reopenClosedTabShortcuts());
     reopenClosedTabAction->setShortcutContext(Qt::WindowShortcut);
     reopenClosedTabAction->setAutoRepeat(false);
@@ -396,14 +401,14 @@ void BrowserWindowUi::build(MainWindow *window)
     );
 
     fileMenu->addSeparator();
-    nextTabAction = fileMenu->addAction(window->tr("Next Tab"));
+    nextTabAction = fileMenu->addAction(MainWindow::tr("Next Tab"));
     nextTabAction->setShortcuts(TabNavigation::nextTabShortcuts());
     nextTabAction->setShortcutContext(Qt::WindowShortcut);
     nextTabAction->setAutoRepeat(false);
     QObject::connect(nextTabAction, &QAction::triggered, window, [window] {
         window->activateAdjacentTab(1);
     });
-    previousTabAction = fileMenu->addAction(window->tr("Previous Tab"));
+    previousTabAction = fileMenu->addAction(MainWindow::tr("Previous Tab"));
     previousTabAction->setShortcuts(TabNavigation::previousTabShortcuts());
     previousTabAction->setShortcutContext(Qt::WindowShortcut);
     previousTabAction->setAutoRepeat(false);
@@ -411,12 +416,12 @@ void BrowserWindowUi::build(MainWindow *window)
         window->activateAdjacentTab(-1);
     });
 
-    switchToTabMenu = fileMenu->addMenu(window->tr("Switch to Tab"));
+    switchToTabMenu = fileMenu->addMenu(MainWindow::tr("Switch to Tab"));
     for (int position = 1; position <= TabNavigation::numberedShortcutCount; ++position) {
         QAction *action = switchToTabMenu->addAction(
             position == TabNavigation::numberedShortcutCount
-                ? window->tr("Last Tab")
-                : window->tr("Tab %1").arg(position)
+                ? MainWindow::tr("Last Tab")
+                : MainWindow::tr("Tab %1").arg(position)
         );
         action->setShortcut(TabNavigation::numberedTabShortcut(position));
         action->setShortcutContext(Qt::WindowShortcut);
@@ -430,20 +435,20 @@ void BrowserWindowUi::build(MainWindow *window)
     fileMenu->addSeparator();
     QAction *addBookmarkAction = fileMenu->addAction(
         QIcon(QStringLiteral(":/assets/icons/star.svg")),
-        window->tr("Add Bookmark…")
+        MainWindow::tr("Add Bookmark…")
     );
     addBookmarkAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_D));
     QObject::connect(addBookmarkAction, &QAction::triggered, window, &MainWindow::editCurrentBookmark);
     QAction *bookmarksAction = fileMenu->addAction(
         QIcon(QStringLiteral(":/assets/icons/star-filled.svg")),
-        window->tr("Bookmarks…")
+        MainWindow::tr("Bookmarks…")
     );
     bookmarksAction->setShortcut(QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_B));
     QObject::connect(bookmarksAction, &QAction::triggered, window, &MainWindow::openBookmarks);
 
     installWebAppAction = fileMenu->addAction(
         QIcon(QStringLiteral(":/assets/icons/layout-grid.svg")),
-        window->tr("Install Web App…")
+        MainWindow::tr("Install Web App…")
     );
     installWebAppAction->setEnabled(false);
     QObject::connect(
@@ -454,7 +459,7 @@ void BrowserWindowUi::build(MainWindow *window)
     );
     webAppsMenu = fileMenu->addMenu(
         QIcon(QStringLiteral(":/assets/icons/layout-grid.svg")),
-        window->tr("Web Apps")
+        MainWindow::tr("Web Apps")
     );
     QObject::connect(webAppsMenu, &QMenu::aboutToShow, window, &MainWindow::rebuildWebAppsMenu);
 
@@ -462,11 +467,11 @@ void BrowserWindowUi::build(MainWindow *window)
     fileMenu->addAction(readerModeAction);
     QAction *findAction = fileMenu->addAction(
         QIcon(QStringLiteral(":/assets/icons/search.svg")),
-        window->tr("Find in Page…")
+        MainWindow::tr("Find in Page…")
     );
     findAction->setShortcut(QKeySequence::Find);
     QObject::connect(findAction, &QAction::triggered, window, &MainWindow::openFindBar);
-    QAction *findNextAction = fileMenu->addAction(window->tr("Find Next"));
+    QAction *findNextAction = fileMenu->addAction(MainWindow::tr("Find Next"));
     findNextAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_G));
     QObject::connect(findNextAction, &QAction::triggered, window, [
         findToolbar = findToolbar,
@@ -477,7 +482,7 @@ void BrowserWindowUi::build(MainWindow *window)
         else
             window->findInPage(false);
     });
-    QAction *findPreviousAction = fileMenu->addAction(window->tr("Find Previous"));
+    QAction *findPreviousAction = fileMenu->addAction(MainWindow::tr("Find Previous"));
     findPreviousAction->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_G));
     QObject::connect(findPreviousAction, &QAction::triggered, window, [
         findToolbar = findToolbar,
@@ -490,25 +495,25 @@ void BrowserWindowUi::build(MainWindow *window)
     });
 
     fileMenu->addSeparator();
-    zoomMenu = fileMenu->addMenu(window->tr("Zoom"));
+    zoomMenu = fileMenu->addMenu(MainWindow::tr("Zoom"));
     zoomLevelAction = zoomMenu->addAction(QStringLiteral("100%"));
     zoomLevelAction->setEnabled(false);
     zoomMenu->addSeparator();
-    zoomInAction = zoomMenu->addAction(window->tr("Zoom In"));
+    zoomInAction = zoomMenu->addAction(MainWindow::tr("Zoom In"));
     zoomInAction->setShortcuts(pageZoomInShortcuts());
     zoomInAction->setShortcutContext(Qt::WindowShortcut);
     zoomInAction->setAutoRepeat(false);
     QObject::connect(zoomInAction, &QAction::triggered, window, [window] {
         window->changePageZoomBySteps(window->commandTargetWebView(), 1);
     });
-    zoomOutAction = zoomMenu->addAction(window->tr("Zoom Out"));
+    zoomOutAction = zoomMenu->addAction(MainWindow::tr("Zoom Out"));
     zoomOutAction->setShortcuts(pageZoomOutShortcuts());
     zoomOutAction->setShortcutContext(Qt::WindowShortcut);
     zoomOutAction->setAutoRepeat(false);
     QObject::connect(zoomOutAction, &QAction::triggered, window, [window] {
         window->changePageZoomBySteps(window->commandTargetWebView(), -1);
     });
-    resetZoomAction = zoomMenu->addAction(window->tr("Actual Size"));
+    resetZoomAction = zoomMenu->addAction(MainWindow::tr("Actual Size"));
     resetZoomAction->setShortcuts(pageZoomResetShortcuts());
     resetZoomAction->setShortcutContext(Qt::WindowShortcut);
     resetZoomAction->setAutoRepeat(false);
@@ -518,7 +523,7 @@ void BrowserWindowUi::build(MainWindow *window)
     QObject::connect(zoomMenu, &QMenu::aboutToShow, window, &MainWindow::updateZoomActions);
 
     fileMenu->addSeparator();
-    developerToolsAction = fileMenu->addAction(window->tr("Developer Tools"));
+    developerToolsAction = fileMenu->addAction(MainWindow::tr("Developer Tools"));
 #if defined(Q_OS_MACOS)
     developerToolsAction->setShortcuts({
         QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_I),
@@ -538,7 +543,7 @@ void BrowserWindowUi::build(MainWindow *window)
     fileMenu->addSeparator();
     QAction *settingsAction = fileMenu->addAction(
         QIcon(QStringLiteral(":/assets/icons/settings.svg")),
-        window->tr("Settings…")
+        MainWindow::tr("Settings…")
     );
     settingsAction->setMenuRole(QAction::NoRole);
     settingsAction->setShortcut(QKeySequence::Preferences);
@@ -547,14 +552,14 @@ void BrowserWindowUi::build(MainWindow *window)
     fileMenu->addSeparator();
     QAction *reloadRulesAction = fileMenu->addAction(
         QIcon(QStringLiteral(":/assets/icons/rotate-cw.svg")),
-        window->tr("Reload Trust Rules")
+        MainWindow::tr("Reload Trust Rules")
     );
     reloadRulesAction->setShortcut(QKeySequence(QStringLiteral("Ctrl+Shift+R")));
     QObject::connect(reloadRulesAction, &QAction::triggered, window, &MainWindow::reloadRules);
 
     QAction *showConfiguration = fileMenu->addAction(
         QIcon(QStringLiteral(":/assets/icons/folder-open.svg")),
-        window->tr("Show Configuration Folder")
+        MainWindow::tr("Show Configuration Folder")
     );
     QObject::connect(showConfiguration, &QAction::triggered, window, [window] {
         QDesktopServices::openUrl(QUrl::fromLocalFile(
@@ -576,9 +581,9 @@ void BrowserWindowUi::build(MainWindow *window)
     toolbar->addWidget(mainMenuButton);
 #endif
 
-    trustStatus = new QLabel(window->tr("Ready"), window);
+    trustStatus = new QLabel(MainWindow::tr("Ready"), window);
     trustStatus->setObjectName(QStringLiteral("trustStatus"));
-    ruleCount = new QLabel(window->tr("No rules loaded"), window);
+    ruleCount = new QLabel(MainWindow::tr("No rules loaded"), window);
     ruleCount->setObjectName(QStringLiteral("ruleCount"));
     progress = new QProgressBar(window);
     progress->setObjectName(QStringLiteral("pageProgress"));
@@ -610,7 +615,7 @@ void BrowserWindowUi::build(MainWindow *window)
         addressWidgetAction->setVisible(false);
         go->setVisible(false);
         newTabAction->setVisible(false);
-        closeTabAction->setText(window->tr("Close Window"));
+        closeTabAction->setText(MainWindow::tr("Close Window"));
         reopenClosedTabAction->setVisible(false);
         nextTabAction->setVisible(false);
         previousTabAction->setVisible(false);
