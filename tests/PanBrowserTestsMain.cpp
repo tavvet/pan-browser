@@ -8,6 +8,8 @@ int runTrustRulesSettingsTests(int argc, char **argv);
 int runCertificateTrustValidatorTests(int argc, char **argv);
 #endif
 int runWindowInteractionTests(int argc, char **argv);
+int runReaderModeTests(int argc, char **argv);
+int runVideoPresentationTests(int argc, char **argv);
 int runPersistenceAndPolicyTests(int argc, char **argv);
 int runVotIntegrationTests(int argc, char **argv);
 int runNetworkSettingsAndAuthTests(int argc, char **argv);
@@ -37,6 +39,10 @@ int main(int argc, char *argv[])
 #endif
     if (suite == QStringLiteral("window"))
         return runWindowInteractionTests(argc, argv);
+    if (suite == QStringLiteral("reader"))
+        return runReaderModeTests(argc, argv);
+    if (suite == QStringLiteral("video-presentation"))
+        return runVideoPresentationTests(argc, argv);
     if (suite == QStringLiteral("persistence"))
         return runPersistenceAndPolicyTests(argc, argv);
     if (suite == QStringLiteral("vot"))
