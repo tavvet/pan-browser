@@ -17,6 +17,7 @@ int runUserAgentTests(int argc, char **argv);
 int runCredentialsAndAuthTests(int argc, char **argv);
 int runBrowsingFeaturesTests(int argc, char **argv);
 int runApplicationAndWebAppTests(int argc, char **argv);
+int runWebAppInstallControllerTests(int argc, char **argv);
 
 int main(int argc, char *argv[])
 {
@@ -59,6 +60,8 @@ int main(int argc, char *argv[])
         return runBrowsingFeaturesTests(argc, argv);
     if (suite == QStringLiteral("webapps"))
         return runApplicationAndWebAppTests(argc, argv);
+    if (suite == QStringLiteral("webapp-install"))
+        return runWebAppInstallControllerTests(argc, argv);
 
     qCritical().noquote() << "Unknown PanBrowser test suite:" << suite;
     return 2;

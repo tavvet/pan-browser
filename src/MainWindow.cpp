@@ -35,6 +35,7 @@
 #include "VotUserscriptManager.h"
 #include "WindowPlacement.h"
 #include "WindowChrome.h"
+#include "WebAppInstallController.h"
 #include "WebAppStore.h"
 #include "WebAppShortcutManager.h"
 
@@ -53,7 +54,6 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QKeyEvent>
-#include <QBuffer>
 #include <QLabel>
 #include <QLineEdit>
 #include <QMenuBar>
@@ -75,7 +75,6 @@
 #include <QTimer>
 #include <QToolBar>
 #include <QToolButton>
-#include <QUuid>
 #include <QVarLengthArray>
 #include <QWebEngineCertificateError>
 #include <QWebEngineFindTextResult>
@@ -327,6 +326,26 @@ MainWindow::MainWindow(
     }
 
     createInterface();
+    m_webAppInstallController = new WebAppInstallController(
+        m_webAppStore,
+        m_ui->installWebAppAction,
+        this,
+        this
+    );
+    connect(
+        m_webAppInstallController,
+        &WebAppInstallController::openInstalledAppRequested,
+        this,
+        &MainWindow::openInstalledWebApp
+    );
+    connect(
+        m_webAppInstallController,
+        &WebAppInstallController::statusMessageRequested,
+        this,
+        [this](const QString &message, int timeoutMs) {
+            statusBar()->showMessage(message, timeoutMs);
+        }
+    );
     if (m_votUserscriptManager) {
         connect(
             m_votUserscriptManager,
@@ -1163,6 +1182,8 @@ void MainWindow::closeTab(int index)
     }
     disconnect(webView, nullptr, this, nullptr);
     disconnect(webView->page(), nullptr, this, nullptr);
+    if (m_webAppInstallController)
+        m_webAppInstallController->forgetView(webView);
     webView->stop();
     m_tabStates.remove(webView);
     m_ui->tabStack->removeWidget(webView);
@@ -1557,8 +1578,8 @@ void MainWindow::connectBrowserSignals(QWebEngineView *webView)
         state.previousAcceptedRule = state.lastAcceptedRule;
         state.externalNavigationDelegated = false;
         state.lastAcceptedRule.clear();
-        state.manifestUrl = QUrl();
-        state.manifestTitle.clear();
+        if (m_webAppInstallController)
+            m_webAppInstallController->clearManifest(webView);
         state.loading = true;
         state.progress = 0;
         if (webView == m_findView) {
@@ -2635,120 +2656,29 @@ void MainWindow::openBookmarks()
 
 void MainWindow::detectWebAppManifest(QWebEngineView *webView)
 {
-    if (!webView || !m_tabStates.contains(webView))
+    if (!m_webAppInstallController)
         return;
-    QWebEnginePage *page = pageForTab(webView);
-    const QUrl documentUrl = page->url();
-    if (documentUrl.scheme().compare(QStringLiteral("https"), Qt::CaseInsensitive) != 0) {
-        m_tabStates[webView].manifestUrl = QUrl();
-        if (webView == currentWebView())
-            updateInstallWebAppAction();
-        return;
-    }
-
-    const QPointer<MainWindow> window(this);
-    const QPointer<QWebEngineView> target(webView);
-    page->runJavaScript(
-        QStringLiteral(R"JS(
-(() => {
-    const link = document.querySelector('link[rel~="manifest"]');
-    if (!link || !link.href)
-        return null;
-    return { url: link.href, title: document.title || "" };
-})()
-)JS"),
-        QWebEngineScript::ApplicationWorld,
-        [window, target, documentUrl](const QVariant &result) {
-            if (!window || !target || !window->m_tabStates.contains(target))
-                return;
-            BrowserTabState &state = window->m_tabStates[target];
-            state.manifestUrl = QUrl();
-            state.manifestTitle.clear();
-            if (window->urlForTab(target) == documentUrl) {
-                const QVariantMap object = result.toMap();
-                const QUrl manifestUrl(object.value(QStringLiteral("url")).toString());
-                if (manifestUrl.scheme().compare(QStringLiteral("https"), Qt::CaseInsensitive) == 0
-                    && manifestUrl.userInfo().isEmpty()
-                    && isSameWebOrigin(manifestUrl, documentUrl)) {
-                    state.manifestUrl = manifestUrl.adjusted(QUrl::NormalizePathSegments);
-                    state.manifestTitle = object.value(QStringLiteral("title")).toString().simplified();
-                }
-            }
-            if (target == window->currentWebView())
-                window->updateInstallWebAppAction();
-        }
+    m_webAppInstallController->detectManifest(
+        webView,
+        qobject_cast<BrowserPage *>(pageForTab(webView))
     );
 }
 
 void MainWindow::updateInstallWebAppAction()
 {
-    if (!m_ui->installWebAppAction || m_windowRole == WindowRole::WebApp)
-        return;
-    QWebEngineView *webView = currentWebView();
-    const BrowserTabState state = webView ? m_tabStates.value(webView) : BrowserTabState();
-    if (!webView
-        || state.manifestUrl.isEmpty()
-        || !m_webAppStore
-        || !m_webAppStore->isAvailable()) {
-        m_ui->installWebAppAction->setText(tr("Install Web App…"));
-        m_ui->installWebAppAction->setEnabled(false);
-        return;
-    }
-    const std::optional<WebApp> installed = m_webAppStore->appForManifest(state.manifestUrl);
-    if (installed) {
-        m_ui->installWebAppAction->setText(tr("Open “%1”").arg(installed->name));
-        m_ui->installWebAppAction->setEnabled(true);
-        return;
-    }
-    const QString name = state.manifestTitle.isEmpty()
-        ? urlForTab(webView).host()
-        : state.manifestTitle.left(80);
-    m_ui->installWebAppAction->setText(tr("Install “%1”…").arg(name));
-    m_ui->installWebAppAction->setEnabled(true);
+    if (m_webAppInstallController)
+        m_webAppInstallController->currentViewChanged(currentWebView());
 }
 
 void MainWindow::installCurrentWebApp()
 {
-    if (!m_webAppStore || m_windowRole == WindowRole::WebApp)
+    if (!m_webAppInstallController || m_windowRole == WindowRole::WebApp)
         return;
     QWebEngineView *webView = currentWebView();
-    if (!webView || !m_tabStates.contains(webView))
-        return;
-    const BrowserTabState state = m_tabStates.value(webView);
-    if (state.manifestUrl.isEmpty())
-        return;
-
-    if (const std::optional<WebApp> installed = m_webAppStore->appForManifest(state.manifestUrl)) {
-        openInstalledWebApp(installed->id);
-        return;
-    }
-
-    const QString requestId = QUuid::createUuid().toString(QUuid::WithoutBraces);
-    m_manifestRequests.insert(requestId, {
+    m_webAppInstallController->installCurrent(
         webView,
-        state.manifestUrl,
-        urlForTab(webView),
-        state.manifestTitle,
-    });
-    m_ui->installWebAppAction->setEnabled(false);
-    m_ui->installWebAppAction->setText(tr("Reading web app manifest…"));
-    static_cast<BrowserPage *>(pageForTab(webView))->fetchWebAppManifest(
-        requestId,
-        state.manifestUrl,
-        WebAppStore::maximumManifestBytes
+        qobject_cast<BrowserPage *>(pageForTab(webView))
     );
-    QTimer::singleShot(15000, this, [this, requestId] {
-        const auto found = m_manifestRequests.find(requestId);
-        if (found == m_manifestRequests.end())
-            return;
-        const QPointer<QWebEngineView> webView = found->webView;
-        m_manifestRequests.erase(found);
-        if (webView) {
-            static_cast<BrowserPage *>(pageForTab(webView))->cancelWebAppManifestFetch(requestId);
-        }
-        updateInstallWebAppAction();
-        statusBar()->showMessage(tr("Timed out while reading the web app manifest"), 5000);
-    });
 }
 
 void MainWindow::handleFetchedWebAppManifest(
@@ -2757,89 +2687,13 @@ void MainWindow::handleFetchedWebAppManifest(
     const QString &fetchError
 )
 {
-    const auto found = m_manifestRequests.find(requestId);
-    if (found == m_manifestRequests.end())
-        return;
-    const PendingManifestRequest request = found.value();
-    m_manifestRequests.erase(found);
-    updateInstallWebAppAction();
-    if (!request.webView
-        || !m_tabStates.contains(request.webView)
-        || m_tabStates.value(request.webView).manifestUrl != request.manifestUrl) {
-        return;
-    }
-    if (!fetchError.isEmpty()) {
-        QMessageBox::warning(
-            this,
-            tr("Cannot install web app"),
-            tr("PanBrowser could not read the web app manifest: %1").arg(fetchError)
+    if (m_webAppInstallController) {
+        m_webAppInstallController->handleManifestFetched(
+            requestId,
+            contents,
+            fetchError
         );
-        return;
     }
-
-    QString error;
-    std::optional<WebApp> app = WebAppStore::parseManifest(
-        contents,
-        request.manifestUrl,
-        request.documentUrl,
-        request.fallbackTitle,
-        &error
-    );
-    if (!app) {
-        QMessageBox::warning(this, tr("Cannot install web app"), error);
-        return;
-    }
-
-    QWebEnginePage *page = pageForTab(request.webView);
-    const QPixmap pixmap = page ? page->icon().pixmap(256, 256) : QPixmap();
-    if (!pixmap.isNull()) {
-        QByteArray iconPng;
-        QBuffer buffer(&iconPng);
-        if (buffer.open(QIODevice::WriteOnly)
-            && pixmap.save(&buffer, "PNG")
-            && iconPng.size() <= WebAppStore::maximumIconBytes) {
-            app->iconPng = iconPng;
-        }
-    }
-
-    QMessageBox dialog(this);
-    dialog.setWindowTitle(tr("Install web app"));
-    dialog.setIcon(QMessageBox::Question);
-    if (!pixmap.isNull())
-        dialog.setIconPixmap(pixmap.scaled(72, 72, Qt::KeepAspectRatio, Qt::SmoothTransformation));
-    dialog.setText(tr("Install “%1”?").arg(app->name));
-    dialog.setInformativeText(
-        tr("The app will open in its own window and share PanBrowser cookies, site data, permissions, and trust rules.\n\nStart page: %1\nAllowed scope: %2")
-            .arg(
-                app->startUrl.toDisplayString(QUrl::RemovePassword),
-                app->scope.toDisplayString(QUrl::RemovePassword)
-            )
-    );
-    QPushButton *installButton = dialog.addButton(tr("Install"), QMessageBox::AcceptRole);
-    dialog.addButton(tr("Cancel"), QMessageBox::RejectRole);
-    dialog.setDefaultButton(installButton);
-    dialog.exec();
-    if (dialog.clickedButton() != installButton)
-        return;
-
-    if (!m_webAppStore->install(*app, &error)) {
-        QMessageBox::warning(this, tr("Cannot install web app"), error);
-        return;
-    }
-    WebAppShortcutManager shortcutManager;
-    if (shortcutManager.isSupported()) {
-        QString shortcutError;
-        if (!shortcutManager.createOrUpdate(*app, &shortcutError)) {
-            QMessageBox::warning(
-                this,
-                tr("Web app installed without a system shortcut"),
-                tr("PanBrowser installed the web app, but could not create its system shortcut: %1")
-                    .arg(shortcutError)
-            );
-        }
-    }
-    statusBar()->showMessage(tr("“%1” installed").arg(app->name), 4000);
-    openInstalledWebApp(app->id);
 }
 
 void MainWindow::rebuildWebAppsMenu()

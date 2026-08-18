@@ -62,6 +62,7 @@ class QWebEnginePage;
 class QWebEngineView;
 class WindowChromeController;
 class VotUserscriptManager;
+class WebAppInstallController;
 
 class MainWindow final : public QMainWindow {
     Q_OBJECT
@@ -116,21 +117,12 @@ private:
         QUrl topLevelUrl;
         QUrl pendingUrl;
         HistoryTransition pendingHistoryTransition = HistoryTransition::Other;
-        QUrl manifestUrl;
-        QString manifestTitle;
         QPointer<QWebEnginePage> page;
         QPointer<QWebEngineView> developerToolsView;
         QPointer<DetachedVideoSession> detachedVideoSession;
         QPointer<DetachedVideoWindow> detachedVideoWindow;
         QPointer<DetachedVideoPlaceholder> detachedVideoPlaceholder;
         QPointer<ReaderModeController> readerModeController;
-    };
-
-    struct PendingManifestRequest {
-        QPointer<QWebEngineView> webView;
-        QUrl manifestUrl;
-        QUrl documentUrl;
-        QString fallbackTitle;
     };
 
     struct CrossDomainPromptRoute {
@@ -286,6 +278,7 @@ private:
     HistoryStore *m_historyStore = nullptr;
     BookmarkStore *m_bookmarkStore = nullptr;
     WebAppStore *m_webAppStore = nullptr;
+    WebAppInstallController *m_webAppInstallController = nullptr;
     std::unique_ptr<BrowserWindowUi> m_ui;
     PermissionController *m_permissionController = nullptr;
     CrossDomainPromptController *m_crossDomainPromptController = nullptr;
@@ -303,7 +296,6 @@ private:
     QTimer *m_addressSuggestionTimer = nullptr;
     QHash<QWebEngineView *, BrowserTabState> m_tabStates;
     QList<SessionTab> m_closedTabs;
-    QHash<QString, PendingManifestRequest> m_manifestRequests;
     QHash<QString, CrossDomainPromptRoute> m_crossDomainPromptRoutes;
     BrowserPreferences m_preferences;
     SearchSettings m_searchSettings;

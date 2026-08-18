@@ -208,6 +208,8 @@ set(PANBROWSER_APP_SOURCES
     src/UrlSanitization.h
     src/WebAppStore.cpp
     src/WebAppStore.h
+    src/WebAppInstallController.cpp
+    src/WebAppInstallController.h
     src/WebAppsSettingsPage.cpp
     src/WebAppsSettingsPage.h
     src/WebAppShortcutManager.cpp
@@ -414,6 +416,7 @@ qt_add_executable(PanBrowserTests
     tests/ReaderModeTests.cpp
     tests/VideoPresentationTests.cpp
     tests/VotIntegrationTests.cpp
+    tests/WebAppInstallControllerTests.cpp
     tests/TrustTests.cpp
     tests/UserAgentTests.cpp
     tests/WindowInteractionTests.cpp
@@ -557,6 +560,8 @@ qt_add_executable(PanBrowserTests
     src/UrlSanitization.h
     src/WebAppStore.cpp
     src/WebAppStore.h
+    src/WebAppInstallController.cpp
+    src/WebAppInstallController.h
     src/WebAppsSettingsPage.cpp
     src/WebAppsSettingsPage.h
     src/WebAppShortcutManager.cpp
@@ -685,3 +690,7 @@ add_test(
 )
 add_test(NAME PanBrowserBrowsingTests COMMAND PanBrowserTests browsing)
 add_test(NAME PanBrowserWebAppTests COMMAND PanBrowserTests webapps)
+add_test(
+    NAME PanBrowserWebAppInstallControllerTests
+    COMMAND PanBrowserTests webapp-install
+)
