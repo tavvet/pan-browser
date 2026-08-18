@@ -7,6 +7,7 @@
 #include <QList>
 #include <QObject>
 #include <QPointer>
+#include <QSet>
 #include <QSslCertificate>
 #include <QUrl>
 
@@ -112,4 +113,5 @@ private:
     VotChromiumTransportState m_state = VotChromiumTransportState::Uninitialized;
     QString m_error;
     QHash<QString, VotChromiumRequestSession *> m_activeRequests;
+    QSet<VotChromiumRequestSession *> m_retiredRequests;
 };

@@ -7,6 +7,7 @@ class VotChromiumRequestSessionTests final : public QObject {
 private slots:
     void requestTimesOutBeforeProfileIsReady();
     void abortAndFailureAreTerminal();
+    void transportRetiresFinishedSessionsBeforeProfileReset();
 };
 
 void VotChromiumRequestSessionTests::requestTimesOutBeforeProfileIsReady()
@@ -71,6 +72,45 @@ void VotChromiumRequestSessionTests::abortAndFailureAreTerminal()
         response.value(QStringLiteral("error")).toString(),
         QStringLiteral("expected failure")
     );
+}
+
+void VotChromiumRequestSessionTests::transportRetiresFinishedSessionsBeforeProfileReset()
+{
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+
+    const QString cacheRoot = directory.filePath(QStringLiteral("blocked-cache"));
+    QFile blocker(cacheRoot);
+    QVERIFY(blocker.open(QIODevice::WriteOnly));
+    QCOMPARE(blocker.write("blocked"), qint64(7));
+    blocker.close();
+
+    QWebEngineProfile profile;
+    VotChromiumNetworkTransport transport(&profile, cacheRoot);
+    QSignalSpy responseSpy(
+        &transport,
+        &VotChromiumNetworkTransport::responseReady
+    );
+
+    VotChromiumRequest request;
+    request.id = QStringLiteral("failed-before-profile-reset");
+    request.url = QUrl(QStringLiteral("https://example.com/audio"));
+    request.method = QByteArrayLiteral("GET");
+    transport.sendRequest(request);
+
+    QCOMPARE(transport.state(), VotChromiumTransportState::Error);
+    QCOMPARE(responseSpy.count(), 1);
+    QPointer<VotChromiumRequestSession> retiredSession(
+        transport.findChild<VotChromiumRequestSession *>(
+            QString(),
+            Qt::FindDirectChildrenOnly
+        )
+    );
+    QVERIFY(retiredSession);
+
+    QVERIFY(QFile::remove(cacheRoot));
+    transport.ensureReady();
+    QVERIFY(retiredSession.isNull());
 }
 
 int runVotChromiumRequestSessionTests(int argc, char **argv)

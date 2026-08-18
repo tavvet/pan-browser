@@ -562,6 +562,10 @@ void VotChromiumNetworkTransport::handleSessionResponse(
     VotChromiumRequestSession *session = m_activeRequests.take(id);
     if (id.isEmpty() || !session)
         return;
+    m_retiredRequests.insert(session);
+    connect(session, &QObject::destroyed, this, [this, session] {
+        m_retiredRequests.remove(session);
+    });
     session->deleteLater();
     emit responseReady(response);
 }
@@ -570,6 +574,11 @@ void VotChromiumNetworkTransport::resetTransportProfile()
 {
     if (m_initializationTimer)
         m_initializationTimer->stop();
+    const QSet<VotChromiumRequestSession *> retiredRequests =
+        m_retiredRequests;
+    m_retiredRequests.clear();
+    for (VotChromiumRequestSession *session : retiredRequests)
+        delete session;
     delete m_controlPage;
     m_controlPage = nullptr;
     delete m_profileBootstrapPage;
