@@ -9,6 +9,7 @@
 #include "BrowserProfile.h"
 #include "CrossDomainPrompt.h"
 #include "CrossDomainPromptController.h"
+#include "CrossDomainWindowRouter.h"
 #include "BrowserInteraction.h"
 #include "BrowserShortcut.h"
 #include "BrowserFullScreenController.h"
@@ -113,13 +114,6 @@ bool isSameWebOrigin(const QUrl &left, const QUrl &right)
         && left.scheme().compare(right.scheme(), Qt::CaseInsensitive) == 0
         && left.host().compare(right.host(), Qt::CaseInsensitive) == 0
         && effectivePort(left) == effectivePort(right);
-}
-
-QString crossDomainRequestKey(const QString &sourceSite, const QString &targetHost)
-{
-    return SiteDomain::registrableDomain(sourceSite)
-        + QLatin1Char('\n')
-        + SiteDomain::normalizeHost(targetHost);
 }
 
 template<typename Callback>
@@ -322,6 +316,7 @@ MainWindow::MainWindow(
         m_networkBlockedByProxyError = primaryWindow->m_networkBlockedByProxyError;
         m_proxyAuthenticationController = primaryWindow->m_proxyAuthenticationController;
         m_httpAuthenticationController = primaryWindow->m_httpAuthenticationController;
+        m_crossDomainWindowRouter = primaryWindow->m_crossDomainWindowRouter;
         setAttribute(Qt::WA_DeleteOnClose);
     }
 
@@ -403,105 +398,19 @@ MainWindow::MainWindow(
             );
         }
     );
-    MainWindow *promptCoordinator = m_primaryWindow ? m_primaryWindow : this;
-    connect(
-        m_crossDomainPromptController,
-        &CrossDomainPromptController::requestFinished,
-        promptCoordinator,
-        [promptCoordinator, this](
-            const QString &sourceSite,
-            const QString &targetHost
-        ) {
-            const QString key = crossDomainRequestKey(sourceSite, targetHost);
-            const auto route = promptCoordinator->m_crossDomainPromptRoutes.find(key);
-            if (route != promptCoordinator->m_crossDomainPromptRoutes.end()
-                && route->window == this) {
-                promptCoordinator->m_crossDomainPromptRoutes.erase(route);
-            }
-        }
-    );
-    connect(
-        m_crossDomainPromptController,
-        &CrossDomainPromptController::requestReanchorRequested,
-        promptCoordinator,
-        [promptCoordinator, this](
-            QWebEngineView *webView,
-            const QList<CrossDomainAffectedView> &affectedViews,
-            const QList<CrossDomainPromptSource> &sources,
-            const QString &sourceSite,
-            const QString &targetHost,
-            int resourceType
-        ) {
-            const QString key = crossDomainRequestKey(sourceSite, targetHost);
-            MainWindow *newPromptWindow = nullptr;
-            QList<MainWindow *> windows{promptCoordinator};
-            for (MainWindow *window : std::as_const(promptCoordinator->m_popupWindows)) {
-                if (window)
-                    windows.append(window);
-            }
-            for (MainWindow *window : std::as_const(windows)) {
-                if (window->m_tabStates.contains(webView)) {
-                    newPromptWindow = window;
-                    break;
-                }
-            }
-
-            auto route = promptCoordinator->m_crossDomainPromptRoutes.find(key);
-            if (!newPromptWindow) {
-                if (route != promptCoordinator->m_crossDomainPromptRoutes.end()
-                    && route->window == this) {
-                    promptCoordinator->m_crossDomainPromptRoutes.erase(route);
-                }
-                for (const CrossDomainPromptSource &source : sources) {
-                    promptCoordinator->m_profile->dismissCrossDomainRequestSource(
-                        sourceSite,
-                        targetHost,
-                        source.url,
-                        source.originOnly
-                    );
-                }
-                return;
-            }
-            if (route == promptCoordinator->m_crossDomainPromptRoutes.end()) {
-                promptCoordinator->m_crossDomainPromptRoutes.insert(
-                    key,
-                    {newPromptWindow, webView}
-                );
-            } else {
-                route->window = newPromptWindow;
-                route->anchor = webView;
-            }
-            newPromptWindow->m_crossDomainPromptController->request(
-                webView,
-                affectedViews,
-                sources,
-                sourceSite,
-                targetHost,
-                resourceType
-            );
-        }
-    );
     if (m_ownsBrowserResources) {
-        connect(
+        m_crossDomainWindowRouter = new CrossDomainWindowRouter(
             m_profile,
-            &BrowserProfile::crossDomainRequestBlocked,
-            this,
-            [this](
-                const QUrl &sourceUrl,
-                const QString &sourceSite,
-                const QString &targetHost,
-                int resourceType,
-                bool sourceUrlIsOriginOnly
-            ) {
-                routeCrossDomainRequest(
-                    sourceUrl,
-                    sourceSite,
-                    targetHost,
-                    resourceType,
-                    sourceUrlIsOriginOnly
-                );
-            }
+            this
         );
+    }
+    if (m_crossDomainWindowRouter) {
+        m_crossDomainWindowRouter->registerWindow(
+            this,
+            m_crossDomainPromptController
+        );
+    }
+    if (m_ownsBrowserResources) {
         restoreWindowPlacement();
         reloadRules();
         if (initializePrimaryTabs) {
@@ -544,6 +453,8 @@ MainWindow::~MainWindow()
     }
     for (QWebEngineView *webView : webViews)
         closeDeveloperTools(webView);
+    if (m_crossDomainWindowRouter)
+        m_crossDomainWindowRouter->unregisterWindow(this);
     delete m_permissionController;
     m_permissionController = nullptr;
     delete m_crossDomainPromptController;
@@ -2958,7 +2869,8 @@ void MainWindow::openSettingsPage(int page)
                 }
             }
         }
-        m_crossDomainPromptRoutes.clear();
+        if (m_crossDomainWindowRouter)
+            m_crossDomainWindowRouter->clearRoutes();
         reloadRules();
         if (languageChanged || proxyRestartRequired || userAgentRestartRequired) {
             QStringList restartChanges;
@@ -3492,173 +3404,8 @@ void MainWindow::initializeVideoTranslationSettings()
 
 void MainWindow::cancelCrossDomainPromptsForView(QWebEngineView *webView)
 {
-    if (!webView)
-        return;
-    MainWindow *primary = m_primaryWindow ? m_primaryWindow : this;
-    QList<QPointer<MainWindow>> windows;
-    windows.append(primary);
-    for (MainWindow *window : std::as_const(primary->m_popupWindows)) {
-        if (window)
-            windows.append(window);
-    }
-    if (!windows.contains(this))
-        windows.append(this);
-
-    for (MainWindow *window : std::as_const(windows)) {
-        if (window && window->m_crossDomainPromptController)
-            window->m_crossDomainPromptController->cancelForView(webView);
-    }
-}
-
-void MainWindow::routeCrossDomainRequest(
-    const QUrl &sourceUrl,
-    const QString &sourceSite,
-    const QString &targetHost,
-    int resourceType,
-    bool sourceUrlIsOriginOnly,
-    int attempt
-)
-{
-    MainWindow *primary = m_primaryWindow ? m_primaryWindow : this;
-    if (primary != this) {
-        primary->routeCrossDomainRequest(
-            sourceUrl,
-            sourceSite,
-            targetHost,
-            resourceType,
-            sourceUrlIsOriginOnly,
-            attempt
-        );
-        return;
-    }
-
-    if (!m_profile->isCrossDomainRequestPending(
-            sourceSite,
-            targetHost,
-            sourceUrl,
-            sourceUrlIsOriginOnly
-        )) {
-        return;
-    }
-
-    if (m_profile->crossDomainSettings().evaluate(sourceSite, targetHost)
-        != CrossDomainEvaluation::Ask) {
-        m_profile->dismissCrossDomainRequest(sourceSite, targetHost);
-        return;
-    }
-
-    const QString requestKey = crossDomainRequestKey(sourceSite, targetHost);
-    auto route = m_crossDomainPromptRoutes.find(requestKey);
-    if (route != m_crossDomainPromptRoutes.end()
-        && (!route->window
-            || !route->anchor
-            || !route->window->m_crossDomainPromptController
-            || !route->window->m_tabStates.contains(route->anchor))) {
-        route = m_crossDomainPromptRoutes.erase(route);
-    }
-    const bool hasPromptOwner = route != m_crossDomainPromptRoutes.end();
-
-    QList<MainWindow *> windows;
-    windows.append(this);
-    for (MainWindow *window : std::as_const(m_popupWindows)) {
-        if (window)
-            windows.append(window);
-    }
-    if (auto *active = qobject_cast<MainWindow *>(QApplication::activeWindow())) {
-        if (windows.removeOne(active))
-            windows.prepend(active);
-    }
-
-    struct Candidate {
-        MainWindow *window = nullptr;
-        QWebEngineView *view = nullptr;
-    };
-    QList<Candidate> candidates;
-    QList<QUrl> candidateUrls;
-    for (MainWindow *window : std::as_const(windows)) {
-        QList<QWebEngineView *> views = window->m_tabStates.keys();
-        if (QWebEngineView *current = window->currentWebView()) {
-            if (views.removeOne(current))
-                views.prepend(current);
-        }
-        for (QWebEngineView *view : std::as_const(views)) {
-            candidates.append({window, view});
-            candidateUrls.append(window->urlForTab(view));
-        }
-    }
-
-    const QList<qsizetype> matchingIndexes = crossDomainPromptCandidateIndexes(
-        sourceUrl,
-        sourceSite,
-        sourceUrlIsOriginOnly,
-        candidateUrls
-    );
-    const Candidate candidate = matchingIndexes.isEmpty()
-        ? Candidate()
-        : candidates.at(matchingIndexes.constFirst());
-    if (candidate.window && candidate.view) {
-        QList<CrossDomainAffectedView> affectedViews;
-        affectedViews.reserve(matchingIndexes.size());
-        for (const qsizetype index : matchingIndexes) {
-            const Candidate &matchingCandidate = candidates.at(index);
-            affectedViews.append({
-                matchingCandidate.view,
-                SiteDomain::normalizedPageUrl(
-                    matchingCandidate.window->urlForTab(matchingCandidate.view)
-                ),
-            });
-        }
-        MainWindow *promptWindow = candidate.window;
-        QWebEngineView *promptAnchor = candidate.view;
-        if (hasPromptOwner) {
-            promptWindow = route->window;
-            promptAnchor = route->anchor;
-        } else {
-            m_crossDomainPromptRoutes.insert(
-                requestKey,
-                {promptWindow, promptAnchor}
-            );
-        }
-        promptWindow->m_crossDomainPromptController->request(
-            promptAnchor,
-            affectedViews,
-            QList<CrossDomainPromptSource>{
-                {sourceUrl, sourceUrlIsOriginOnly},
-            },
-            sourceSite,
-            targetHost,
-            resourceType
-        );
-        return;
-    }
-
-    if (attempt < 3) {
-        QTimer::singleShot(50 * (attempt + 1), this, [
-            this,
-            sourceUrl,
-            sourceSite,
-            targetHost,
-            resourceType,
-            sourceUrlIsOriginOnly,
-            attempt
-        ] {
-            routeCrossDomainRequest(
-                sourceUrl,
-                sourceSite,
-                targetHost,
-                resourceType,
-                sourceUrlIsOriginOnly,
-                attempt + 1
-            );
-        });
-        return;
-    }
-    m_profile->dismissCrossDomainRequestSource(
-        sourceSite,
-        targetHost,
-        sourceUrl,
-        sourceUrlIsOriginOnly
-    );
+    if (m_crossDomainWindowRouter)
+        m_crossDomainWindowRouter->cancelForView(webView);
 }
 
 void MainWindow::showCrossDomainConfigurationError()

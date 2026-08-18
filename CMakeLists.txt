@@ -107,6 +107,8 @@ set(PANBROWSER_APP_SOURCES
     src/CrossDomainSettings.h
     src/CrossDomainSettingsPage.cpp
     src/CrossDomainSettingsPage.h
+    src/CrossDomainWindowRouter.cpp
+    src/CrossDomainWindowRouter.h
     src/DownloadHistoryStore.cpp
     src/DownloadHistoryStore.h
     src/DownloadManager.cpp

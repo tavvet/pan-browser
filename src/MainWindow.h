@@ -52,6 +52,7 @@ class PermissionController;
 class PermissionPrompt;
 class CrossDomainPrompt;
 class CrossDomainPromptController;
+class CrossDomainWindowRouter;
 class ProxyAuthenticationController;
 class ReaderModeController;
 class QCloseEvent;
@@ -68,6 +69,7 @@ class MainWindow final : public QMainWindow {
     Q_OBJECT
 
     friend struct BrowserWindowUi;
+    friend class CrossDomainWindowRouter;
 
 public:
     enum class StartupPresentation {
@@ -123,11 +125,6 @@ private:
         QPointer<DetachedVideoWindow> detachedVideoWindow;
         QPointer<DetachedVideoPlaceholder> detachedVideoPlaceholder;
         QPointer<ReaderModeController> readerModeController;
-    };
-
-    struct CrossDomainPromptRoute {
-        QPointer<MainWindow> window;
-        QPointer<QWebEngineView> anchor;
     };
 
     MainWindow(
@@ -261,14 +258,6 @@ private:
     void initializeCrossDomainSettings();
     void initializeVideoTranslationSettings();
     void cancelCrossDomainPromptsForView(QWebEngineView *webView);
-    void routeCrossDomainRequest(
-        const QUrl &sourceUrl,
-        const QString &sourceSite,
-        const QString &targetHost,
-        int resourceType,
-        bool sourceUrlIsOriginOnly,
-        int attempt = 0
-    );
     void showCrossDomainConfigurationError();
     void showProxyConfigurationError();
 
@@ -282,6 +271,7 @@ private:
     std::unique_ptr<BrowserWindowUi> m_ui;
     PermissionController *m_permissionController = nullptr;
     CrossDomainPromptController *m_crossDomainPromptController = nullptr;
+    CrossDomainWindowRouter *m_crossDomainWindowRouter = nullptr;
     HttpAuthenticationController *m_httpAuthenticationController = nullptr;
     ProxyAuthenticationController *m_proxyAuthenticationController = nullptr;
     QPointer<QMessageBox> m_externalUrlDialog;
@@ -296,7 +286,6 @@ private:
     QTimer *m_addressSuggestionTimer = nullptr;
     QHash<QWebEngineView *, BrowserTabState> m_tabStates;
     QList<SessionTab> m_closedTabs;
-    QHash<QString, CrossDomainPromptRoute> m_crossDomainPromptRoutes;
     BrowserPreferences m_preferences;
     SearchSettings m_searchSettings;
     UserAgentSettings m_userAgentSettings;
