@@ -12,6 +12,7 @@ int runReaderModeTests(int argc, char **argv);
 int runVideoPresentationTests(int argc, char **argv);
 int runPersistenceAndPolicyTests(int argc, char **argv);
 int runVotIntegrationTests(int argc, char **argv);
+int runVotChromiumRequestSessionTests(int argc, char **argv);
 int runNetworkSettingsTests(int argc, char **argv);
 int runUserAgentTests(int argc, char **argv);
 int runCredentialsAndAuthTests(int argc, char **argv);
@@ -50,6 +51,8 @@ int main(int argc, char *argv[])
         return runPersistenceAndPolicyTests(argc, argv);
     if (suite == QStringLiteral("vot"))
         return runVotIntegrationTests(argc, argv);
+    if (suite == QStringLiteral("vot-request-session"))
+        return runVotChromiumRequestSessionTests(argc, argv);
     if (suite == QStringLiteral("network"))
         return runNetworkSettingsTests(argc, argv);
     if (suite == QStringLiteral("user-agent"))

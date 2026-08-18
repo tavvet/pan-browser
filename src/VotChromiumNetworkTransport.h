@@ -7,7 +7,6 @@
 #include <QList>
 #include <QObject>
 #include <QPointer>
-#include <QSet>
 #include <QSslCertificate>
 #include <QUrl>
 
@@ -21,6 +20,7 @@ class QWebEngineExtensionInfo;
 class QWebEngineExtensionManager;
 class QWebEnginePage;
 class QWebEngineProfile;
+class VotChromiumRequestSession;
 
 enum class VotChromiumTransportState {
     Uninitialized,
@@ -80,13 +80,6 @@ signals:
     );
 
 private:
-    struct ActiveRequest final {
-        VotChromiumRequest request;
-        QPointer<QWebEnginePage> transportPage;
-        QPointer<QTimer> timeoutTimer;
-        bool started = false;
-    };
-
     void beginExtensionLoad();
     bool createTransportProfile(QString *error);
     void enableExtension(
@@ -97,24 +90,13 @@ private:
     void createControlPage(const QString &extensionId);
     void flushPendingRequests();
     void startRequest(const VotChromiumRequest &request);
-    void startLoadedRequest(
-        const QString &requestId,
-        QWebEnginePage *page
-    );
-    void handleRequestPageFailure(
-        const QString &requestId,
-        QWebEnginePage *page,
-        const QString &error
-    );
-    void handleConsoleMessage(const QString &message);
+    void handleSessionResponse(const QJsonObject &response);
     void resetTransportProfile();
-    void retireRequestPage(QWebEnginePage *page);
     void fail(const QString &error);
     void setState(
         VotChromiumTransportState state,
         const QString &error = QString()
     );
-    void emitTerminalResponse(const QJsonObject &response);
 
     QPointer<QWebEngineProfile> m_profile;
     QWebEngineProfile *m_transportProfile = nullptr;
@@ -129,7 +111,5 @@ private:
     QString m_token;
     VotChromiumTransportState m_state = VotChromiumTransportState::Uninitialized;
     QString m_error;
-    QHash<QString, VotChromiumRequest> m_pendingRequests;
-    QHash<QString, ActiveRequest> m_activeRequests;
-    QSet<QWebEnginePage *> m_retiredRequestPages;
+    QHash<QString, VotChromiumRequestSession *> m_activeRequests;
 };

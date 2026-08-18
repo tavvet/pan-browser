@@ -130,6 +130,8 @@ set(PANBROWSER_APP_SOURCES
     src/VotChromiumNetworkTransport.cpp
     src/VotChromiumNetworkTransport.h
     src/VotChromiumRequest.h
+    src/VotChromiumRequestSession.cpp
+    src/VotChromiumRequestSession.h
     src/VotUserscriptBridge.cpp
     src/VotUserscriptBridge.h
     src/VotUserscriptManager.cpp
@@ -419,6 +421,7 @@ qt_add_executable(PanBrowserTests
     tests/ReaderModeTests.cpp
     tests/VideoPresentationTests.cpp
     tests/VotIntegrationTests.cpp
+    tests/VotChromiumRequestSessionTests.cpp
     tests/WebAppInstallControllerTests.cpp
     tests/TrustTests.cpp
     tests/UserAgentTests.cpp
@@ -494,6 +497,8 @@ qt_add_executable(PanBrowserTests
     src/VotChromiumNetworkTransport.cpp
     src/VotChromiumNetworkTransport.h
     src/VotChromiumRequest.h
+    src/VotChromiumRequestSession.cpp
+    src/VotChromiumRequestSession.h
     src/VotUserscriptBridge.cpp
     src/VotUserscriptBridge.h
     src/VotUserscriptManager.cpp
@@ -686,6 +691,10 @@ add_test(
 )
 add_test(NAME PanBrowserPersistenceTests COMMAND PanBrowserTests persistence)
 add_test(NAME PanBrowserVotTests COMMAND PanBrowserTests vot)
+add_test(
+    NAME PanBrowserVotRequestSessionTests
+    COMMAND PanBrowserTests vot-request-session
+)
 add_test(NAME PanBrowserNetworkTests COMMAND PanBrowserTests network)
 add_test(NAME PanBrowserUserAgentTests COMMAND PanBrowserTests user-agent)
 add_test(

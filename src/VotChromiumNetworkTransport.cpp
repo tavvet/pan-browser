@@ -3,19 +3,16 @@
 #include "BrowserPage.h"
 #include "CrossDomainRequestInterceptor.h"
 #include "PrivateData.h"
+#include "VotChromiumRequestSession.h"
 
 #include <QAuthenticator>
 #include <QCoreApplication>
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
-#include <QJsonArray>
-#include <QJsonDocument>
-#include <QJsonParseError>
 #include <QSaveFile>
 #include <QStandardPaths>
 #include <QTimer>
-#include <QUrlQuery>
 #include <QUuid>
 #include <QWebEngineExtensionInfo>
 #include <QWebEngineExtensionManager>
@@ -29,16 +26,7 @@
 
 namespace {
 
-constexpr qsizetype maximumTransportMessageLength = 48 * 1024 * 1024;
 constexpr int initializationTimeoutMilliseconds = 15'000;
-
-QString javaScriptValue(const QJsonValue &value)
-{
-    QJsonArray wrapper;
-    wrapper.append(value);
-    const QByteArray json = QJsonDocument(wrapper).toJson(QJsonDocument::Compact);
-    return QString::fromUtf8(json.mid(1, json.size() - 2));
-}
 
 QString normalizedPath(const QString &path)
 {
@@ -81,39 +69,6 @@ bool writeResourceFile(
     }
     return PrivateData::restrictFile(destinationPath, error);
 }
-
-class TransportPage final : public QWebEnginePage {
-public:
-    explicit TransportPage(QWebEngineProfile *profile, QObject *parent)
-        : QWebEnginePage(profile, parent)
-    {
-    }
-
-    std::function<void(const QString &)> consoleHandler;
-
-protected:
-    void javaScriptConsoleMessage(
-        JavaScriptConsoleMessageLevel level,
-        const QString &message,
-        int lineNumber,
-        const QString &sourceId
-    ) override
-    {
-        if (consoleHandler
-            && message.startsWith(
-                VotChromiumNetworkTransport::responseMessagePrefix()
-            )) {
-            consoleHandler(message);
-            return;
-        }
-        QWebEnginePage::javaScriptConsoleMessage(
-            level,
-            message,
-            lineNumber,
-            sourceId
-        );
-    }
-};
 
 } // namespace
 
@@ -158,19 +113,14 @@ VotChromiumNetworkTransport::VotChromiumNetworkTransport(
 
 VotChromiumNetworkTransport::~VotChromiumNetworkTransport()
 {
-    for (const ActiveRequest &request : std::as_const(m_activeRequests)) {
-        if (auto *page = static_cast<TransportPage *>(request.transportPage.data()))
-            page->consoleHandler = {};
-        delete request.timeoutTimer;
-        delete request.transportPage;
-    }
+    qDeleteAll(m_activeRequests);
     m_activeRequests.clear();
     resetTransportProfile();
 }
 
 QString VotChromiumNetworkTransport::responseMessagePrefix()
 {
-    return QStringLiteral("__PANBROWSER_VOT_CHROMIUM_RESPONSE__");
+    return VotChromiumRequestSession::responseMessagePrefix();
 }
 
 bool VotChromiumNetworkTransport::prepareExtensionDirectory(
@@ -398,63 +348,36 @@ void VotChromiumNetworkTransport::sendRequest(
 {
     if (request.id.isEmpty() || m_activeRequests.contains(request.id))
         return;
-    auto *timeoutTimer = new QTimer(this);
-    timeoutTimer->setSingleShot(true);
-    connect(timeoutTimer, &QTimer::timeout, this, [this, id = request.id] {
-        const auto found = m_activeRequests.constFind(id);
-        if (found == m_activeRequests.cend())
-            return;
-        if (found->started && found->transportPage) {
-            found->transportPage->runJavaScript(
-                QStringLiteral("globalThis.panBrowserVotTransport?.abort(%1)")
-                    .arg(javaScriptValue(id)),
-                QWebEngineScript::MainWorld
-            );
-        }
-        emitTerminalResponse({
-            {QStringLiteral("id"), id},
-            {QStringLiteral("type"), QStringLiteral("timeout")},
-            {QStringLiteral("error"), tr("Request timed out")},
-        });
-    });
-    ActiveRequest active;
-    active.request = request;
-    active.timeoutTimer = timeoutTimer;
-    m_activeRequests.insert(request.id, active);
-    timeoutTimer->start(qMax(1, request.timeoutMilliseconds));
+
+    auto *session = new VotChromiumRequestSession(request, this);
+    m_activeRequests.insert(request.id, session);
+    connect(
+        session,
+        &VotChromiumRequestSession::responseReady,
+        this,
+        &VotChromiumNetworkTransport::handleSessionResponse
+    );
+    connect(
+        session,
+        &VotChromiumRequestSession::proxyAuthenticationRequired,
+        this,
+        &VotChromiumNetworkTransport::proxyAuthenticationRequired
+    );
+
     if (m_state == VotChromiumTransportState::Uninitialized)
         ensureReady();
     if (m_state == VotChromiumTransportState::Error) {
-        emitTerminalResponse({
-            {QStringLiteral("id"), request.id},
-            {QStringLiteral("type"), QStringLiteral("error")},
-            {QStringLiteral("error"), m_error},
-        });
+        session->fail(m_error);
         return;
     }
-    if (m_state != VotChromiumTransportState::Ready) {
-        m_pendingRequests.insert(request.id, request);
-        return;
-    }
-    startRequest(request);
+    if (m_state == VotChromiumTransportState::Ready)
+        startRequest(request);
 }
 
 void VotChromiumNetworkTransport::abortRequest(const QString &id)
 {
-    const auto found = m_activeRequests.constFind(id);
-    if (found == m_activeRequests.cend())
-        return;
-    if (found->started && found->transportPage) {
-        found->transportPage->runJavaScript(
-            QStringLiteral("globalThis.panBrowserVotTransport?.abort(%1)")
-                .arg(javaScriptValue(id)),
-            QWebEngineScript::MainWorld
-        );
-    }
-    emitTerminalResponse({
-        {QStringLiteral("id"), id},
-        {QStringLiteral("type"), QStringLiteral("abort")},
-    });
+    if (VotChromiumRequestSession *session = m_activeRequests.value(id))
+        session->abort();
 }
 
 bool VotChromiumNetworkTransport::registerRequestAuthorizer(
@@ -519,7 +442,7 @@ void VotChromiumNetworkTransport::createControlPage(
     if (m_controlPage)
         m_controlPage->deleteLater();
 
-    auto *page = new TransportPage(m_transportProfile, this);
+    auto *page = new QWebEnginePage(m_transportProfile, this);
     QPointer<VotChromiumNetworkTransport> self(this);
     m_controlPage = page;
     connect(
@@ -604,11 +527,16 @@ void VotChromiumNetworkTransport::createControlPage(
 
 void VotChromiumNetworkTransport::flushPendingRequests()
 {
-    const QList<VotChromiumRequest> pending = m_pendingRequests.values();
-    m_pendingRequests.clear();
-    for (const VotChromiumRequest &request : pending) {
-        if (m_activeRequests.contains(request.id))
-            startRequest(request);
+    const QList<QString> requestIds = m_activeRequests.keys();
+    for (const QString &requestId : requestIds) {
+        VotChromiumRequestSession *session = m_activeRequests.value(requestId);
+        if (session && !session->isStarted()) {
+            session->start(
+                m_transportProfile,
+                m_extensionId,
+                m_token
+            );
+        }
     }
 }
 
@@ -616,205 +544,32 @@ void VotChromiumNetworkTransport::startRequest(
     const VotChromiumRequest &request
 )
 {
-    if (!m_transportProfile || !m_activeRequests.contains(request.id))
+    VotChromiumRequestSession *session = m_activeRequests.value(request.id);
+    if (!session || !m_transportProfile)
         return;
-    auto *page = new TransportPage(m_transportProfile, this);
-    QPointer<VotChromiumNetworkTransport> self(this);
-    page->consoleHandler = [self](const QString &message) {
-        if (self)
-            self->handleConsoleMessage(message);
-    };
-    auto active = m_activeRequests.find(request.id);
-    if (active == m_activeRequests.end()) {
-        page->deleteLater();
-        return;
-    }
-    active->transportPage = page;
-    connect(
-        page,
-        &QWebEnginePage::authenticationRequired,
-        this,
-        [](const QUrl &, QAuthenticator *authenticator) {
-            if (authenticator)
-                *authenticator = QAuthenticator();
-        }
-    );
-    connect(
-        page,
-        &QWebEnginePage::proxyAuthenticationRequired,
-        this,
-        [this, id = request.id](
-            const QUrl &requestUrl,
-            QAuthenticator *authenticator,
-            const QString &proxyHost
-        ) {
-            const auto found = m_activeRequests.constFind(id);
-            if (found == m_activeRequests.cend()) {
-                if (authenticator)
-                    *authenticator = QAuthenticator();
-                return;
-            }
-            bool handled = false;
-            emit proxyAuthenticationRequired(
-                found->request.sourcePage.data(),
-                requestUrl,
-                authenticator,
-                proxyHost,
-                &handled
-            );
-            if (!handled && authenticator)
-                *authenticator = QAuthenticator();
-        }
-    );
-    connect(
-        page,
-        &QWebEnginePage::renderProcessTerminated,
-        this,
-        [self, id = request.id, guardedPage = QPointer<QWebEnginePage>(page)](
-            QWebEnginePage::RenderProcessTerminationStatus,
-            int
-        ) {
-            if (!self || !guardedPage)
-                return;
-            self->handleRequestPageFailure(
-                id,
-                guardedPage,
-                QCoreApplication::translate(
-                    "VotChromiumNetworkTransport",
-                    "The Chromium VOT request process stopped unexpectedly"
-                )
-            );
-        }
-    );
-    connect(
-        page,
-        &QWebEnginePage::loadFinished,
-        this,
-        [self, id = request.id, guardedPage = QPointer<QWebEnginePage>(page)](
-            bool ok
-        ) {
-            if (!self || !guardedPage)
-                return;
-            if (!ok) {
-                self->handleRequestPageFailure(
-                    id,
-                    guardedPage,
-                    QCoreApplication::translate(
-                        "VotChromiumNetworkTransport",
-                        "Cannot open the Chromium page for a VOT request"
-                    )
-                );
-                return;
-            }
-            self->startLoadedRequest(id, guardedPage);
-        }
-    );
-    QUrl transportUrl(QStringLiteral(
-        "chrome-extension://%1/transport.html"
-    ).arg(m_extensionId));
-    QUrlQuery query;
-    query.addQueryItem(QStringLiteral("request"), request.id);
-    transportUrl.setQuery(query);
-    page->setUrl(transportUrl);
-}
-
-void VotChromiumNetworkTransport::startLoadedRequest(
-    const QString &requestId,
-    QWebEnginePage *page
-)
-{
-    auto active = m_activeRequests.find(requestId);
-    if (active == m_activeRequests.end() || !page
-        || active->transportPage != page) {
-        return;
-    }
-    active->started = true;
-    const VotChromiumRequest &request = active->request;
-    QJsonObject payload{
-        {QStringLiteral("id"), request.id},
-        {QStringLiteral("token"), m_token},
-        {QStringLiteral("url"), request.url.toString(QUrl::FullyEncoded)},
-        {QStringLiteral("method"), QString::fromLatin1(request.method)},
-        {QStringLiteral("headers"), request.headers},
-        {QStringLiteral("body"), QString::fromLatin1(request.body.toBase64())},
-        {QStringLiteral("redirect"), request.redirectMode},
-        {QStringLiteral("timeout"), request.timeoutMilliseconds},
-    };
-    page->runJavaScript(
-        QStringLiteral("globalThis.panBrowserVotTransport?.request(%1)")
-            .arg(javaScriptValue(payload)),
-        QWebEngineScript::MainWorld,
-        [self = QPointer<VotChromiumNetworkTransport>(this),
-         id = request.id,
-         guardedPage = QPointer<QWebEnginePage>(page)](const QVariant &started) {
-            if (!self || !guardedPage || !self->m_activeRequests.contains(id)
-                || started.toBool()) {
-                return;
-            }
-            self->emitTerminalResponse({
-                {QStringLiteral("id"), id},
-                {QStringLiteral("type"), QStringLiteral("error")},
-                {
-                    QStringLiteral("error"),
-                    QCoreApplication::translate(
-                        "VotChromiumNetworkTransport",
-                        "The Chromium VOT request could not be started"
-                    )
-                },
-            });
-        }
+    session->start(
+        m_transportProfile,
+        m_extensionId,
+        m_token
     );
 }
 
-void VotChromiumNetworkTransport::handleRequestPageFailure(
-    const QString &requestId,
-    QWebEnginePage *page,
-    const QString &error
+void VotChromiumNetworkTransport::handleSessionResponse(
+    const QJsonObject &response
 )
 {
-    const auto found = m_activeRequests.constFind(requestId);
-    if (found == m_activeRequests.cend() || found->transportPage != page)
-        return;
-    emitTerminalResponse({
-        {QStringLiteral("id"), requestId},
-        {QStringLiteral("type"), QStringLiteral("error")},
-        {QStringLiteral("error"), error},
-    });
-}
-
-void VotChromiumNetworkTransport::handleConsoleMessage(
-    const QString &message
-)
-{
-    const QString prefix = responseMessagePrefix();
-    if (!message.startsWith(prefix) || message.size() > maximumTransportMessageLength)
-        return;
-    QJsonParseError parseError;
-    const QJsonDocument document = QJsonDocument::fromJson(
-        message.mid(prefix.size()).toUtf8(),
-        &parseError
-    );
-    if (parseError.error != QJsonParseError::NoError || !document.isObject())
-        return;
-    QJsonObject response = document.object();
-    if (response.take(QStringLiteral("token")).toString() != m_token)
-        return;
     const QString id = response.value(QStringLiteral("id")).toString();
-    if (!m_activeRequests.contains(id))
+    VotChromiumRequestSession *session = m_activeRequests.take(id);
+    if (id.isEmpty() || !session)
         return;
-    emitTerminalResponse(response);
+    session->deleteLater();
+    emit responseReady(response);
 }
 
 void VotChromiumNetworkTransport::resetTransportProfile()
 {
     if (m_initializationTimer)
         m_initializationTimer->stop();
-    const QSet<QWebEnginePage *> retiredRequestPages = m_retiredRequestPages;
-    m_retiredRequestPages.clear();
-    for (QWebEnginePage *page : retiredRequestPages)
-        delete page;
-    if (auto *page = static_cast<TransportPage *>(m_controlPage))
-        page->consoleHandler = {};
     delete m_controlPage;
     m_controlPage = nullptr;
     delete m_profileBootstrapPage;
@@ -825,30 +580,15 @@ void VotChromiumNetworkTransport::resetTransportProfile()
     m_extensionId.clear();
 }
 
-void VotChromiumNetworkTransport::retireRequestPage(QWebEnginePage *page)
-{
-    if (!page || m_retiredRequestPages.contains(page))
-        return;
-    m_retiredRequestPages.insert(page);
-    connect(page, &QObject::destroyed, this, [this, page] {
-        m_retiredRequestPages.remove(page);
-    });
-    page->deleteLater();
-}
-
 void VotChromiumNetworkTransport::fail(const QString &error)
 {
     const QString detail = error.isEmpty()
         ? tr("The built-in VOT network transport failed")
         : error;
     const QStringList activeIds = m_activeRequests.keys();
-    m_pendingRequests.clear();
     for (const QString &id : activeIds) {
-        emitTerminalResponse({
-            {QStringLiteral("id"), id},
-            {QStringLiteral("type"), QStringLiteral("error")},
-            {QStringLiteral("error"), detail},
-        });
+        if (VotChromiumRequestSession *session = m_activeRequests.value(id))
+            session->fail(detail);
     }
     setState(VotChromiumTransportState::Error, detail);
 }
@@ -865,27 +605,4 @@ void VotChromiumNetworkTransport::setState(
     m_state = state;
     m_error = error;
     emit stateChanged();
-}
-
-void VotChromiumNetworkTransport::emitTerminalResponse(
-    const QJsonObject &response
-)
-{
-    const QString id = response.value(QStringLiteral("id")).toString();
-    auto found = m_activeRequests.find(id);
-    if (id.isEmpty() || found == m_activeRequests.end())
-        return;
-    const ActiveRequest active = found.value();
-    m_activeRequests.erase(found);
-    m_pendingRequests.remove(id);
-    if (active.timeoutTimer) {
-        active.timeoutTimer->stop();
-        active.timeoutTimer->deleteLater();
-    }
-    if (active.transportPage) {
-        static_cast<TransportPage *>(active.transportPage.data())
-            ->consoleHandler = {};
-        retireRequestPage(active.transportPage.data());
-    }
-    emit responseReady(response);
 }
