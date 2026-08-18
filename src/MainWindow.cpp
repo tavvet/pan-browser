@@ -13,6 +13,7 @@
 #include "BrowserShortcut.h"
 #include "BrowserFullScreenController.h"
 #include "BrowserTabBar.h"
+#include "BrowserWindowUi.h"
 #include "CertificateTrustValidator.h"
 #include "DownloadManager.h"
 #include "DownloadsPanel.h"
@@ -178,6 +179,7 @@ MainWindow::MainWindow(
     QWidget *parent
 )
     : QMainWindow(parent, role == WindowRole::Primary ? Qt::WindowFlags() : Qt::Window)
+    , m_ui(std::make_unique<BrowserWindowUi>())
     , m_sessionStore(QDir(
         QStandardPaths::writableLocation(QStandardPaths::AppDataLocation)
     ).filePath(QStringLiteral("session.json")))
@@ -364,10 +366,10 @@ MainWindow::MainWindow(
     );
     if (!m_historyError.isEmpty())
         setTrustStatus(tr("History unavailable: %1").arg(m_historyError), true);
-    m_permissionController = new PermissionController(m_permissionPrompt, this);
+    m_permissionController = new PermissionController(m_ui->permissionPrompt, this);
     m_crossDomainPromptController = new CrossDomainPromptController(
         m_profile,
-        m_crossDomainPrompt,
+        m_ui->crossDomainPrompt,
         this
     );
     connect(
@@ -528,10 +530,10 @@ MainWindow::~MainWindow()
     delete m_crossDomainPromptController;
     m_crossDomainPromptController = nullptr;
     delete takeCentralWidget();
-    m_tabStack = nullptr;
+    m_ui->tabStack = nullptr;
     m_tabStates.clear();
-    delete m_downloadsPanel;
-    m_downloadsPanel = nullptr;
+    delete m_ui->downloadsPanel;
+    m_ui->downloadsPanel = nullptr;
     if (m_ownsBrowserResources) {
         delete m_downloadManager;
         delete m_profile;
@@ -608,39 +610,39 @@ bool MainWindow::eventFilter(QObject *watched, QEvent *event)
             return true;
         }
         if (triggerShortcutAction(
-                m_newTabAction,
+                m_ui->newTabAction,
                 keyEvent,
-                m_newTabAction && m_newTabAction->isEnabled(),
+                m_ui->newTabAction && m_ui->newTabAction->isEnabled(),
                 [this] { openNewTab(); }
             )
             || triggerShortcutAction(
-                m_closeTabAction,
+                m_ui->closeTabAction,
                 keyEvent,
-                m_closeTabAction && m_closeTabAction->isEnabled(),
+                m_ui->closeTabAction && m_ui->closeTabAction->isEnabled(),
                 [this, webView] { closeActiveBrowserSurface(webView); }
             )
             || triggerShortcutAction(
-                m_reopenClosedTabAction,
+                m_ui->reopenClosedTabAction,
                 keyEvent,
-                m_reopenClosedTabAction && m_reopenClosedTabAction->isEnabled(),
+                m_ui->reopenClosedTabAction && m_ui->reopenClosedTabAction->isEnabled(),
                 [this] { reopenLastClosedTab(); }
             )
             || triggerShortcutAction(
-                m_nextTabAction,
+                m_ui->nextTabAction,
                 keyEvent,
-                m_nextTabAction && m_nextTabAction->isEnabled(),
+                m_ui->nextTabAction && m_ui->nextTabAction->isEnabled(),
                 [this] { activateAdjacentTab(1); }
             )
             || triggerShortcutAction(
-                m_previousTabAction,
+                m_ui->previousTabAction,
                 keyEvent,
-                m_previousTabAction && m_previousTabAction->isEnabled(),
+                m_ui->previousTabAction && m_ui->previousTabAction->isEnabled(),
                 [this] { activateAdjacentTab(-1); }
             )) {
             return true;
         }
-        for (int index = 0; index < m_numberedTabActions.size(); ++index) {
-            QAction *action = m_numberedTabActions.at(index);
+        for (int index = 0; index < m_ui->numberedTabActions.size(); ++index) {
+            QAction *action = m_ui->numberedTabActions.at(index);
             if (triggerShortcutAction(
                     action,
                     keyEvent,
@@ -659,20 +661,20 @@ bool MainWindow::eventFilter(QObject *watched, QEvent *event)
             && zoomPercentage > pageZoomPercentage(minimumPageZoomFactor);
         const bool canResetZoom = page
             && zoomPercentage != pageZoomPercentage(defaultPageZoomFactor);
-        if (triggerShortcutAction(m_zoomInAction, keyEvent, canZoomIn, [this, webView] {
+        if (triggerShortcutAction(m_ui->zoomInAction, keyEvent, canZoomIn, [this, webView] {
                 changePageZoomBySteps(webView, 1);
             })
-            || triggerShortcutAction(m_zoomOutAction, keyEvent, canZoomOut, [this, webView] {
+            || triggerShortcutAction(m_ui->zoomOutAction, keyEvent, canZoomOut, [this, webView] {
                 changePageZoomBySteps(webView, -1);
             })
-            || triggerShortcutAction(m_resetZoomAction, keyEvent, canResetZoom, [this, webView] {
+            || triggerShortcutAction(m_ui->resetZoomAction, keyEvent, canResetZoom, [this, webView] {
                 setPageZoom(webView, defaultPageZoomFactor);
             })) {
             return true;
         }
         if (m_preferences.developerToolsEnabled()
             && triggerShortcutAction(
-                m_developerToolsAction,
+                m_ui->developerToolsAction,
                 keyEvent,
                 true,
                 [this, webView] {
@@ -682,9 +684,9 @@ bool MainWindow::eventFilter(QObject *watched, QEvent *event)
             return true;
         }
         if (triggerShortcutAction(
-                m_readerModeAction,
+                m_ui->readerModeAction,
                 keyEvent,
-                m_readerModeAction && m_readerModeAction->isEnabled(),
+                m_ui->readerModeAction && m_ui->readerModeAction->isEnabled(),
                 [this, webView] { toggleReaderMode(webView); }
             )) {
             return true;
@@ -760,9 +762,9 @@ void MainWindow::createInterface()
     }
     setWindowIcon(windowIcon);
 
-    m_tabStack = new QStackedWidget(this);
-    m_tabStack->setObjectName(QStringLiteral("browserTabs"));
-    setCentralWidget(m_tabStack);
+    m_ui->tabStack = new QStackedWidget(this);
+    m_ui->tabStack->setObjectName(QStringLiteral("browserTabs"));
+    setCentralWidget(m_ui->tabStack);
 
     QToolBar *tabsToolbar = new QToolBar(tr("Tabs"), this);
     tabsToolbar->setObjectName(QStringLiteral("tabsBar"));
@@ -777,19 +779,19 @@ void MainWindow::createInterface()
     tabsLayout->setContentsMargins(0, 0, 0, 0);
     tabsLayout->setSpacing(4);
 
-    m_tabBar = new BrowserTabBar(tabsContainer);
-    m_tabBar->setObjectName(QStringLiteral("browserTabBar"));
-    m_tabBar->setDocumentMode(true);
-    m_tabBar->setTabsClosable(true);
-    m_tabBar->setMovable(true);
-    m_tabBar->setExpanding(false);
-    m_tabBar->setElideMode(Qt::ElideRight);
-    m_tabBar->setUsesScrollButtons(true);
-    m_tabBar->setSelectionBehaviorOnRemove(QTabBar::SelectPreviousTab);
-    m_tabBar->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Preferred);
+    m_ui->tabBar = new BrowserTabBar(tabsContainer);
+    m_ui->tabBar->setObjectName(QStringLiteral("browserTabBar"));
+    m_ui->tabBar->setDocumentMode(true);
+    m_ui->tabBar->setTabsClosable(true);
+    m_ui->tabBar->setMovable(true);
+    m_ui->tabBar->setExpanding(false);
+    m_ui->tabBar->setElideMode(Qt::ElideRight);
+    m_ui->tabBar->setUsesScrollButtons(true);
+    m_ui->tabBar->setSelectionBehaviorOnRemove(QTabBar::SelectPreviousTab);
+    m_ui->tabBar->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Preferred);
     if (m_windowRole == WindowRole::Primary)
-        m_tabBar->setContextMenuPolicy(Qt::CustomContextMenu);
-    tabsLayout->addWidget(m_tabBar, 0, Qt::AlignBottom);
+        m_ui->tabBar->setContextMenuPolicy(Qt::CustomContextMenu);
+    tabsLayout->addWidget(m_ui->tabBar, 0, Qt::AlignBottom);
 
     QToolButton *newTabButton = new QToolButton(tabsContainer);
     newTabButton->setObjectName(QStringLiteral("newTabButton"));
@@ -808,7 +810,7 @@ void MainWindow::createInterface()
     tabsToolbar->addWidget(tabsContainer);
 
     if (m_integratedWindowChrome) {
-        m_windowChromeController = new WindowChromeController(
+        m_ui->windowChromeController = new WindowChromeController(
             this,
             tabsLayout,
             {tabsToolbar, tabsContainer},
@@ -826,83 +828,83 @@ void MainWindow::createInterface()
     toolbar->setIconSize(QSize(19, 19));
     toolbar->setToolButtonStyle(Qt::ToolButtonIconOnly);
 
-    m_backAction = toolbar->addAction(
+    m_ui->backAction = toolbar->addAction(
         QIcon(QStringLiteral(":/assets/icons/arrow-left.svg")),
         tr("Back")
     );
-    m_forwardAction = toolbar->addAction(
+    m_ui->forwardAction = toolbar->addAction(
         QIcon(QStringLiteral(":/assets/icons/arrow-right.svg")),
         tr("Forward")
     );
-    m_reloadAction = toolbar->addAction(
+    m_ui->reloadAction = toolbar->addAction(
         QIcon(QStringLiteral(":/assets/icons/rotate-cw.svg")),
         tr("Reload")
     );
-    m_backAction->setEnabled(false);
-    m_forwardAction->setEnabled(false);
-    m_reloadAction->setEnabled(false);
+    m_ui->backAction->setEnabled(false);
+    m_ui->forwardAction->setEnabled(false);
+    m_ui->reloadAction->setEnabled(false);
 
-    m_address = new AddressLineEdit(toolbar);
-    m_address->setObjectName(QStringLiteral("addressBar"));
+    m_ui->address = new AddressLineEdit(toolbar);
+    m_ui->address->setObjectName(QStringLiteral("addressBar"));
     updateAddressPlaceholder();
-    m_address->setClearButtonEnabled(true);
-    m_securityIndicator = m_address->addAction(
+    m_ui->address->setClearButtonEnabled(true);
+    m_ui->securityIndicator = m_ui->address->addAction(
         QIcon(),
         QLineEdit::LeadingPosition
     );
-    m_bookmarkAction = m_address->addAction(
+    m_ui->bookmarkAction = m_ui->address->addAction(
         QIcon(QStringLiteral(":/assets/icons/star.svg")),
         QLineEdit::TrailingPosition
     );
-    m_bookmarkAction->setEnabled(false);
-    m_bookmarkAction->setToolTip(tr("Add Bookmark (⌘D)"));
-    m_readerModeAction = new QAction(
+    m_ui->bookmarkAction->setEnabled(false);
+    m_ui->bookmarkAction->setToolTip(tr("Add Bookmark (⌘D)"));
+    m_ui->readerModeAction = new QAction(
         QIcon(QStringLiteral(":/assets/icons/book-open.svg")),
         tr("Reader Mode"),
         this
     );
-    m_readerModeAction->setCheckable(true);
-    m_readerModeAction->setShortcut(QKeySequence(Qt::Key_F9));
-    m_readerModeAction->setShortcutContext(Qt::WindowShortcut);
-    m_readerModeAction->setAutoRepeat(false);
-    m_readerModeAction->setVisible(false);
-    m_address->addAction(m_readerModeAction, QLineEdit::TrailingPosition);
-    connect(m_readerModeAction, &QAction::triggered, this, [this] {
+    m_ui->readerModeAction->setCheckable(true);
+    m_ui->readerModeAction->setShortcut(QKeySequence(Qt::Key_F9));
+    m_ui->readerModeAction->setShortcutContext(Qt::WindowShortcut);
+    m_ui->readerModeAction->setAutoRepeat(false);
+    m_ui->readerModeAction->setVisible(false);
+    m_ui->address->addAction(m_ui->readerModeAction, QLineEdit::TrailingPosition);
+    connect(m_ui->readerModeAction, &QAction::triggered, this, [this] {
         toggleReaderMode(commandTargetWebView());
     });
-    m_addressCompletionPopup = new AddressCompletionPopup(m_address, this);
+    m_ui->addressCompletionPopup = new AddressCompletionPopup(m_ui->address, this);
     m_addressSuggestionTimer = new QTimer(this);
     m_addressSuggestionTimer->setSingleShot(true);
     m_addressSuggestionTimer->setInterval(100);
-    QAction *addressWidgetAction = toolbar->addWidget(m_address);
+    QAction *addressWidgetAction = toolbar->addWidget(m_ui->address);
     QAction *go = toolbar->addAction(
         QIcon(QStringLiteral(":/assets/icons/arrow-right.svg")),
         tr("Go")
     );
-    m_downloadButton = new DownloadButton(toolbar);
-    m_downloadButton->setObjectName(QStringLiteral("downloadsButton"));
-    m_downloadButton->setIcon(QIcon(QStringLiteral(":/assets/icons/download.svg")));
-    m_downloadButton->setToolTip(tr("Downloads"));
-    toolbar->addWidget(m_downloadButton);
+    m_ui->downloadButton = new DownloadButton(toolbar);
+    m_ui->downloadButton->setObjectName(QStringLiteral("downloadsButton"));
+    m_ui->downloadButton->setIcon(QIcon(QStringLiteral(":/assets/icons/download.svg")));
+    m_ui->downloadButton->setToolTip(tr("Downloads"));
+    toolbar->addWidget(m_ui->downloadButton);
     addToolBar(Qt::TopToolBarArea, toolbar);
 
     addToolBarBreak(Qt::TopToolBarArea);
-    m_findToolbar = new QToolBar(tr("Find in page"), this);
-    m_findToolbar->setObjectName(QStringLiteral("findBar"));
-    m_findToolbar->setMovable(false);
-    m_findToolbar->setFloatable(false);
-    m_findBar = new FindBar(m_findToolbar);
-    m_findToolbar->addWidget(m_findBar);
-    addToolBar(Qt::TopToolBarArea, m_findToolbar);
-    m_findToolbar->hide();
+    m_ui->findToolbar = new QToolBar(tr("Find in page"), this);
+    m_ui->findToolbar->setObjectName(QStringLiteral("findBar"));
+    m_ui->findToolbar->setMovable(false);
+    m_ui->findToolbar->setFloatable(false);
+    m_ui->findBar = new FindBar(m_ui->findToolbar);
+    m_ui->findToolbar->addWidget(m_ui->findBar);
+    addToolBar(Qt::TopToolBarArea, m_ui->findToolbar);
+    m_ui->findToolbar->hide();
 
     addToolBarBreak(Qt::TopToolBarArea);
     QToolBar *permissionToolbar = new QToolBar(tr("Permission request"), this);
     permissionToolbar->setObjectName(QStringLiteral("permissionBar"));
     permissionToolbar->setMovable(false);
     permissionToolbar->setFloatable(false);
-    m_permissionPrompt = new PermissionPrompt(permissionToolbar);
-    permissionToolbar->addWidget(m_permissionPrompt);
+    m_ui->permissionPrompt = new PermissionPrompt(permissionToolbar);
+    permissionToolbar->addWidget(m_ui->permissionPrompt);
     addToolBar(Qt::TopToolBarArea, permissionToolbar);
     permissionToolbar->hide();
 
@@ -911,47 +913,47 @@ void MainWindow::createInterface()
     crossDomainToolbar->setObjectName(QStringLiteral("crossDomainBar"));
     crossDomainToolbar->setMovable(false);
     crossDomainToolbar->setFloatable(false);
-    m_crossDomainPrompt = new CrossDomainPrompt(crossDomainToolbar);
-    crossDomainToolbar->addWidget(m_crossDomainPrompt);
+    m_ui->crossDomainPrompt = new CrossDomainPrompt(crossDomainToolbar);
+    crossDomainToolbar->addWidget(m_ui->crossDomainPrompt);
     addToolBar(Qt::TopToolBarArea, crossDomainToolbar);
     crossDomainToolbar->hide();
 
-    connect(m_findBar, &FindBar::queryChanged, this, [this] {
+    connect(m_ui->findBar, &FindBar::queryChanged, this, [this] {
         findInPage(false);
     });
-    connect(m_findBar, &FindBar::navigationRequested, this, &MainWindow::findInPage);
-    connect(m_findBar, &FindBar::closeRequested, this, &MainWindow::closeFindBar);
-    m_closeFindAction = new QAction(this);
-    m_closeFindAction->setShortcut(QKeySequence(Qt::Key_Escape));
-    m_closeFindAction->setShortcutContext(Qt::WindowShortcut);
-    m_closeFindAction->setEnabled(false);
-    addAction(m_closeFindAction);
-    connect(m_closeFindAction, &QAction::triggered, this, &MainWindow::closeFindBar);
+    connect(m_ui->findBar, &FindBar::navigationRequested, this, &MainWindow::findInPage);
+    connect(m_ui->findBar, &FindBar::closeRequested, this, &MainWindow::closeFindBar);
+    m_ui->closeFindAction = new QAction(this);
+    m_ui->closeFindAction->setShortcut(QKeySequence(Qt::Key_Escape));
+    m_ui->closeFindAction->setShortcutContext(Qt::WindowShortcut);
+    m_ui->closeFindAction->setEnabled(false);
+    addAction(m_ui->closeFindAction);
+    connect(m_ui->closeFindAction, &QAction::triggered, this, &MainWindow::closeFindBar);
 
-    m_downloadsPanel = new DownloadsPanel(m_downloadManager, this);
-    m_downloadButton->setActiveCount(m_downloadManager->activeCount());
-    connect(m_downloadButton, &QToolButton::clicked, this, [this] {
-        if (m_downloadsPanel->isVisible())
-            m_downloadsPanel->hide();
+    m_ui->downloadsPanel = new DownloadsPanel(m_downloadManager, this);
+    m_ui->downloadButton->setActiveCount(m_downloadManager->activeCount());
+    connect(m_ui->downloadButton, &QToolButton::clicked, this, [this] {
+        if (m_ui->downloadsPanel->isVisible())
+            m_ui->downloadsPanel->hide();
         else
-            m_downloadsPanel->showBelow(m_downloadButton);
+            m_ui->downloadsPanel->showBelow(m_ui->downloadButton);
     });
     connect(
         m_downloadManager,
         &DownloadManager::activeCountChanged,
-        m_downloadButton,
+        m_ui->downloadButton,
         &DownloadButton::setActiveCount
     );
     connect(m_downloadManager, &DownloadManager::recordAdded, this, [this] {
         if (isActiveWindow() && m_windowRole != WindowRole::WebApp)
-            m_downloadsPanel->showBelow(m_downloadButton);
+            m_ui->downloadsPanel->showBelow(m_ui->downloadButton);
     });
 
     connect(newTabButton, &QToolButton::clicked, this, &MainWindow::openNewTab);
-    connect(m_tabBar, &QTabBar::currentChanged, this, [this](int index) {
+    connect(m_ui->tabBar, &QTabBar::currentChanged, this, [this](int index) {
         if (m_fullScreenController && m_fullScreenController->isActive()) {
             QWebEngineView *requestedView = index >= 0
-                ? qobject_cast<QWebEngineView *>(m_tabStack->widget(index))
+                ? qobject_cast<QWebEngineView *>(m_ui->tabStack->widget(index))
                 : nullptr;
             QWebEngineView *fullScreenView = m_fullScreenController->webView();
             if (fullScreenView && requestedView != fullScreenView)
@@ -960,7 +962,7 @@ void MainWindow::createInterface()
         m_zoomAngleRemainder = 0;
         m_zoomPixelRemainder = 0;
         if (index >= 0) {
-            m_tabStack->setCurrentIndex(index);
+            m_ui->tabStack->setCurrentIndex(index);
             if (!m_restoringSession)
                 activatePendingTab(currentWebView());
         }
@@ -977,62 +979,62 @@ void MainWindow::createInterface()
         }
         updateCurrentTabUi();
         updateTabNavigationActions();
-        if (m_findToolbar && m_findToolbar->isVisible())
+        if (m_ui->findToolbar && m_ui->findToolbar->isVisible())
             findInPage(false);
         scheduleSessionSave();
     });
-    connect(m_tabBar, &QTabBar::tabCloseRequested, this, &MainWindow::closeTab);
-    connect(m_tabBar, &QTabBar::tabMoved, this, [this](int from, int to) {
-        QWidget *webView = m_tabStack->widget(from);
+    connect(m_ui->tabBar, &QTabBar::tabCloseRequested, this, &MainWindow::closeTab);
+    connect(m_ui->tabBar, &QTabBar::tabMoved, this, [this](int from, int to) {
+        QWidget *webView = m_ui->tabStack->widget(from);
         if (!webView)
             return;
-        m_tabStack->removeWidget(webView);
-        m_tabStack->insertWidget(to, webView);
-        m_tabStack->setCurrentIndex(m_tabBar->currentIndex());
+        m_ui->tabStack->removeWidget(webView);
+        m_ui->tabStack->insertWidget(to, webView);
+        m_ui->tabStack->setCurrentIndex(m_ui->tabBar->currentIndex());
         scheduleSessionSave();
     });
     if (m_windowRole == WindowRole::Primary) {
         connect(
-            m_tabBar,
+            m_ui->tabBar,
             &QWidget::customContextMenuRequested,
             this,
             &MainWindow::showTabContextMenu
         );
     }
-    connect(m_backAction, &QAction::triggered, this, [this] {
+    connect(m_ui->backAction, &QAction::triggered, this, [this] {
         if (QWebEnginePage *page = pageForTab(currentWebView()))
             page->triggerAction(QWebEnginePage::Back);
     });
-    connect(m_forwardAction, &QAction::triggered, this, [this] {
+    connect(m_ui->forwardAction, &QAction::triggered, this, [this] {
         if (QWebEnginePage *page = pageForTab(currentWebView()))
             page->triggerAction(QWebEnginePage::Forward);
     });
-    connect(m_reloadAction, &QAction::triggered, this, [this] {
+    connect(m_ui->reloadAction, &QAction::triggered, this, [this] {
         if (QWebEnginePage *page = pageForTab(currentWebView()))
             page->triggerAction(QWebEnginePage::Reload);
     });
     connect(go, &QAction::triggered, this, &MainWindow::navigateFromAddressBar);
-    connect(m_bookmarkAction, &QAction::triggered, this, &MainWindow::editCurrentBookmark);
-    connect(m_address, &QLineEdit::returnPressed, this, &MainWindow::navigateFromAddressBar);
-    connect(m_address, &QLineEdit::textEdited, this, [this] {
-        m_address->clearGhostCompletion();
+    connect(m_ui->bookmarkAction, &QAction::triggered, this, &MainWindow::editCurrentBookmark);
+    connect(m_ui->address, &QLineEdit::returnPressed, this, &MainWindow::navigateFromAddressBar);
+    connect(m_ui->address, &QLineEdit::textEdited, this, [this] {
+        m_ui->address->clearGhostCompletion();
         const bool historyAvailable = m_preferences.saveBrowsingHistory()
             && m_historyStore
             && m_historyStore->isOpen();
         const bool bookmarksAvailable = m_bookmarkStore && m_bookmarkStore->isOpen();
         if (!historyAvailable && !bookmarksAvailable) {
-            m_addressCompletionPopup->hide();
+            m_ui->addressCompletionPopup->hide();
             return;
         }
         m_addressSuggestionTimer->start();
     });
     connect(m_addressSuggestionTimer, &QTimer::timeout, this, &MainWindow::showAddressSuggestions);
     connect(
-        m_addressCompletionPopup,
+        m_ui->addressCompletionPopup,
         &AddressCompletionPopup::urlActivated,
         this,
         [this](const QUrl &url) {
-            m_address->setText(url.toString());
+            m_ui->address->setText(url.toString());
             navigateFromAddressBar();
         }
     );
@@ -1043,53 +1045,53 @@ void MainWindow::createInterface()
 #else
     auto *fileMenu = new QMenu(tr("PanBrowser"), this);
 #endif
-    m_newTabAction = fileMenu->addAction(
+    m_ui->newTabAction = fileMenu->addAction(
         QIcon(QStringLiteral(":/assets/icons/plus.svg")),
         tr("New Tab")
     );
-    m_newTabAction->setShortcuts(TabNavigation::newTabShortcuts());
-    m_newTabAction->setShortcutContext(Qt::WindowShortcut);
-    m_newTabAction->setAutoRepeat(false);
-    connect(m_newTabAction, &QAction::triggered, this, &MainWindow::openNewTab);
+    m_ui->newTabAction->setShortcuts(TabNavigation::newTabShortcuts());
+    m_ui->newTabAction->setShortcutContext(Qt::WindowShortcut);
+    m_ui->newTabAction->setAutoRepeat(false);
+    connect(m_ui->newTabAction, &QAction::triggered, this, &MainWindow::openNewTab);
 
-    m_closeTabAction = fileMenu->addAction(tr("Close Tab"));
-    m_closeTabAction->setShortcuts(TabNavigation::closeTabShortcuts());
-    m_closeTabAction->setShortcutContext(Qt::WindowShortcut);
-    m_closeTabAction->setAutoRepeat(false);
-    connect(m_closeTabAction, &QAction::triggered, this, [this] {
+    m_ui->closeTabAction = fileMenu->addAction(tr("Close Tab"));
+    m_ui->closeTabAction->setShortcuts(TabNavigation::closeTabShortcuts());
+    m_ui->closeTabAction->setShortcutContext(Qt::WindowShortcut);
+    m_ui->closeTabAction->setAutoRepeat(false);
+    connect(m_ui->closeTabAction, &QAction::triggered, this, [this] {
         closeActiveBrowserSurface(commandTargetWebView());
     });
 
-    m_reopenClosedTabAction = fileMenu->addAction(tr("Reopen Closed Tab"));
-    m_reopenClosedTabAction->setShortcuts(TabNavigation::reopenClosedTabShortcuts());
-    m_reopenClosedTabAction->setShortcutContext(Qt::WindowShortcut);
-    m_reopenClosedTabAction->setAutoRepeat(false);
+    m_ui->reopenClosedTabAction = fileMenu->addAction(tr("Reopen Closed Tab"));
+    m_ui->reopenClosedTabAction->setShortcuts(TabNavigation::reopenClosedTabShortcuts());
+    m_ui->reopenClosedTabAction->setShortcutContext(Qt::WindowShortcut);
+    m_ui->reopenClosedTabAction->setAutoRepeat(false);
     connect(
-        m_reopenClosedTabAction,
+        m_ui->reopenClosedTabAction,
         &QAction::triggered,
         this,
         &MainWindow::reopenLastClosedTab
     );
 
     fileMenu->addSeparator();
-    m_nextTabAction = fileMenu->addAction(tr("Next Tab"));
-    m_nextTabAction->setShortcuts(TabNavigation::nextTabShortcuts());
-    m_nextTabAction->setShortcutContext(Qt::WindowShortcut);
-    m_nextTabAction->setAutoRepeat(false);
-    connect(m_nextTabAction, &QAction::triggered, this, [this] {
+    m_ui->nextTabAction = fileMenu->addAction(tr("Next Tab"));
+    m_ui->nextTabAction->setShortcuts(TabNavigation::nextTabShortcuts());
+    m_ui->nextTabAction->setShortcutContext(Qt::WindowShortcut);
+    m_ui->nextTabAction->setAutoRepeat(false);
+    connect(m_ui->nextTabAction, &QAction::triggered, this, [this] {
         activateAdjacentTab(1);
     });
-    m_previousTabAction = fileMenu->addAction(tr("Previous Tab"));
-    m_previousTabAction->setShortcuts(TabNavigation::previousTabShortcuts());
-    m_previousTabAction->setShortcutContext(Qt::WindowShortcut);
-    m_previousTabAction->setAutoRepeat(false);
-    connect(m_previousTabAction, &QAction::triggered, this, [this] {
+    m_ui->previousTabAction = fileMenu->addAction(tr("Previous Tab"));
+    m_ui->previousTabAction->setShortcuts(TabNavigation::previousTabShortcuts());
+    m_ui->previousTabAction->setShortcutContext(Qt::WindowShortcut);
+    m_ui->previousTabAction->setAutoRepeat(false);
+    connect(m_ui->previousTabAction, &QAction::triggered, this, [this] {
         activateAdjacentTab(-1);
     });
 
-    m_switchToTabMenu = fileMenu->addMenu(tr("Switch to Tab"));
+    m_ui->switchToTabMenu = fileMenu->addMenu(tr("Switch to Tab"));
     for (int position = 1; position <= TabNavigation::numberedShortcutCount; ++position) {
-        QAction *action = m_switchToTabMenu->addAction(
+        QAction *action = m_ui->switchToTabMenu->addAction(
             position == TabNavigation::numberedShortcutCount
                 ? tr("Last Tab")
                 : tr("Tab %1").arg(position)
@@ -1100,7 +1102,7 @@ void MainWindow::createInterface()
         connect(action, &QAction::triggered, this, [this, position] {
             activateNumberedTab(position);
         });
-        m_numberedTabActions.append(action);
+        m_ui->numberedTabActions.append(action);
     }
 
     fileMenu->addSeparator();
@@ -1117,25 +1119,25 @@ void MainWindow::createInterface()
     bookmarksAction->setShortcut(QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_B));
     connect(bookmarksAction, &QAction::triggered, this, &MainWindow::openBookmarks);
 
-    m_installWebAppAction = fileMenu->addAction(
+    m_ui->installWebAppAction = fileMenu->addAction(
         QIcon(QStringLiteral(":/assets/icons/layout-grid.svg")),
         tr("Install Web App…")
     );
-    m_installWebAppAction->setEnabled(false);
+    m_ui->installWebAppAction->setEnabled(false);
     connect(
-        m_installWebAppAction,
+        m_ui->installWebAppAction,
         &QAction::triggered,
         this,
         &MainWindow::installCurrentWebApp
     );
-    m_webAppsMenu = fileMenu->addMenu(
+    m_ui->webAppsMenu = fileMenu->addMenu(
         QIcon(QStringLiteral(":/assets/icons/layout-grid.svg")),
         tr("Web Apps")
     );
-    connect(m_webAppsMenu, &QMenu::aboutToShow, this, &MainWindow::rebuildWebAppsMenu);
+    connect(m_ui->webAppsMenu, &QMenu::aboutToShow, this, &MainWindow::rebuildWebAppsMenu);
 
     fileMenu->addSeparator();
-    fileMenu->addAction(m_readerModeAction);
+    fileMenu->addAction(m_ui->readerModeAction);
     QAction *findAction = fileMenu->addAction(
         QIcon(QStringLiteral(":/assets/icons/search.svg")),
         tr("Find in Page…")
@@ -1145,7 +1147,7 @@ void MainWindow::createInterface()
     QAction *findNextAction = fileMenu->addAction(tr("Find Next"));
     findNextAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_G));
     connect(findNextAction, &QAction::triggered, this, [this] {
-        if (!m_findToolbar->isVisible())
+        if (!m_ui->findToolbar->isVisible())
             openFindBar();
         else
             findInPage(false);
@@ -1153,55 +1155,55 @@ void MainWindow::createInterface()
     QAction *findPreviousAction = fileMenu->addAction(tr("Find Previous"));
     findPreviousAction->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_G));
     connect(findPreviousAction, &QAction::triggered, this, [this] {
-        if (!m_findToolbar->isVisible())
+        if (!m_ui->findToolbar->isVisible())
             openFindBar();
         else
             findInPage(true);
     });
 
     fileMenu->addSeparator();
-    m_zoomMenu = fileMenu->addMenu(tr("Zoom"));
-    m_zoomLevelAction = m_zoomMenu->addAction(QStringLiteral("100%"));
-    m_zoomLevelAction->setEnabled(false);
-    m_zoomMenu->addSeparator();
-    m_zoomInAction = m_zoomMenu->addAction(tr("Zoom In"));
-    m_zoomInAction->setShortcuts(pageZoomInShortcuts());
-    m_zoomInAction->setShortcutContext(Qt::WindowShortcut);
-    m_zoomInAction->setAutoRepeat(false);
-    connect(m_zoomInAction, &QAction::triggered, this, [this] {
+    m_ui->zoomMenu = fileMenu->addMenu(tr("Zoom"));
+    m_ui->zoomLevelAction = m_ui->zoomMenu->addAction(QStringLiteral("100%"));
+    m_ui->zoomLevelAction->setEnabled(false);
+    m_ui->zoomMenu->addSeparator();
+    m_ui->zoomInAction = m_ui->zoomMenu->addAction(tr("Zoom In"));
+    m_ui->zoomInAction->setShortcuts(pageZoomInShortcuts());
+    m_ui->zoomInAction->setShortcutContext(Qt::WindowShortcut);
+    m_ui->zoomInAction->setAutoRepeat(false);
+    connect(m_ui->zoomInAction, &QAction::triggered, this, [this] {
         changePageZoomBySteps(commandTargetWebView(), 1);
     });
-    m_zoomOutAction = m_zoomMenu->addAction(tr("Zoom Out"));
-    m_zoomOutAction->setShortcuts(pageZoomOutShortcuts());
-    m_zoomOutAction->setShortcutContext(Qt::WindowShortcut);
-    m_zoomOutAction->setAutoRepeat(false);
-    connect(m_zoomOutAction, &QAction::triggered, this, [this] {
+    m_ui->zoomOutAction = m_ui->zoomMenu->addAction(tr("Zoom Out"));
+    m_ui->zoomOutAction->setShortcuts(pageZoomOutShortcuts());
+    m_ui->zoomOutAction->setShortcutContext(Qt::WindowShortcut);
+    m_ui->zoomOutAction->setAutoRepeat(false);
+    connect(m_ui->zoomOutAction, &QAction::triggered, this, [this] {
         changePageZoomBySteps(commandTargetWebView(), -1);
     });
-    m_resetZoomAction = m_zoomMenu->addAction(tr("Actual Size"));
-    m_resetZoomAction->setShortcuts(pageZoomResetShortcuts());
-    m_resetZoomAction->setShortcutContext(Qt::WindowShortcut);
-    m_resetZoomAction->setAutoRepeat(false);
-    connect(m_resetZoomAction, &QAction::triggered, this, [this] {
+    m_ui->resetZoomAction = m_ui->zoomMenu->addAction(tr("Actual Size"));
+    m_ui->resetZoomAction->setShortcuts(pageZoomResetShortcuts());
+    m_ui->resetZoomAction->setShortcutContext(Qt::WindowShortcut);
+    m_ui->resetZoomAction->setAutoRepeat(false);
+    connect(m_ui->resetZoomAction, &QAction::triggered, this, [this] {
         setPageZoom(commandTargetWebView(), defaultPageZoomFactor);
     });
-    connect(m_zoomMenu, &QMenu::aboutToShow, this, &MainWindow::updateZoomActions);
+    connect(m_ui->zoomMenu, &QMenu::aboutToShow, this, &MainWindow::updateZoomActions);
 
     fileMenu->addSeparator();
-    m_developerToolsAction = fileMenu->addAction(tr("Developer Tools"));
+    m_ui->developerToolsAction = fileMenu->addAction(tr("Developer Tools"));
 #if defined(Q_OS_MACOS)
-    m_developerToolsAction->setShortcuts({
+    m_ui->developerToolsAction->setShortcuts({
         QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_I),
         QKeySequence(Qt::Key_F12),
     });
 #else
-    m_developerToolsAction->setShortcuts({
+    m_ui->developerToolsAction->setShortcuts({
         QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_I),
         QKeySequence(Qt::Key_F12),
     });
 #endif
-    m_developerToolsAction->setShortcutContext(Qt::WindowShortcut);
-    connect(m_developerToolsAction, &QAction::triggered, this, [this] {
+    m_ui->developerToolsAction->setShortcutContext(Qt::WindowShortcut);
+    connect(m_ui->developerToolsAction, &QAction::triggered, this, [this] {
         openDeveloperTools(commandTargetWebView());
     });
 
@@ -1246,21 +1248,21 @@ void MainWindow::createInterface()
     toolbar->addWidget(mainMenuButton);
 #endif
 
-    m_trustStatus = new QLabel(tr("Ready"), this);
-    m_trustStatus->setObjectName(QStringLiteral("trustStatus"));
-    m_ruleCount = new QLabel(tr("No rules loaded"), this);
-    m_ruleCount->setObjectName(QStringLiteral("ruleCount"));
-    m_progress = new QProgressBar(this);
-    m_progress->setObjectName(QStringLiteral("pageProgress"));
-    m_progress->setRange(0, 100);
-    m_progress->setMaximumWidth(120);
-    m_progress->setTextVisible(false);
-    m_progress->hide();
+    m_ui->trustStatus = new QLabel(tr("Ready"), this);
+    m_ui->trustStatus->setObjectName(QStringLiteral("trustStatus"));
+    m_ui->ruleCount = new QLabel(tr("No rules loaded"), this);
+    m_ui->ruleCount->setObjectName(QStringLiteral("ruleCount"));
+    m_ui->progress = new QProgressBar(this);
+    m_ui->progress->setObjectName(QStringLiteral("pageProgress"));
+    m_ui->progress->setRange(0, 100);
+    m_ui->progress->setMaximumWidth(120);
+    m_ui->progress->setTextVisible(false);
+    m_ui->progress->hide();
 
     statusBar()->setSizeGripEnabled(false);
-    statusBar()->addWidget(m_trustStatus, 1);
-    statusBar()->addPermanentWidget(m_progress);
-    statusBar()->addPermanentWidget(m_ruleCount);
+    statusBar()->addWidget(m_ui->trustStatus, 1);
+    statusBar()->addPermanentWidget(m_ui->progress);
+    statusBar()->addPermanentWidget(m_ui->ruleCount);
 
     m_sessionSaveTimer = new QTimer(this);
     m_sessionSaveTimer->setSingleShot(true);
@@ -1279,21 +1281,21 @@ void MainWindow::createInterface()
         tabsToolbar->hide();
         addressWidgetAction->setVisible(false);
         go->setVisible(false);
-        m_newTabAction->setVisible(false);
-        m_closeTabAction->setText(tr("Close Window"));
-        m_reopenClosedTabAction->setVisible(false);
-        m_nextTabAction->setVisible(false);
-        m_previousTabAction->setVisible(false);
-        m_switchToTabMenu->menuAction()->setVisible(false);
+        m_ui->newTabAction->setVisible(false);
+        m_ui->closeTabAction->setText(tr("Close Window"));
+        m_ui->reopenClosedTabAction->setVisible(false);
+        m_ui->nextTabAction->setVisible(false);
+        m_ui->previousTabAction->setVisible(false);
+        m_ui->switchToTabMenu->menuAction()->setVisible(false);
         addBookmarkAction->setVisible(false);
         bookmarksAction->setVisible(false);
-        m_installWebAppAction->setVisible(false);
-        m_webAppsMenu->menuAction()->setVisible(false);
-        m_readerModeAction->setVisible(false);
+        m_ui->installWebAppAction->setVisible(false);
+        m_ui->webAppsMenu->menuAction()->setVisible(false);
+        m_ui->readerModeAction->setVisible(false);
         settingsAction->setVisible(false);
         reloadRulesAction->setVisible(false);
         showConfiguration->setVisible(false);
-        m_ruleCount->hide();
+        m_ui->ruleCount->hide();
     }
 
     updateZoomActions();
@@ -1392,7 +1394,7 @@ QWebEngineView *MainWindow::createTab(
     if (m_windowRole == WindowRole::Primary && m_ownsBrowserResources)
         m_discardSessionOnClose = false;
 
-    QWebEngineView *webView = new QWebEngineView(m_tabStack);
+    QWebEngineView *webView = new QWebEngineView(m_ui->tabStack);
     auto *page = new BrowserPage(m_profile, webView);
     if (m_windowRole == WindowRole::WebApp)
         page->setWebApp(m_webApp);
@@ -1502,17 +1504,17 @@ QWebEngineView *MainWindow::createTab(
         }
     );
 
-    const int stackIndex = m_tabStack->addWidget(webView);
-    const int tabIndex = m_tabBar->addTab(state.title);
+    const int stackIndex = m_ui->tabStack->addWidget(webView);
+    const int tabIndex = m_ui->tabBar->addTab(state.title);
     Q_ASSERT(stackIndex == tabIndex);
-    m_tabBar->setTabPinned(tabIndex, pinned);
+    m_ui->tabBar->setTabPinned(tabIndex, pinned);
     updateTabPresentation(webView);
     updateTabNavigationActions();
 
     if (activate)
-        m_tabBar->setCurrentIndex(tabIndex);
+        m_ui->tabBar->setCurrentIndex(tabIndex);
     if (!m_restoringSession)
-        m_tabBar->animateTabOpening(tabIndex);
+        m_ui->tabBar->animateTabOpening(tabIndex);
     if (!deferred && url.isValid() && !url.isEmpty())
         webView->setUrl(url);
     if (!m_restoringSession)
@@ -1526,12 +1528,12 @@ void MainWindow::showTabContextMenu(const QPoint &position)
     if (m_windowRole != WindowRole::Primary)
         return;
 
-    const int index = m_tabBar->tabAt(position);
+    const int index = m_ui->tabBar->tabAt(position);
     if (index < 0)
         return;
 
     QMenu menu(this);
-    const bool pinned = m_tabBar->isTabPinned(index);
+    const bool pinned = m_ui->tabBar->isTabPinned(index);
     QAction *pinAction = menu.addAction(pinned ? tr("Unpin Tab") : tr("Pin Tab"));
     connect(pinAction, &QAction::triggered, this, [this, index, pinned] {
         setTabPinned(index, !pinned);
@@ -1541,38 +1543,38 @@ void MainWindow::showTabContextMenu(const QPoint &position)
     connect(closeAction, &QAction::triggered, this, [this, index] {
         closeTab(index);
     });
-    menu.exec(m_tabBar->mapToGlobal(position));
+    menu.exec(m_ui->tabBar->mapToGlobal(position));
 }
 
 void MainWindow::setTabPinned(int index, bool pinned)
 {
     if (m_windowRole != WindowRole::Primary
         || index < 0
-        || index >= m_tabBar->count()) {
+        || index >= m_ui->tabBar->count()) {
         return;
     }
 
-    QWebEngineView *webView = qobject_cast<QWebEngineView *>(m_tabStack->widget(index));
+    QWebEngineView *webView = qobject_cast<QWebEngineView *>(m_ui->tabStack->widget(index));
     auto state = m_tabStates.find(webView);
     if (state == m_tabStates.end() || state->pinned == pinned)
         return;
 
     state->pinned = pinned;
-    m_tabBar->setTabPinned(index, pinned);
+    m_ui->tabBar->setTabPinned(index, pinned);
     updateTabPresentation(webView);
 
     const int destination = pinned
-        ? m_tabBar->pinnedTabCount() - 1
-        : m_tabBar->pinnedTabCount();
+        ? m_ui->tabBar->pinnedTabCount() - 1
+        : m_ui->tabBar->pinnedTabCount();
     if (destination != index)
-        m_tabBar->moveTab(index, destination);
+        m_ui->tabBar->moveTab(index, destination);
     else
         scheduleSessionSave();
 }
 
 void MainWindow::updateTabPresentation(QWebEngineView *webView)
 {
-    const int index = m_tabStack ? m_tabStack->indexOf(webView) : -1;
+    const int index = m_ui->tabStack ? m_ui->tabStack->indexOf(webView) : -1;
     auto state = m_tabStates.find(webView);
     if (index < 0 || state == m_tabStates.end())
         return;
@@ -1583,11 +1585,11 @@ void MainWindow::updateTabPresentation(QWebEngineView *webView)
         state->title = url.host().isEmpty() ? tr("New Tab") : url.host();
     }
 
-    m_tabBar->setTabPinned(index, state->pinned);
-    m_tabBar->setTabText(index, state->pinned ? QString() : state->title);
-    m_tabBar->setAccessibleTabName(index, state->title);
+    m_ui->tabBar->setTabPinned(index, state->pinned);
+    m_ui->tabBar->setTabText(index, state->pinned ? QString() : state->title);
+    m_ui->tabBar->setAccessibleTabName(index, state->title);
     const QString urlText = url.toString();
-    m_tabBar->setTabToolTip(
+    m_ui->tabBar->setTabToolTip(
         index,
         urlText.isEmpty() || urlText == state->title
             ? state->title
@@ -1597,14 +1599,14 @@ void MainWindow::updateTabPresentation(QWebEngineView *webView)
     QIcon icon = page ? page->icon() : QIcon();
     if (state->pinned && icon.isNull())
         icon = QIcon(QStringLiteral(":/assets/app-icon.png"));
-    m_tabBar->setTabIcon(index, icon);
+    m_ui->tabBar->setTabIcon(index, icon);
 }
 
 bool MainWindow::hasPinnedTabs() const
 {
-    if (!m_tabBar)
+    if (!m_ui->tabBar)
         return false;
-    return m_tabBar->pinnedTabCount() > 0;
+    return m_ui->tabBar->pinnedTabCount() > 0;
 }
 
 void MainWindow::openNewTab()
@@ -1616,8 +1618,8 @@ void MainWindow::openNewTab()
 
 void MainWindow::closeCurrentTab()
 {
-    if (m_tabBar)
-        closeTab(m_tabBar->currentIndex());
+    if (m_ui->tabBar)
+        closeTab(m_ui->tabBar->currentIndex());
 }
 
 void MainWindow::closeActiveBrowserSurface(QWebEngineView *webView)
@@ -1649,42 +1651,42 @@ void MainWindow::reopenLastClosedTab()
         closedTab.pinned
     );
     if (closedTab.pinned && webView) {
-        const int index = m_tabStack->indexOf(webView);
-        const int destination = m_tabBar->pinnedTabCount() - 1;
+        const int index = m_ui->tabStack->indexOf(webView);
+        const int destination = m_ui->tabBar->pinnedTabCount() - 1;
         if (index >= 0 && destination >= 0 && index != destination)
-            m_tabBar->moveTab(index, destination);
+            m_ui->tabBar->moveTab(index, destination);
     }
     updateTabNavigationActions();
 }
 
 void MainWindow::activateAdjacentTab(int offset)
 {
-    if (!m_tabBar)
+    if (!m_ui->tabBar)
         return;
     const int index = TabNavigation::adjacentTabIndex(
-        m_tabBar->currentIndex(),
-        m_tabBar->count(),
+        m_ui->tabBar->currentIndex(),
+        m_ui->tabBar->count(),
         offset
     );
     if (index >= 0)
-        m_tabBar->setCurrentIndex(index);
+        m_ui->tabBar->setCurrentIndex(index);
 }
 
 void MainWindow::activateNumberedTab(int position)
 {
-    if (!m_tabBar)
+    if (!m_ui->tabBar)
         return;
-    const int index = TabNavigation::numberedTabIndex(position, m_tabBar->count());
+    const int index = TabNavigation::numberedTabIndex(position, m_ui->tabBar->count());
     if (index >= 0)
-        m_tabBar->setCurrentIndex(index);
+        m_ui->tabBar->setCurrentIndex(index);
 }
 
 void MainWindow::closeTab(int index)
 {
-    if (index < 0 || index >= m_tabBar->count())
+    if (index < 0 || index >= m_ui->tabBar->count())
         return;
 
-    QWebEngineView *webView = qobject_cast<QWebEngineView *>(m_tabStack->widget(index));
+    QWebEngineView *webView = qobject_cast<QWebEngineView *>(m_ui->tabStack->widget(index));
     if (!webView)
         return;
 
@@ -1712,19 +1714,19 @@ void MainWindow::closeTab(int index)
     if (m_findView == webView) {
         ++m_findRequestSerial;
         m_findView.clear();
-        if (m_findBar)
-            m_findBar->clearResults();
+        if (m_ui->findBar)
+            m_ui->findBar->clearResults();
     }
     disconnect(webView, nullptr, this, nullptr);
     disconnect(webView->page(), nullptr, this, nullptr);
     webView->stop();
     m_tabStates.remove(webView);
-    m_tabStack->removeWidget(webView);
-    m_tabBar->removeTab(index);
+    m_ui->tabStack->removeWidget(webView);
+    m_ui->tabBar->removeTab(index);
     webView->deleteLater();
     updateTabNavigationActions();
 
-    if (m_tabBar->count() == 0) {
+    if (m_ui->tabBar->count() == 0) {
         if (m_ownsBrowserResources) {
             m_discardSessionOnClose = true;
             m_sessionStore.clear();
@@ -1733,14 +1735,14 @@ void MainWindow::closeTab(int index)
         return;
     }
 
-    m_tabStack->setCurrentIndex(m_tabBar->currentIndex());
+    m_ui->tabStack->setCurrentIndex(m_ui->tabBar->currentIndex());
     updateCurrentTabUi();
     scheduleSessionSave();
 }
 
 QWebEngineView *MainWindow::currentWebView() const
 {
-    return qobject_cast<QWebEngineView *>(m_tabStack->currentWidget());
+    return qobject_cast<QWebEngineView *>(m_ui->tabStack->currentWidget());
 }
 
 QWebEnginePage *MainWindow::pageForTab(QWebEngineView *webView) const
@@ -1866,9 +1868,9 @@ void MainWindow::returnDetachedVideoForPermissionPrompt(QWebEngineView *webView)
         }
     }
 
-    const int index = m_tabStack ? m_tabStack->indexOf(webView) : -1;
-    if (index >= 0 && m_tabBar->currentIndex() != index)
-        m_tabBar->setCurrentIndex(index);
+    const int index = m_ui->tabStack ? m_ui->tabStack->indexOf(webView) : -1;
+    if (index >= 0 && m_ui->tabBar->currentIndex() != index)
+        m_ui->tabBar->setCurrentIndex(index);
     if (m_permissionController)
         m_permissionController->currentViewChanged(webView);
     show();
@@ -1971,9 +1973,9 @@ void MainWindow::closeDeveloperTools(QWebEngineView *webView)
 void MainWindow::applyDeveloperToolsPreference()
 {
     const bool enabled = m_preferences.developerToolsEnabled();
-    if (m_developerToolsAction) {
-        m_developerToolsAction->setEnabled(enabled);
-        m_developerToolsAction->setVisible(enabled);
+    if (m_ui->developerToolsAction) {
+        m_ui->developerToolsAction->setEnabled(enabled);
+        m_ui->developerToolsAction->setVisible(enabled);
     }
     if (enabled)
         return;
@@ -2052,13 +2054,13 @@ void MainWindow::connectBrowserSignals(QWebEngineView *webView)
             state.title = url.host().isEmpty() ? tr("New Tab") : url.host();
         updateTabPresentation(webView);
         if (webView == currentWebView())
-            m_address->setText(url.toString());
+            m_ui->address->setText(url.toString());
         if (webView == currentWebView())
             updateBookmarkAction();
         if (m_addressSuggestionTimer)
             m_addressSuggestionTimer->stop();
-        if (m_addressCompletionPopup)
-            m_addressCompletionPopup->hide();
+        if (m_ui->addressCompletionPopup)
+            m_ui->addressCompletionPopup->hide();
         updateNavigationActions();
         if (webView == currentWebView())
             updateInstallWebAppAction();
@@ -2118,16 +2120,16 @@ void MainWindow::connectBrowserSignals(QWebEngineView *webView)
         if (webView == m_findView) {
             ++m_findRequestSerial;
             if (webView == currentWebView()
-                && m_findToolbar
-                && m_findToolbar->isVisible()
-                && !m_findBar->query().isEmpty()) {
-                m_findBar->setSearching();
+                && m_ui->findToolbar
+                && m_ui->findToolbar->isVisible()
+                && !m_ui->findBar->query().isEmpty()) {
+                m_ui->findBar->setSearching();
             }
         }
         setTabTrustStatus(webView, tr("Loading…"));
         if (webView == currentWebView()) {
-            m_progress->setValue(0);
-            m_progress->show();
+            m_ui->progress->setValue(0);
+            m_ui->progress->show();
         }
         updateNavigationActions();
         if (webView == currentWebView())
@@ -2136,14 +2138,14 @@ void MainWindow::connectBrowserSignals(QWebEngineView *webView)
     connect(page, &QWebEnginePage::loadProgress, this, [this, webView](int progress) {
         m_tabStates[webView].progress = progress;
         if (webView == currentWebView())
-            m_progress->setValue(progress);
+            m_ui->progress->setValue(progress);
     });
     connect(page, &QWebEnginePage::loadFinished, this, [this, webView, page](bool ok) {
         BrowserTabState &state = m_tabStates[webView];
         state.loading = false;
         state.progress = 100;
         if (webView == currentWebView())
-            m_progress->hide();
+            m_ui->progress->hide();
         if (state.externalNavigationDelegated) {
             state.externalNavigationDelegated = false;
             state.lastAcceptedRule = state.previousAcceptedRule;
@@ -2152,9 +2154,9 @@ void MainWindow::connectBrowserSignals(QWebEngineView *webView)
             state.suppressNextHistoryVisit = false;
             updateNavigationActions();
             if (webView == currentWebView()
-                && m_findToolbar
-                && m_findToolbar->isVisible()
-                && !m_findBar->query().isEmpty()) {
+                && m_ui->findToolbar
+                && m_ui->findToolbar->isVisible()
+                && !m_ui->findBar->query().isEmpty()) {
                 findInPage(false);
             }
             return;
@@ -2195,9 +2197,9 @@ void MainWindow::connectBrowserSignals(QWebEngineView *webView)
         state.suppressNextHistoryVisit = false;
         updateNavigationActions();
         if (webView == currentWebView()
-            && m_findToolbar
-            && m_findToolbar->isVisible()
-            && !m_findBar->query().isEmpty()) {
+            && m_ui->findToolbar
+            && m_ui->findToolbar->isVisible()
+            && !m_ui->findBar->query().isEmpty()) {
             findInPage(false);
         }
     });
@@ -2700,11 +2702,11 @@ void MainWindow::updateCurrentTabUi()
 {
     QWebEngineView *webView = currentWebView();
     if (!webView) {
-        m_address->clear();
+        m_ui->address->clear();
         setWindowTitle(
             m_windowRole == WindowRole::WebApp ? m_webApp.name : QStringLiteral("PanBrowser")
         );
-        m_progress->hide();
+        m_ui->progress->hide();
         updateNavigationActions();
         updateBookmarkAction();
         updateReaderModeAction();
@@ -2714,9 +2716,9 @@ void MainWindow::updateCurrentTabUi()
     }
 
     const QUrl currentUrl = urlForTab(webView);
-    m_address->setText(currentUrl.toString());
+    m_ui->address->setText(currentUrl.toString());
     if (currentUrl.isEmpty() && !m_tabStates.value(webView).pendingUrl.isEmpty())
-        m_address->setText(m_tabStates.value(webView).pendingUrl.toString());
+        m_ui->address->setText(m_tabStates.value(webView).pendingUrl.toString());
     const QString title = titleForTab(webView);
     if (m_windowRole == WindowRole::WebApp)
         setWindowTitle(m_webApp.name);
@@ -2725,8 +2727,8 @@ void MainWindow::updateCurrentTabUi()
 
     const BrowserTabState state = m_tabStates.value(webView);
     setTrustStatus(state.trustStatus, state.trustError);
-    m_progress->setValue(state.progress);
-    m_progress->setVisible(state.loading);
+    m_ui->progress->setValue(state.progress);
+    m_ui->progress->setVisible(state.loading);
     updateNavigationActions();
     updateBookmarkAction();
     updateReaderModeAction();
@@ -2766,7 +2768,7 @@ void MainWindow::toggleReaderMode(QWebEngineView *webView)
 
 void MainWindow::updateReaderModeAction()
 {
-    if (!m_readerModeAction)
+    if (!m_ui->readerModeAction)
         return;
 
     QWebEngineView *webView = currentWebView();
@@ -2781,18 +2783,18 @@ void MainWindow::updateReaderModeAction()
     const bool blockedByDetachedVideo = state != m_tabStates.cend()
         && state->detachedVideoWindow;
 
-    m_readerModeAction->setVisible(
+    m_ui->readerModeAction->setVisible(
         m_windowRole != WindowRole::WebApp && available
     );
-    m_readerModeAction->setEnabled(
+    m_ui->readerModeAction->setEnabled(
         available
             && !controller->isActivationPending()
             && (!blockedByPresentation || active)
             && (!blockedByDetachedVideo || active)
     );
-    m_readerModeAction->setChecked(active);
-    m_readerModeAction->setText(active ? tr("Exit Reader Mode") : tr("Reader Mode"));
-    m_readerModeAction->setToolTip(
+    m_ui->readerModeAction->setChecked(active);
+    m_ui->readerModeAction->setText(active ? tr("Exit Reader Mode") : tr("Reader Mode"));
+    m_ui->readerModeAction->setToolTip(
         active ? tr("Exit Reader Mode (F9)") : tr("Reader Mode (F9)")
     );
 }
@@ -2801,32 +2803,32 @@ void MainWindow::updateNavigationActions()
 {
     QWebEngineView *webView = currentWebView();
     QWebEnginePage *page = pageForTab(webView);
-    m_backAction->setEnabled(page && page->history()->canGoBack());
-    m_forwardAction->setEnabled(page && page->history()->canGoForward());
-    m_reloadAction->setEnabled(page != nullptr);
+    m_ui->backAction->setEnabled(page && page->history()->canGoBack());
+    m_ui->forwardAction->setEnabled(page && page->history()->canGoForward());
+    m_ui->reloadAction->setEnabled(page != nullptr);
 }
 
 void MainWindow::updateTabNavigationActions()
 {
-    const int tabCount = m_tabBar ? m_tabBar->count() : 0;
+    const int tabCount = m_ui->tabBar ? m_ui->tabBar->count() : 0;
     const bool tabNavigationAvailable = m_windowRole != WindowRole::WebApp;
-    if (m_newTabAction)
-        m_newTabAction->setEnabled(tabNavigationAvailable);
-    if (m_closeTabAction)
-        m_closeTabAction->setEnabled(tabCount > 0);
-    if (m_reopenClosedTabAction) {
-        m_reopenClosedTabAction->setEnabled(
+    if (m_ui->newTabAction)
+        m_ui->newTabAction->setEnabled(tabNavigationAvailable);
+    if (m_ui->closeTabAction)
+        m_ui->closeTabAction->setEnabled(tabCount > 0);
+    if (m_ui->reopenClosedTabAction) {
+        m_ui->reopenClosedTabAction->setEnabled(
             m_windowRole == WindowRole::Primary && !m_closedTabs.isEmpty()
         );
     }
-    if (m_nextTabAction)
-        m_nextTabAction->setEnabled(tabNavigationAvailable && tabCount > 1);
-    if (m_previousTabAction)
-        m_previousTabAction->setEnabled(tabNavigationAvailable && tabCount > 1);
-    if (m_switchToTabMenu)
-        m_switchToTabMenu->setEnabled(tabNavigationAvailable && tabCount > 0);
-    for (int index = 0; index < m_numberedTabActions.size(); ++index) {
-        m_numberedTabActions.at(index)->setEnabled(
+    if (m_ui->nextTabAction)
+        m_ui->nextTabAction->setEnabled(tabNavigationAvailable && tabCount > 1);
+    if (m_ui->previousTabAction)
+        m_ui->previousTabAction->setEnabled(tabNavigationAvailable && tabCount > 1);
+    if (m_ui->switchToTabMenu)
+        m_ui->switchToTabMenu->setEnabled(tabNavigationAvailable && tabCount > 0);
+    for (int index = 0; index < m_ui->numberedTabActions.size(); ++index) {
+        m_ui->numberedTabActions.at(index)->setEnabled(
             tabNavigationAvailable
                 && TabNavigation::numberedTabIndex(index + 1, tabCount) >= 0
         );
@@ -2835,15 +2837,15 @@ void MainWindow::updateTabNavigationActions()
 
 void MainWindow::updateBookmarkAction()
 {
-    if (!m_bookmarkAction)
+    if (!m_ui->bookmarkAction)
         return;
     QWebEngineView *webView = currentWebView();
     const QUrl url = BookmarkStore::normalizedUrl(urlForTab(webView));
     const bool available = m_bookmarkStore && m_bookmarkStore->isOpen() && url.isValid();
-    m_bookmarkAction->setEnabled(available);
+    m_ui->bookmarkAction->setEnabled(available);
     if (!available) {
-        m_bookmarkAction->setIcon(QIcon(QStringLiteral(":/assets/icons/star.svg")));
-        m_bookmarkAction->setToolTip(tr("Only web pages can be bookmarked"));
+        m_ui->bookmarkAction->setIcon(QIcon(QStringLiteral(":/assets/icons/star.svg")));
+        m_ui->bookmarkAction->setToolTip(tr("Only web pages can be bookmarked"));
         return;
     }
 
@@ -2851,11 +2853,11 @@ void MainWindow::updateBookmarkAction()
     const bool bookmarked = m_bookmarkStore->bookmarkForUrl(url, &error).has_value();
     if (!error.isEmpty())
         qWarning().noquote() << "[PanBrowser bookmarks]" << error;
-    m_bookmarkAction->setIcon(QIcon(
+    m_ui->bookmarkAction->setIcon(QIcon(
         bookmarked ? QStringLiteral(":/assets/icons/star-filled.svg")
                    : QStringLiteral(":/assets/icons/star.svg")
     ));
-    m_bookmarkAction->setToolTip(
+    m_ui->bookmarkAction->setToolTip(
         bookmarked ? tr("Edit Bookmark (⌘D)")
                    : tr("Add Bookmark (⌘D)")
     );
@@ -2863,10 +2865,10 @@ void MainWindow::updateBookmarkAction()
 
 void MainWindow::updateAddressPlaceholder()
 {
-    if (!m_address)
+    if (!m_ui->address)
         return;
     const SearchEngineSettings *engine = m_searchSettings.defaultEngine();
-    m_address->setPlaceholderText(
+    m_ui->address->setPlaceholderText(
         engine ? tr("Search with %1 or enter an address").arg(engine->name)
                : tr("Enter an address")
     );
@@ -2876,9 +2878,9 @@ void MainWindow::navigateFromAddressBar()
 {
     if (m_addressSuggestionTimer)
         m_addressSuggestionTimer->stop();
-    if (m_addressCompletionPopup)
-        m_addressCompletionPopup->hide();
-    const ResolvedAddressInput result = resolveAddressInput(m_address->text(), m_searchSettings);
+    if (m_ui->addressCompletionPopup)
+        m_ui->addressCompletionPopup->hide();
+    const ResolvedAddressInput result = resolveAddressInput(m_ui->address->text(), m_searchSettings);
     if (result.kind == AddressInputKind::Error) {
         setTrustStatus(result.error, true);
         return;
@@ -2893,14 +2895,14 @@ void MainWindow::navigateFromAddressBar()
 
 void MainWindow::showAddressSuggestions()
 {
-    if (!m_addressCompletionPopup) {
+    if (!m_ui->addressCompletionPopup) {
         return;
     }
-    const QString input = m_address->text().trimmed();
+    const QString input = m_ui->address->text().trimmed();
     if (input.isEmpty()
         || input.startsWith(QLatin1Char('?'))
         || input.startsWith(QLatin1Char('@'))) {
-        m_addressCompletionPopup->hide();
+        m_ui->addressCompletionPopup->hide();
         return;
     }
     QList<AddressSuggestion> candidates;
@@ -2941,15 +2943,15 @@ void MainWindow::showAddressSuggestions()
         }
     }
     const QList<AddressSuggestion> suggestions = rankedAddressSuggestions(candidates, input, 8);
-    m_addressCompletionPopup->showSuggestions(suggestions);
+    m_ui->addressCompletionPopup->showSuggestions(suggestions);
 }
 
 void MainWindow::openFindBar()
 {
-    if (!m_findToolbar || !m_findBar)
+    if (!m_ui->findToolbar || !m_ui->findBar)
         return;
-    if (m_addressCompletionPopup)
-        m_addressCompletionPopup->hide();
+    if (m_ui->addressCompletionPopup)
+        m_ui->addressCompletionPopup->hide();
 
     QString selectedText;
     if (QWebEngineView *webView = currentWebView()) {
@@ -2960,12 +2962,12 @@ void MainWindow::openFindBar()
             selectedText.clear();
         }
     }
-    const bool wasVisible = m_findToolbar->isVisible();
+    const bool wasVisible = m_ui->findToolbar->isVisible();
     const bool queryWillChange = !selectedText.isEmpty()
-        && selectedText != m_findBar->query();
-    m_findToolbar->show();
-    m_closeFindAction->setEnabled(true);
-    m_findBar->focusInput(selectedText);
+        && selectedText != m_ui->findBar->query();
+    m_ui->findToolbar->show();
+    m_ui->closeFindAction->setEnabled(true);
+    m_ui->findBar->focusInput(selectedText);
     if (!wasVisible && !queryWillChange)
         findInPage(false);
 }
@@ -2976,12 +2978,12 @@ void MainWindow::closeFindBar()
     if (m_findView)
         pageForTab(m_findView)->findText(QString());
     m_findView.clear();
-    if (m_findBar)
-        m_findBar->clearResults();
-    if (m_findToolbar)
-        m_findToolbar->hide();
-    if (m_closeFindAction)
-        m_closeFindAction->setEnabled(false);
+    if (m_ui->findBar)
+        m_ui->findBar->clearResults();
+    if (m_ui->findToolbar)
+        m_ui->findToolbar->hide();
+    if (m_ui->closeFindAction)
+        m_ui->closeFindAction->setEnabled(false);
     if (QWebEngineView *webView = currentWebView()) {
         const BrowserTabState state = m_tabStates.value(webView);
         if (state.detachedVideoWindow)
@@ -2993,11 +2995,11 @@ void MainWindow::closeFindBar()
 
 void MainWindow::findInPage(bool backward)
 {
-    if (!m_findToolbar || !m_findToolbar->isVisible() || !m_findBar)
+    if (!m_ui->findToolbar || !m_ui->findToolbar->isVisible() || !m_ui->findBar)
         return;
     QWebEngineView *webView = currentWebView();
     if (!webView) {
-        m_findBar->clearResults();
+        m_ui->findBar->clearResults();
         return;
     }
 
@@ -3005,16 +3007,16 @@ void MainWindow::findInPage(bool backward)
         pageForTab(m_findView)->findText(QString());
     m_findView = webView;
 
-    const QString query = m_findBar->query();
+    const QString query = m_ui->findBar->query();
     const quint64 requestSerial = ++m_findRequestSerial;
     QWebEnginePage *page = pageForTab(webView);
     if (query.isEmpty()) {
         page->findText(QString());
-        m_findBar->clearResults();
+        m_ui->findBar->clearResults();
         return;
     }
 
-    m_findBar->setSearching();
+    m_ui->findBar->setSearching();
     QWebEnginePage::FindFlags flags;
     if (backward)
         flags.setFlag(QWebEnginePage::FindBackward);
@@ -3028,11 +3030,11 @@ void MainWindow::findInPage(bool backward)
             || requestSerial != window->m_findRequestSerial
             || target != window->currentWebView()
             || target != window->m_findView
-            || !window->m_findToolbar->isVisible()
-            || query != window->m_findBar->query()) {
+            || !window->m_ui->findToolbar->isVisible()
+            || query != window->m_ui->findBar->query()) {
             return;
         }
-        window->m_findBar->setResults(result.activeMatch(), result.numberOfMatches());
+        window->m_ui->findBar->setResults(result.activeMatch(), result.numberOfMatches());
     });
 }
 
@@ -3106,11 +3108,11 @@ void MainWindow::setPageZoom(QWebEngineView *webView, double factor)
 
 void MainWindow::updateZoomActions()
 {
-    if (!m_zoomMenu
-        || !m_zoomLevelAction
-        || !m_zoomInAction
-        || !m_zoomOutAction
-        || !m_resetZoomAction) {
+    if (!m_ui->zoomMenu
+        || !m_ui->zoomLevelAction
+        || !m_ui->zoomInAction
+        || !m_ui->zoomOutAction
+        || !m_ui->resetZoomAction) {
         return;
     }
 
@@ -3119,15 +3121,15 @@ void MainWindow::updateZoomActions()
     const int percentage = pageZoomPercentage(
         page ? page->zoomFactor() : defaultPageZoomFactor
     );
-    m_zoomMenu->setEnabled(page != nullptr);
-    m_zoomLevelAction->setText(QStringLiteral("%1%").arg(percentage));
-    m_zoomInAction->setEnabled(
+    m_ui->zoomMenu->setEnabled(page != nullptr);
+    m_ui->zoomLevelAction->setText(QStringLiteral("%1%").arg(percentage));
+    m_ui->zoomInAction->setEnabled(
         page && percentage < pageZoomPercentage(maximumPageZoomFactor)
     );
-    m_zoomOutAction->setEnabled(
+    m_ui->zoomOutAction->setEnabled(
         page && percentage > pageZoomPercentage(minimumPageZoomFactor)
     );
-    m_resetZoomAction->setEnabled(
+    m_ui->resetZoomAction->setEnabled(
         page && percentage != pageZoomPercentage(defaultPageZoomFactor)
     );
 }
@@ -3236,7 +3238,7 @@ void MainWindow::detectWebAppManifest(QWebEngineView *webView)
 
 void MainWindow::updateInstallWebAppAction()
 {
-    if (!m_installWebAppAction || m_windowRole == WindowRole::WebApp)
+    if (!m_ui->installWebAppAction || m_windowRole == WindowRole::WebApp)
         return;
     QWebEngineView *webView = currentWebView();
     const BrowserTabState state = webView ? m_tabStates.value(webView) : BrowserTabState();
@@ -3244,21 +3246,21 @@ void MainWindow::updateInstallWebAppAction()
         || state.manifestUrl.isEmpty()
         || !m_webAppStore
         || !m_webAppStore->isAvailable()) {
-        m_installWebAppAction->setText(tr("Install Web App…"));
-        m_installWebAppAction->setEnabled(false);
+        m_ui->installWebAppAction->setText(tr("Install Web App…"));
+        m_ui->installWebAppAction->setEnabled(false);
         return;
     }
     const std::optional<WebApp> installed = m_webAppStore->appForManifest(state.manifestUrl);
     if (installed) {
-        m_installWebAppAction->setText(tr("Open “%1”").arg(installed->name));
-        m_installWebAppAction->setEnabled(true);
+        m_ui->installWebAppAction->setText(tr("Open “%1”").arg(installed->name));
+        m_ui->installWebAppAction->setEnabled(true);
         return;
     }
     const QString name = state.manifestTitle.isEmpty()
         ? urlForTab(webView).host()
         : state.manifestTitle.left(80);
-    m_installWebAppAction->setText(tr("Install “%1”…").arg(name));
-    m_installWebAppAction->setEnabled(true);
+    m_ui->installWebAppAction->setText(tr("Install “%1”…").arg(name));
+    m_ui->installWebAppAction->setEnabled(true);
 }
 
 void MainWindow::installCurrentWebApp()
@@ -3284,8 +3286,8 @@ void MainWindow::installCurrentWebApp()
         urlForTab(webView),
         state.manifestTitle,
     });
-    m_installWebAppAction->setEnabled(false);
-    m_installWebAppAction->setText(tr("Reading web app manifest…"));
+    m_ui->installWebAppAction->setEnabled(false);
+    m_ui->installWebAppAction->setText(tr("Reading web app manifest…"));
     static_cast<BrowserPage *>(pageForTab(webView))->fetchWebAppManifest(
         requestId,
         state.manifestUrl,
@@ -3398,26 +3400,26 @@ void MainWindow::handleFetchedWebAppManifest(
 
 void MainWindow::rebuildWebAppsMenu()
 {
-    if (!m_webAppsMenu || !m_webAppStore)
+    if (!m_ui->webAppsMenu || !m_webAppStore)
         return;
-    m_webAppsMenu->clear();
+    m_ui->webAppsMenu->clear();
     const QList<WebApp> apps = m_webAppStore->apps();
     for (const WebApp &app : apps) {
         QIcon icon(QStringLiteral(":/assets/app-icon.png"));
         QPixmap pixmap;
         if (!app.iconPng.isEmpty() && pixmap.loadFromData(app.iconPng, "PNG"))
             icon = QIcon(pixmap);
-        QAction *action = m_webAppsMenu->addAction(icon, app.name);
+        QAction *action = m_ui->webAppsMenu->addAction(icon, app.name);
         connect(action, &QAction::triggered, this, [this, id = app.id] {
             openInstalledWebApp(id);
         });
     }
     if (apps.isEmpty()) {
-        QAction *empty = m_webAppsMenu->addAction(tr("No web apps installed"));
+        QAction *empty = m_ui->webAppsMenu->addAction(tr("No web apps installed"));
         empty->setEnabled(false);
     }
-    m_webAppsMenu->addSeparator();
-    QAction *manage = m_webAppsMenu->addAction(
+    m_ui->webAppsMenu->addSeparator();
+    QAction *manage = m_ui->webAppsMenu->addAction(
         QIcon(QStringLiteral(":/assets/icons/settings.svg")),
         tr("Manage Web Apps…")
     );
@@ -3440,7 +3442,7 @@ void MainWindow::activatePrimaryWindow()
         m_primaryTabsInitialized = true;
         restoreInitialTabs();
     }
-    if (m_tabBar && m_tabBar->count() == 0)
+    if (m_ui->tabBar && m_ui->tabBar->count() == 0)
         createTab(m_preferences.startPage());
     presentPrimaryWindow();
 }
@@ -3621,8 +3623,8 @@ void MainWindow::openSettingsPage(int page)
             }
         }
         applyDeveloperToolsPreference();
-        if (!m_preferences.saveBrowsingHistory() && m_addressCompletionPopup)
-            m_addressCompletionPopup->hide();
+        if (!m_preferences.saveBrowsingHistory() && m_ui->addressCompletionPopup)
+            m_ui->addressCompletionPopup->hide();
         updateAddressPlaceholder();
         m_profile->setPersistSessionCookies(m_preferences.persistSessionCookies());
         if (m_preferences.startupMode() == StartupMode::RestoreTabs)
@@ -3653,8 +3655,8 @@ void MainWindow::openSettingsPage(int page)
                 popup->applyDeveloperToolsPreference();
                 popup->updateAddressPlaceholder();
                 if (!m_preferences.saveBrowsingHistory()
-                    && popup->m_addressCompletionPopup) {
-                    popup->m_addressCompletionPopup->hide();
+                    && popup->m_ui->addressCompletionPopup) {
+                    popup->m_ui->addressCompletionPopup->hide();
                 }
             }
         }
@@ -3709,8 +3711,8 @@ void MainWindow::restoreInitialTabs()
     m_restoringSession = true;
     for (const SessionTab &tab : session.tabs)
         createTab(tab.url, false, true, tab.title, tab.pinned);
-    m_tabBar->setCurrentIndex(session.activeIndex);
-    m_tabStack->setCurrentIndex(session.activeIndex);
+    m_ui->tabBar->setCurrentIndex(session.activeIndex);
+    m_ui->tabStack->setCurrentIndex(session.activeIndex);
     m_restoringSession = false;
     activatePendingTab(currentWebView());
     updateCurrentTabUi();
@@ -3773,12 +3775,12 @@ void MainWindow::saveSession()
 BrowserSession MainWindow::currentSession(bool includeRegularTabs) const
 {
     BrowserSession session;
-    if (!m_tabStack)
+    if (!m_ui->tabStack)
         return session;
 
-    const int activeTabIndex = m_tabBar ? m_tabBar->currentIndex() : 0;
-    for (int index = 0; index < m_tabStack->count(); ++index) {
-        QWebEngineView *webView = qobject_cast<QWebEngineView *>(m_tabStack->widget(index));
+    const int activeTabIndex = m_ui->tabBar ? m_ui->tabBar->currentIndex() : 0;
+    for (int index = 0; index < m_ui->tabStack->count(); ++index) {
+        QWebEngineView *webView = qobject_cast<QWebEngineView *>(m_ui->tabStack->widget(index));
         if (!webView)
             continue;
         const BrowserTabState state = m_tabStates.value(webView);
@@ -3812,13 +3814,13 @@ void MainWindow::reloadRulesLocal()
         m_configurationPath = ensureConfiguration();
     QString error;
     if (!m_trustPolicy.load(m_configurationPath, &error)) {
-        m_ruleCount->setText(tr("Rules unavailable"));
+        m_ui->ruleCount->setText(tr("Rules unavailable"));
         setTrustStatus(tr("Rules error: %1").arg(error), true);
         return;
     }
 
     const qsizetype count = m_trustPolicy.ruleCount();
-    m_ruleCount->setText(
+    m_ui->ruleCount->setText(
         tr("%n custom rule(s)", nullptr, static_cast<int>(count))
     );
     setTrustStatus(tr("Trust rules loaded"));
@@ -3912,20 +3914,20 @@ void MainWindow::setTabTrustStatus(QWebEngineView *webView, const QString &text,
 
 void MainWindow::setTrustStatus(const QString &text, bool error)
 {
-    m_trustStatus->setText(text);
+    m_ui->trustStatus->setText(text);
     const bool secure = !error && text.startsWith(tr("Secure"));
-    m_trustStatus->setProperty(
+    m_ui->trustStatus->setProperty(
         "state",
         error ? QStringLiteral("error")
               : secure ? QStringLiteral("secure") : QStringLiteral("neutral")
     );
-    m_securityIndicator->setIcon(QIcon(
+    m_ui->securityIndicator->setIcon(QIcon(
         error ? QStringLiteral(":/assets/icons/triangle-alert.svg")
               : secure ? QStringLiteral(":/assets/icons/shield-check.svg") : QString()
     ));
-    m_trustStatus->style()->unpolish(m_trustStatus);
-    m_trustStatus->style()->polish(m_trustStatus);
-    m_trustStatus->update();
+    m_ui->trustStatus->style()->unpolish(m_ui->trustStatus);
+    m_ui->trustStatus->style()->polish(m_ui->trustStatus);
+    m_ui->trustStatus->update();
 }
 
 void MainWindow::restoreWindowPlacement()

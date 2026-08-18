@@ -176,6 +176,7 @@ set(PANBROWSER_APP_SOURCES
     src/main.cpp
     src/MainWindow.cpp
     src/MainWindow.h
+    src/BrowserWindowUi.h
     src/SessionStore.cpp
     src/SessionStore.h
     src/SearchSettings.cpp
