@@ -1,5 +1,7 @@
 #pragma once
 
+#include "VotChromiumRequest.h"
+
 #include <QHash>
 #include <QJsonObject>
 #include <QList>
@@ -25,17 +27,6 @@ enum class VotChromiumTransportState {
     Loading,
     Ready,
     Error,
-};
-
-struct VotChromiumRequest final {
-    QString id;
-    QUrl url;
-    QByteArray method;
-    QByteArray body;
-    QJsonObject headers;
-    QString redirectMode;
-    int timeoutMilliseconds = 30'000;
-    QPointer<BrowserPage> sourcePage;
 };
 
 class VotChromiumNetworkTransport final : public QObject {
