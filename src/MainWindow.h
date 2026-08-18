@@ -66,6 +66,8 @@ class VotUserscriptManager;
 class MainWindow final : public QMainWindow {
     Q_OBJECT
 
+    friend struct BrowserWindowUi;
+
 public:
     enum class StartupPresentation {
         Browser,

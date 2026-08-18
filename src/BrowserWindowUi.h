@@ -11,6 +11,7 @@ class DownloadButton;
 class DownloadsPanel;
 class FindBar;
 class QLabel;
+class MainWindow;
 class QMenu;
 class PermissionPrompt;
 class QProgressBar;
@@ -19,6 +20,8 @@ class QToolBar;
 class WindowChromeController;
 
 struct BrowserWindowUi final {
+    void build(MainWindow *window);
+
     DownloadsPanel *downloadsPanel = nullptr;
     DownloadButton *downloadButton = nullptr;
     FindBar *findBar = nullptr;
