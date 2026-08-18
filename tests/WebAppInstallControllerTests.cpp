@@ -9,6 +9,7 @@ class WebAppInstallControllerTests final : public QObject {
 
 private slots:
     void detectedManifestUpdatesInstallAction();
+    void clearedManifestIgnoresPendingDetection();
 };
 
 void WebAppInstallControllerTests::detectedManifestUpdatesInstallAction()
@@ -77,6 +78,63 @@ void WebAppInstallControllerTests::detectedManifestUpdatesInstallAction()
     QCOMPARE(installAction.text(), QStringLiteral("Open “Installed App”"));
 
     controller.clearManifest(&view);
+    QVERIFY(!installAction.isEnabled());
+    QCOMPARE(installAction.text(), QStringLiteral("Install Web App…"));
+}
+
+void WebAppInstallControllerTests::clearedManifestIgnoresPendingDetection()
+{
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+
+    WebAppStore store(directory.filePath(QStringLiteral("web-apps.json")));
+    QString error;
+    QVERIFY2(store.load(&error), qPrintable(error));
+
+    QAction installAction;
+    QWidget dialogParent;
+    WebAppInstallController controller(
+        &store,
+        &installAction,
+        &dialogParent
+    );
+
+    QWebEngineView view;
+    auto *page = new BrowserPage(QWebEngineProfile::defaultProfile(), &view);
+    view.setPage(page);
+    controller.currentViewChanged(&view);
+
+    QSignalSpy loadSpy(page, &QWebEnginePage::loadFinished);
+    page->setHtml(
+        QStringLiteral(R"HTML(
+<!doctype html>
+<html>
+<head>
+  <title>Stale Application</title>
+  <link rel="manifest" href="/app/manifest.webmanifest">
+</head>
+<body></body>
+</html>
+)HTML"),
+        QUrl(QStringLiteral("https://example.com/app/index.html"))
+    );
+    QTRY_VERIFY_WITH_TIMEOUT(!loadSpy.isEmpty(), 5000);
+    QVERIFY(loadSpy.constLast().constFirst().toBool());
+
+    controller.detectManifest(&view, page);
+    controller.clearManifest(&view);
+
+    bool javaScriptBarrierReached = false;
+    page->runJavaScript(
+        QStringLiteral("true"),
+        QWebEngineScript::ApplicationWorld,
+        [&javaScriptBarrierReached](const QVariant &) {
+            javaScriptBarrierReached = true;
+        }
+    );
+    QTRY_VERIFY_WITH_TIMEOUT(javaScriptBarrierReached, 3000);
+    QTest::qWait(50);
+
     QVERIFY(!installAction.isEnabled());
     QCOMPARE(installAction.text(), QStringLiteral("Install Web App…"));
 }

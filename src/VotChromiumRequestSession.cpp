@@ -94,7 +94,13 @@ VotChromiumRequestSession::VotChromiumRequestSession(
         finish({
             {QStringLiteral("id"), m_request.id},
             {QStringLiteral("type"), QStringLiteral("timeout")},
-            {QStringLiteral("error"), transportText("Request timed out")},
+            {
+                QStringLiteral("error"),
+                transportText(QT_TRANSLATE_NOOP(
+                    "VotChromiumNetworkTransport",
+                    "Request timed out"
+                ))
+            },
         });
     });
     m_timeoutTimer->start(qMax(1, m_request.timeoutMilliseconds));
@@ -151,11 +157,16 @@ void VotChromiumRequestSession::start(
         page,
         &QWebEnginePage::proxyAuthenticationRequired,
         this,
-        [this](
+        [this, guardedPage = QPointer<QWebEnginePage>(page)](
             const QUrl &requestUrl,
             QAuthenticator *authenticator,
             const QString &proxyHost
         ) {
+            if (m_finished || !guardedPage || guardedPage != m_page) {
+                if (authenticator)
+                    *authenticator = QAuthenticator();
+                return;
+            }
             bool handled = false;
             emit proxyAuthenticationRequired(
                 m_request.sourcePage.data(),
@@ -178,9 +189,10 @@ void VotChromiumRequestSession::start(
         ) {
             if (!guardedPage || guardedPage != m_page)
                 return;
-            fail(transportText(
+            fail(transportText(QT_TRANSLATE_NOOP(
+                "VotChromiumNetworkTransport",
                 "The Chromium VOT request process stopped unexpectedly"
-            ));
+            )));
         }
     );
     connect(
@@ -191,9 +203,10 @@ void VotChromiumRequestSession::start(
             if (!guardedPage || guardedPage != m_page)
                 return;
             if (!ok) {
-                fail(transportText(
+                fail(transportText(QT_TRANSLATE_NOOP(
+                    "VotChromiumNetworkTransport",
                     "Cannot open the Chromium page for a VOT request"
-                ));
+                )));
                 return;
             }
             startLoadedRequest(guardedPage);
@@ -269,9 +282,10 @@ void VotChromiumRequestSession::startLoadedRequest(QWebEnginePage *page)
                 || started.toBool()) {
                 return;
             }
-            self->fail(transportText(
+            self->fail(transportText(QT_TRANSLATE_NOOP(
+                "VotChromiumNetworkTransport",
                 "The Chromium VOT request could not be started"
-            ));
+            )));
         }
     );
 }

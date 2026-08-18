@@ -73,7 +73,9 @@ public:
     QPointer<QWidget> dialogParent;
     QPointer<QWebEngineView> currentView;
     QHash<QWebEngineView *, ManifestState> manifests;
+    QHash<QWebEngineView *, quint64> manifestDetectionGenerations;
     QHash<QString, PendingRequest> pendingRequests;
+    quint64 nextManifestDetectionGeneration = 0;
 };
 
 WebAppInstallController::WebAppInstallController(
@@ -96,6 +98,7 @@ void WebAppInstallController::clearManifest(QWebEngineView *webView)
 {
     if (!webView)
         return;
+    m_impl->manifestDetectionGenerations.remove(webView);
     m_impl->manifests.remove(webView);
     if (m_impl->currentView == webView)
         currentViewChanged(webView);
@@ -106,6 +109,7 @@ void WebAppInstallController::forgetView(QWebEngineView *webView)
     if (!webView)
         return;
 
+    m_impl->manifestDetectionGenerations.remove(webView);
     m_impl->manifests.remove(webView);
     for (auto iterator = m_impl->pendingRequests.begin();
          iterator != m_impl->pendingRequests.end();) {
@@ -139,6 +143,8 @@ void WebAppInstallController::detectManifest(
     const QPointer<WebAppInstallController> controller(this);
     const QPointer<QWebEngineView> target(webView);
     const QPointer<BrowserPage> targetPage(page);
+    const quint64 generation = ++m_impl->nextManifestDetectionGeneration;
+    m_impl->manifestDetectionGenerations.insert(webView, generation);
     page->runJavaScript(
         QStringLiteral(R"JS(
 (() => {
@@ -149,9 +155,23 @@ void WebAppInstallController::detectManifest(
 })()
 )JS"),
         QWebEngineScript::ApplicationWorld,
-        [controller, target, targetPage, documentUrl](const QVariant &result) {
+        [controller,
+         target,
+         targetPage,
+         documentUrl,
+         generation](const QVariant &result) {
             if (!controller || !target || !targetPage)
                 return;
+            const auto pending =
+                controller->m_impl->manifestDetectionGenerations.constFind(
+                    target
+                );
+            if (pending
+                == controller->m_impl->manifestDetectionGenerations.cend()
+                || *pending != generation) {
+                return;
+            }
+            controller->m_impl->manifestDetectionGenerations.erase(pending);
 
             Impl::ManifestState state;
             state.documentUrl = documentUrl;
@@ -192,7 +212,10 @@ void WebAppInstallController::currentViewChanged(QWebEngineView *webView)
         || state->manifestUrl.isEmpty()
         || !m_impl->store
         || !m_impl->store->isAvailable()) {
-        m_impl->installAction->setText(windowText("Install Web App…"));
+        m_impl->installAction->setText(windowText(QT_TRANSLATE_NOOP(
+            "MainWindow",
+            "Install Web App…"
+        )));
         m_impl->installAction->setEnabled(false);
         return;
     }
@@ -202,7 +225,8 @@ void WebAppInstallController::currentViewChanged(QWebEngineView *webView)
     );
     if (installed) {
         m_impl->installAction->setText(
-            windowText("Open “%1”").arg(installed->name)
+            windowText(QT_TRANSLATE_NOOP("MainWindow", "Open “%1”"))
+                .arg(installed->name)
         );
         m_impl->installAction->setEnabled(true);
         return;
@@ -211,7 +235,10 @@ void WebAppInstallController::currentViewChanged(QWebEngineView *webView)
     const QString name = state->title.isEmpty()
         ? state->documentUrl.host()
         : state->title.left(80);
-    m_impl->installAction->setText(windowText("Install “%1”…").arg(name));
+    m_impl->installAction->setText(
+        windowText(QT_TRANSLATE_NOOP("MainWindow", "Install “%1”…"))
+            .arg(name)
+    );
     m_impl->installAction->setEnabled(true);
 }
 
@@ -247,7 +274,10 @@ void WebAppInstallController::installCurrent(
     if (m_impl->installAction) {
         m_impl->installAction->setEnabled(false);
         m_impl->installAction->setText(
-            windowText("Reading web app manifest…")
+            windowText(QT_TRANSLATE_NOOP(
+                "MainWindow",
+                "Reading web app manifest…"
+            ))
         );
     }
     page->fetchWebAppManifest(
@@ -266,7 +296,10 @@ void WebAppInstallController::installCurrent(
             page->cancelWebAppManifestFetch(requestId);
         currentViewChanged(m_impl->currentView);
         emit statusMessageRequested(
-            windowText("Timed out while reading the web app manifest"),
+            windowText(QT_TRANSLATE_NOOP(
+                "MainWindow",
+                "Timed out while reading the web app manifest"
+            )),
             5000
         );
     });
@@ -299,8 +332,14 @@ void WebAppInstallController::handleManifestFetched(
     if (!fetchError.isEmpty()) {
         QMessageBox::warning(
             m_impl->dialogParent,
-            windowText("Cannot install web app"),
-            windowText("PanBrowser could not read the web app manifest: %1")
+            windowText(QT_TRANSLATE_NOOP(
+                "MainWindow",
+                "Cannot install web app"
+            )),
+            windowText(QT_TRANSLATE_NOOP(
+                "MainWindow",
+                "PanBrowser could not read the web app manifest: %1"
+            ))
                 .arg(fetchError)
         );
         return;
@@ -317,7 +356,10 @@ void WebAppInstallController::handleManifestFetched(
     if (!app) {
         QMessageBox::warning(
             m_impl->dialogParent,
-            windowText("Cannot install web app"),
+            windowText(QT_TRANSLATE_NOOP(
+                "MainWindow",
+                "Cannot install web app"
+            )),
             error
         );
         return;
@@ -335,7 +377,10 @@ void WebAppInstallController::handleManifestFetched(
     }
 
     QMessageBox dialog(m_impl->dialogParent);
-    dialog.setWindowTitle(windowText("Install web app"));
+    dialog.setWindowTitle(windowText(QT_TRANSLATE_NOOP(
+        "MainWindow",
+        "Install web app"
+    )));
     dialog.setIcon(QMessageBox::Question);
     if (!pixmap.isNull()) {
         dialog.setIconPixmap(
@@ -347,22 +392,29 @@ void WebAppInstallController::handleManifestFetched(
             )
         );
     }
-    dialog.setText(windowText("Install “%1”?").arg(app->name));
+    dialog.setText(
+        windowText(QT_TRANSLATE_NOOP("MainWindow", "Install “%1”?"))
+            .arg(app->name)
+    );
     dialog.setInformativeText(
-        windowText(
+        windowText(QT_TRANSLATE_NOOP(
+            "MainWindow",
             "The app will open in its own window and share PanBrowser cookies, "
             "site data, permissions, and trust rules.\n\n"
             "Start page: %1\nAllowed scope: %2"
-        ).arg(
+        )).arg(
             app->startUrl.toDisplayString(QUrl::RemovePassword),
             app->scope.toDisplayString(QUrl::RemovePassword)
         )
     );
     QPushButton *installButton = dialog.addButton(
-        windowText("Install"),
+        windowText(QT_TRANSLATE_NOOP("MainWindow", "Install")),
         QMessageBox::AcceptRole
     );
-    dialog.addButton(windowText("Cancel"), QMessageBox::RejectRole);
+    dialog.addButton(
+        windowText(QT_TRANSLATE_NOOP("MainWindow", "Cancel")),
+        QMessageBox::RejectRole
+    );
     dialog.setDefaultButton(installButton);
     dialog.exec();
     if (dialog.clickedButton() != installButton)
@@ -371,7 +423,10 @@ void WebAppInstallController::handleManifestFetched(
     if (!m_impl->store->install(*app, &error)) {
         QMessageBox::warning(
             m_impl->dialogParent,
-            windowText("Cannot install web app"),
+            windowText(QT_TRANSLATE_NOOP(
+                "MainWindow",
+                "Cannot install web app"
+            )),
             error
         );
         return;
@@ -383,17 +438,22 @@ void WebAppInstallController::handleManifestFetched(
         if (!shortcutManager.createOrUpdate(*app, &shortcutError)) {
             QMessageBox::warning(
                 m_impl->dialogParent,
-                windowText("Web app installed without a system shortcut"),
-                windowText(
+                windowText(QT_TRANSLATE_NOOP(
+                    "MainWindow",
+                    "Web app installed without a system shortcut"
+                )),
+                windowText(QT_TRANSLATE_NOOP(
+                    "MainWindow",
                     "PanBrowser installed the web app, but could not create "
                     "its system shortcut: %1"
-                ).arg(shortcutError)
+                )).arg(shortcutError)
             );
         }
     }
 
     emit statusMessageRequested(
-        windowText("“%1” installed").arg(app->name),
+        windowText(QT_TRANSLATE_NOOP("MainWindow", "“%1” installed"))
+            .arg(app->name),
         4000
     );
     emit openInstalledAppRequested(app->id);

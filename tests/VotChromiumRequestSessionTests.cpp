@@ -7,6 +7,7 @@ class VotChromiumRequestSessionTests final : public QObject {
 private slots:
     void requestTimesOutBeforeProfileIsReady();
     void abortAndFailureAreTerminal();
+    void completedRequestIgnoresLateProxyAuthentication();
     void transportRetiresFinishedSessionsBeforeProfileReset();
 };
 
@@ -72,6 +73,65 @@ void VotChromiumRequestSessionTests::abortAndFailureAreTerminal()
         response.value(QStringLiteral("error")).toString(),
         QStringLiteral("expected failure")
     );
+}
+
+void VotChromiumRequestSessionTests::completedRequestIgnoresLateProxyAuthentication()
+{
+    QWebEngineProfile profile;
+    VotChromiumRequest request;
+    request.id = QStringLiteral("late-proxy-auth");
+    request.timeoutMilliseconds = 30'000;
+
+    VotChromiumRequestSession session(request);
+    int promptCount = 0;
+    connect(
+        &session,
+        &VotChromiumRequestSession::proxyAuthenticationRequired,
+        &session,
+        [&promptCount](
+            BrowserPage *,
+            const QUrl &,
+            QAuthenticator *,
+            const QString &,
+            bool *handled
+        ) {
+            ++promptCount;
+            if (handled)
+                *handled = true;
+        }
+    );
+    QSignalSpy responseSpy(
+        &session,
+        &VotChromiumRequestSession::responseReady
+    );
+
+    session.start(
+        &profile,
+        QStringLiteral("missing-extension"),
+        QStringLiteral("test-token")
+    );
+    QWebEnginePage *page = session.findChild<QWebEnginePage *>(
+        QString(),
+        Qt::FindDirectChildrenOnly
+    );
+    QVERIFY(page);
+
+    QAuthenticator authenticator;
+    page->proxyAuthenticationRequired(
+        QUrl(QStringLiteral("https://example.com/audio")),
+        &authenticator,
+        QStringLiteral("proxy.example")
+    );
+    QCOMPARE(promptCount, 1);
+
+    session.abort();
+    QCOMPARE(responseSpy.count(), 1);
+    page->proxyAuthenticationRequired(
+        QUrl(QStringLiteral("https://example.com/audio")),
+        &authenticator,
+        QStringLiteral("proxy.example")
+    );
+    QCOMPARE(promptCount, 1);
 }
 
 void VotChromiumRequestSessionTests::transportRetiresFinishedSessionsBeforeProfileReset()

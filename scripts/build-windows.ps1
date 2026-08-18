@@ -83,10 +83,17 @@ if ($LASTEXITCODE -ne 0) {
                 "trust-rules",
                 "certificate-validator",
                 "window",
+                "reader",
+                "video-presentation",
                 "persistence",
+                "vot",
+                "vot-request-session",
                 "network",
+                "user-agent",
+                "credentials-auth",
                 "browsing",
-                "webapps"
+                "webapps",
+                "webapp-install"
             )) {
                 $DiagnosticPrefix = Join-Path $BuildDir "PanBrowserTests.$TestSuite"
                 $DiagnosticOutput = "$DiagnosticPrefix.stdout.txt"
