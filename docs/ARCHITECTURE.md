@@ -45,8 +45,9 @@ allowing PanBrowser to own the surrounding UI and certificate-error policy.
 flowchart TD
     App["main.cpp / QApplication"] --> Instance["SingleInstanceCoordinator / local IPC"]
     Instance --> MW["Primary MainWindow"]
+    MW --> WindowUi["BrowserWindowUi / widgets and actions"]
     MW --> Profile["BrowserProfile / QWebEngineProfile"]
-    MW --> Tabs["QTabBar + QStackedWidget"]
+    WindowUi --> Tabs["QTabBar + QStackedWidget"]
     Tabs --> View["QWebEngineView per tab"]
     View --> Page["BrowserPage per tab"]
     Page --> Profile
@@ -69,11 +70,16 @@ flowchart TD
     ConnectionPolicy --> PSL["Bundled Public Suffix List"]
     MW --> Session["SessionStore"]
     MW --> WebApps["WebAppStore / web-apps.json"]
+    MW --> WebAppInstall["WebAppInstallController"]
+    WebAppInstall --> WebApps
     WebApps --> Shortcuts["WebAppShortcutManager / macOS .app launchers"]
+    MW --> ConnectionRouter["CrossDomainWindowRouter"]
+    RequestFilter --> ConnectionRouter
     Page --> VotBridge["VotUserscriptBridge / isolated world"]
     VotManager --> VotStore["VotUserscriptStore / vot-storage.json"]
     VotManager --> VotBridge
     VotBridge --> VotTransport["VotChromiumNetworkTransport / isolated profile"]
+    VotTransport --> VotSession["VotChromiumRequestSession per request"]
     VotTransport --> InternalExtension["Built-in inert MV3 transport extension"]
     InternalExtension --> VotRequestFilter["Fail-closed VOT request interceptor"]
     VotRequestFilter --> RequestFilter
@@ -114,6 +120,14 @@ shared `BrowserProfile`, `DownloadManager`, `HistoryStore`, `BookmarkStore`,
 reuse those objects and the current trust, search, User-Agent, DNS, proxy,
 video-translation, and preference state; they do not create independent browser
 profiles.
+
+`MainWindow` remains the composition root, but it no longer owns every feature
+state machine directly. `BrowserWindowUi` creates and retains the window's
+widgets, menus, and actions. `WebAppInstallController` owns manifest discovery,
+bounded fetch requests, install confirmation, and shortcut creation.
+`CrossDomainWindowRouter` is shared by the primary, popup, and installed
+web-app windows and assigns each pending Site Connections decision to one
+live prompt controller.
 
 Each tab owns one `QWebEngineView` and one `BrowserPage`. `BrowserTabState` in
 `MainWindow` contains UI state that Qt WebEngine does not provide as a single
@@ -270,8 +284,8 @@ Qt WebEngine exposes Chromium rendering and persistent-profile primitives but
 does not expose Chromium's PWA installation UI. PanBrowser therefore owns a
 small manifest-based installation layer:
 
-1. after a successful HTTPS load, `MainWindow` looks for a manifest link in an
-   isolated JavaScript world;
+1. after a successful HTTPS load, `WebAppInstallController` looks for a
+   manifest link in an isolated JavaScript world;
 2. only same-origin HTTPS manifest URLs are offered for installation;
 3. `BrowserPage` fetches the manifest in the existing page context so the
    request uses the same WebEngine profile, cookies, and certificate handling;
@@ -726,13 +740,15 @@ application so they remain reviewable and reproducible.
 
 The interceptor includes the normalized selected source identity in its queued
 notification, except for the bounded origin-only case described above.
-`MainWindow` requires an exact page identity for normal notifications. It falls
-back to an exact-origin match only for an explicitly marked origin-only identity
+`CrossDomainWindowRouter` requires an exact page identity for normal
+notifications. It falls back to an exact-origin match only for an explicitly
+marked origin-only identity
 and only when there is a single candidate, avoiding attribution to a page that
 navigated elsewhere before queued delivery.
-The primary `MainWindow` assigns one prompt owner to each source-site/target-host
-decision and merges matching views from browser, popup, and installed web-app
-windows as further URL notifications arrive. Before routing a queued
+The primary window's shared `CrossDomainWindowRouter` assigns one prompt owner
+to each source-site/target-host decision and merges matching views from browser,
+popup, and installed web-app windows as further URL notifications arrive.
+Before routing a queued
 notification, it confirms that the corresponding URL fingerprint is still
 pending; a session decision or dismissal therefore cannot reopen a stale
 prompt. If no matching source view remains after bounded retries, only that
@@ -819,6 +835,14 @@ built-in Manifest V3 extension provides the cross-origin `fetch` capability.
 The extension has no background worker, content scripts, external messaging,
 or remotely supplied code; its hidden page is opened only by PanBrowser. It is
 not a general extension platform.
+
+Profile and extension initialization stay in
+`VotChromiumNetworkTransport`. Each request is represented by one
+`VotChromiumRequestSession`, which owns its hidden extension page, timeout,
+console-response parser, proxy-auth forwarding, and exactly-once terminal
+response. A request timeout therefore remains active while the shared profile
+is still loading, without mixing per-request page lifetime into the profile
+bootstrap state machine.
 
 `VotUserscriptManager` installs page bridges while that transport is still
 loading so the userscript is present in the initial document rather than only
@@ -1313,14 +1337,20 @@ of collecting the entire browser test surface in one QObject:
 
 - `TrustTests.cpp` contains focused `trust-configuration`, `trust-rules`, and
   platform-only `certificate-validator` suites;
-- `WindowInteractionTests.cpp` covers browser-window interaction and chrome;
-- `PersistenceAndPolicyTests.cpp` covers stored state, navigation policy, and
-  the verified VOT package/storage/Chromium-network boundary;
-- `NetworkSettingsAndAuthTests.cpp` covers DNS, proxy, User-Agent profiles,
-  permissions, and auth;
+- `WindowInteractionTests.cpp` covers browser-window interaction and chrome,
+  while `ReaderModeTests.cpp` and `VideoPresentationTests.cpp` isolate the
+  WebEngine-heavy reader and video-window lifecycles;
+- `PersistenceAndPolicyTests.cpp` covers stored state and navigation policy;
+  `VotIntegrationTests.cpp` and `VotChromiumRequestSessionTests.cpp` cover the
+  verified VOT package/storage/profile and per-request boundaries;
+- `NetworkSettingsTests.cpp`, `UserAgentTests.cpp`, and
+  `CredentialsAndAuthTests.cpp` cover DNS/proxy configuration, User-Agent
+  profiles, password storage, and authentication independently;
 - `BrowsingFeaturesTests.cpp` covers address suggestions, history, bookmarks,
   find-in-page, and zoom;
-- `ApplicationAndWebAppTests.cpp` covers launch coordination and web apps.
+- `ApplicationAndWebAppTests.cpp` covers launch coordination and web-app
+  persistence, while `WebAppInstallControllerTests.cpp` covers live manifest
+  discovery and install-action state.
 
 Together these suites cover domains and rule validation, settings backups,
 window placement, sessions, cleanup boundaries, downloads, permissions,
