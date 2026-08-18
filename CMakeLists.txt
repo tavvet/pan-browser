@@ -408,6 +408,7 @@ qt_add_executable(PanBrowserTests
     tests/PanBrowserTestCommon.h
     tests/PanBrowserTestsMain.cpp
     tests/PersistenceAndPolicyTests.cpp
+    tests/VotIntegrationTests.cpp
     tests/TrustTests.cpp
     tests/WindowInteractionTests.cpp
     src/AddressLineEdit.cpp
@@ -664,6 +665,7 @@ if(WIN32 OR CMAKE_SYSTEM_NAME STREQUAL "Linux")
 endif()
 add_test(NAME PanBrowserWindowTests COMMAND PanBrowserTests window)
 add_test(NAME PanBrowserPersistenceTests COMMAND PanBrowserTests persistence)
+add_test(NAME PanBrowserVotTests COMMAND PanBrowserTests vot)
 add_test(NAME PanBrowserNetworkTests COMMAND PanBrowserTests network)
 add_test(NAME PanBrowserBrowsingTests COMMAND PanBrowserTests browsing)
 add_test(NAME PanBrowserWebAppTests COMMAND PanBrowserTests webapps)

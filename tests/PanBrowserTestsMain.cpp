@@ -9,6 +9,7 @@ int runCertificateTrustValidatorTests(int argc, char **argv);
 #endif
 int runWindowInteractionTests(int argc, char **argv);
 int runPersistenceAndPolicyTests(int argc, char **argv);
+int runVotIntegrationTests(int argc, char **argv);
 int runNetworkSettingsAndAuthTests(int argc, char **argv);
 int runBrowsingFeaturesTests(int argc, char **argv);
 int runApplicationAndWebAppTests(int argc, char **argv);
@@ -38,6 +39,8 @@ int main(int argc, char *argv[])
         return runWindowInteractionTests(argc, argv);
     if (suite == QStringLiteral("persistence"))
         return runPersistenceAndPolicyTests(argc, argv);
+    if (suite == QStringLiteral("vot"))
+        return runVotIntegrationTests(argc, argv);
     if (suite == QStringLiteral("network"))
         return runNetworkSettingsAndAuthTests(argc, argv);
     if (suite == QStringLiteral("browsing"))
