@@ -404,7 +404,8 @@ qt_add_executable(PanBrowserTests
     src/AddressCompletionPopup.h
     tests/ApplicationAndWebAppTests.cpp
     tests/BrowsingFeaturesTests.cpp
-    tests/NetworkSettingsAndAuthTests.cpp
+    tests/CredentialsAndAuthTests.cpp
+    tests/NetworkSettingsTests.cpp
     tests/PanBrowserTestCommon.h
     tests/PanBrowserTestsMain.cpp
     tests/PersistenceAndPolicyTests.cpp
@@ -412,6 +413,7 @@ qt_add_executable(PanBrowserTests
     tests/VideoPresentationTests.cpp
     tests/VotIntegrationTests.cpp
     tests/TrustTests.cpp
+    tests/UserAgentTests.cpp
     tests/WindowInteractionTests.cpp
     src/AddressLineEdit.cpp
     src/AddressLineEdit.h
@@ -674,5 +676,10 @@ add_test(
 add_test(NAME PanBrowserPersistenceTests COMMAND PanBrowserTests persistence)
 add_test(NAME PanBrowserVotTests COMMAND PanBrowserTests vot)
 add_test(NAME PanBrowserNetworkTests COMMAND PanBrowserTests network)
+add_test(NAME PanBrowserUserAgentTests COMMAND PanBrowserTests user-agent)
+add_test(
+    NAME PanBrowserCredentialsAndAuthTests
+    COMMAND PanBrowserTests credentials-auth
+)
 add_test(NAME PanBrowserBrowsingTests COMMAND PanBrowserTests browsing)
 add_test(NAME PanBrowserWebAppTests COMMAND PanBrowserTests webapps)

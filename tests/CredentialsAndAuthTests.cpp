@@ -181,25 +181,12 @@ public:
 
 } // namespace
 
-class NetworkSettingsAndAuthTests final : public QObject {
+class CredentialsAndAuthTests final : public QObject {
     Q_OBJECT
 
 private slots:
-    void dnsSettingsDefaultToSystemAndIncludeBuiltIns();
-    void dnsSettingsRoundTripCustomProvidersAndCreateBackup();
-    void dnsSettingsRejectOversizedConfigurationWithoutWriting();
-    void dnsSettingsRejectUnsafeTemplatesAndApplyModes();
-    void proxySettingsDefaultToSystemAndRoundTrip();
-    void proxySettingsRejectUnsafeManualConfiguration();
-    void proxySettingsApplyGlobalModes();
-    void proxySettingsCompareOnlyEffectiveConfiguration();
-    void proxyFailureBlocksWebEngineNetworkSchemes();
-    void userAgentSettingsRoundTripAndRejectUnsafeValues();
-    void userAgentSettingsApplyProfileAndCompareEffectiveConfiguration();
-    void userAgentSettingsPageSelectsAndProtectsProfiles();
     void credentialTargetsAreOriginScopedAndDeterministic();
     void credentialPayloadRoundTripsMetadataAndLegacyRecords();
-    void credentialsSettingsPageListsAndRemovesSavedCredentials();
     void httpAuthenticationAcceptsCredentialsAndSanitizesDisplay();
     void httpAuthenticationCancelClearsAuthenticator();
     void httpAuthenticationRetriesAndWarnsForPlainHttp();
@@ -211,485 +198,11 @@ private slots:
     void httpAuthenticationRealmDisplayRemovesControlCharacters();
     void proxyAuthenticationUsesSharedCredentialDialog();
     void manualProxyAuthenticationUsesSavedCredentials();
+    void credentialsSettingsPageListsAndRemovesSavedCredentials();
     void nativeCredentialStoreRoundTripsWhenEnabled();
 };
 
-void NetworkSettingsAndAuthTests::dnsSettingsDefaultToSystemAndIncludeBuiltIns()
-{
-    const DnsSettings settings = DnsSettings::defaults();
-    QCOMPARE(settings.mode(), DnsResolutionMode::System);
-    QCOMPARE(settings.selectedProviderId(), QStringLiteral("builtin-adguard"));
-    QCOMPARE(settings.providers().size(), 6);
-    const DnsProvider *adguard = settings.providerById(QStringLiteral("builtin-adguard"));
-    QVERIFY(adguard);
-    QCOMPARE(adguard->name, QStringLiteral("AdGuard DNS"));
-    QCOMPARE(
-        adguard->serverTemplates,
-        QStringList{QStringLiteral("https://dns.adguard-dns.com/dns-query{?dns}")}
-    );
-    QString error;
-    QVERIFY2(settings.validate(&error), qPrintable(error));
-    QVERIFY2(applyDnsSettings(settings, &error), qPrintable(error));
-}
-
-void NetworkSettingsAndAuthTests::userAgentSettingsRoundTripAndRejectUnsafeValues()
-{
-    QTemporaryDir directory;
-    QVERIFY(directory.isValid());
-    const QString path = directory.filePath(QStringLiteral("user-agents.json"));
-
-    UserAgentSettings settings = UserAgentSettings::defaults();
-    QCOMPARE(settings.selectedProfileId(), defaultUserAgentProfileId());
-    QCOMPARE(settings.profiles().size(), 5);
-    QVERIFY(settings.profileById(QStringLiteral("builtin-chromium-android")));
-
-    UserAgentProfile custom;
-    custom.id = QStringLiteral("test-windows");
-    custom.name = QStringLiteral("Test Windows profile");
-    custom.userAgent = QStringLiteral(
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) TestBrowser/1.0"
-    );
-    custom.platform = UserAgentPlatform::Windows;
-    settings.profiles().append(custom);
-    settings.setSelectedProfileId(custom.id);
-
-    QString error;
-    QVERIFY2(settings.validate(&error), qPrintable(error));
-    QVERIFY2(settings.save(path, &error), qPrintable(error));
-    QVERIFY2(settings.save(path, &error), qPrintable(error));
-    const QString backupPath = path + QStringLiteral(".backup");
-    QVERIFY(QFileInfo::exists(backupPath));
-#if defined(Q_OS_UNIX)
-    for (const QString &privatePath : {path, backupPath}) {
-        const QFileDevice::Permissions permissions = QFileInfo(privatePath).permissions();
-        QVERIFY(permissions.testFlag(QFileDevice::ReadOwner));
-        QVERIFY(permissions.testFlag(QFileDevice::WriteOwner));
-        QVERIFY(!permissions.testFlag(QFileDevice::ReadGroup));
-        QVERIFY(!permissions.testFlag(QFileDevice::ReadOther));
-    }
-#endif
-
-    UserAgentSettings loaded;
-    QVERIFY2(loaded.load(path, &error), qPrintable(error));
-    QCOMPARE(loaded.selectedProfileId(), custom.id);
-    const UserAgentProfile *restored = loaded.profileById(custom.id);
-    QVERIFY(restored);
-    QCOMPARE(restored->name, custom.name);
-    QCOMPARE(restored->userAgent, custom.userAgent);
-    QCOMPARE(restored->platform, UserAgentPlatform::Windows);
-    QVERIFY(!restored->mobile);
-    QVERIFY(!restored->builtIn);
-
-    UserAgentSettings unsafe = loaded;
-    unsafe.profileById(custom.id)->userAgent = QStringLiteral("Valid/1.0\r\nInjected: yes");
-    QVERIFY(!unsafe.validate(&error));
-    QVERIFY(error.contains(QStringLiteral("printable ASCII")));
-
-    unsafe = loaded;
-    unsafe.setSelectedProfileId(QStringLiteral("missing"));
-    QVERIFY(!unsafe.validate(&error));
-    QVERIFY(error.contains(QStringLiteral("does not exist")));
-
-    unsafe = loaded;
-    unsafe.profileById(custom.id)->id = QStringLiteral("builtin-custom");
-    QVERIFY(!unsafe.validate(&error));
-    QVERIFY(error.contains(QStringLiteral("built-in prefix")));
-
-    UserAgentSettings localizedBuiltInName = loaded;
-    localizedBuiltInName.profileById(custom.id)->name =
-        localizedBuiltInName.profileById(defaultUserAgentProfileId())->name;
-    QVERIFY2(localizedBuiltInName.validate(&error), qPrintable(error));
-
-    UserAgentProfile duplicateCustom = custom;
-    duplicateCustom.id = QStringLiteral("duplicate-custom-name");
-    loaded.profiles().append(duplicateCustom);
-    QVERIFY(!loaded.validate(&error));
-    QVERIFY(error.contains(QStringLiteral("Duplicate User-Agent profile name")));
-}
-
-void NetworkSettingsAndAuthTests::userAgentSettingsApplyProfileAndCompareEffectiveConfiguration()
-{
-    UserAgentSettings defaults = UserAgentSettings::defaults();
-    QString error;
-    QVERIFY2(defaults.validate(&error), qPrintable(error));
-
-    QWebEngineProfile defaultProfile;
-    const QString defaultUserAgent = defaultProfile.httpUserAgent();
-    QVERIFY2(
-        applyUserAgentSettings(&defaultProfile, defaults, &error),
-        qPrintable(error)
-    );
-    QCOMPARE(defaultProfile.httpUserAgent(), defaultUserAgent);
-
-    UserAgentSettings custom = defaults;
-    UserAgentProfile profile;
-    profile.id = QStringLiteral("test-android");
-    profile.name = QStringLiteral("Test Android");
-    profile.userAgent = QStringLiteral(
-        "Mozilla/5.0 (Linux; Android 10; K) TestBrowser/2.0 Mobile"
-    );
-    profile.platform = UserAgentPlatform::Android;
-    profile.mobile = true;
-    custom.profiles().append(profile);
-    custom.setSelectedProfileId(profile.id);
-
-    QWebEngineProfile customProfile;
-    QVERIFY2(
-        applyUserAgentSettings(&customProfile, custom, &error),
-        qPrintable(error)
-    );
-    QCOMPARE(customProfile.httpUserAgent(), profile.userAgent);
-    QVERIFY(customProfile.clientHints());
-    QCOMPARE(customProfile.clientHints()->platform(), QStringLiteral("Android"));
-    QVERIFY(customProfile.clientHints()->isMobile());
-    QVERIFY(!customProfile.clientHints()->isAllClientHintsEnabled());
-
-    QWebEnginePage page(&customProfile);
-    bool scriptFinished = false;
-    QString navigatorUserAgent;
-    page.runJavaScript(
-        QStringLiteral("navigator.userAgent"),
-        [&](const QVariant &result) {
-            navigatorUserAgent = result.toString();
-            scriptFinished = true;
-        }
-    );
-    QTRY_VERIFY_WITH_TIMEOUT(scriptFinished, 5000);
-    QCOMPARE(navigatorUserAgent, profile.userAgent);
-    QVERIFY(!hasSameEffectiveUserAgentConfiguration(defaults, custom));
-
-    UserAgentSettings renamed = custom;
-    renamed.profileById(profile.id)->name = QStringLiteral("Renamed only");
-    QVERIFY(hasSameEffectiveUserAgentConfiguration(custom, renamed));
-
-    UserAgentSettings inactiveChanged = custom;
-    inactiveChanged.profileById(QStringLiteral("builtin-chromium-windows"))->name =
-        QStringLiteral("Inactive renamed profile");
-    QVERIFY(hasSameEffectiveUserAgentConfiguration(custom, inactiveChanged));
-
-    UserAgentSettings changed = custom;
-    changed.profileById(profile.id)->mobile = false;
-    QVERIFY(!hasSameEffectiveUserAgentConfiguration(custom, changed));
-}
-
-void NetworkSettingsAndAuthTests::userAgentSettingsPageSelectsAndProtectsProfiles()
-{
-    UserAgentSettings settings = UserAgentSettings::defaults();
-    UserAgentProfile custom;
-    custom.id = QStringLiteral("custom-page-test");
-    custom.name = QStringLiteral("Custom page test");
-    custom.userAgent = QStringLiteral("Mozilla/5.0 TestBrowser/1.0");
-    custom.platform = UserAgentPlatform::Linux;
-    settings.profiles().append(custom);
-
-    UserAgentSettingsPage page(settings, QStringLiteral("Default/1.0"));
-    auto *active = page.findChild<QComboBox *>(QStringLiteral("activeUserAgentProfile"));
-    auto *profiles = page.findChild<QListWidget *>(QStringLiteral("userAgentProfilesList"));
-    auto *edit = page.findChild<QPushButton *>(QStringLiteral("editUserAgentProfile"));
-    auto *duplicate = page.findChild<QPushButton *>(
-        QStringLiteral("duplicateUserAgentProfile")
-    );
-    auto *remove = page.findChild<QPushButton *>(QStringLiteral("removeUserAgentProfile"));
-    QVERIFY(active);
-    QVERIFY(profiles);
-    QVERIFY(edit);
-    QVERIFY(duplicate);
-    QVERIFY(remove);
-    QCOMPARE(active->count(), settings.profiles().size());
-    QCOMPARE(profiles->count(), settings.profiles().size());
-
-    const int customIndex = active->findData(custom.id);
-    QVERIFY(customIndex >= 0);
-    active->setCurrentIndex(customIndex);
-    QCOMPARE(page.settings().selectedProfileId(), custom.id);
-
-    profiles->setCurrentRow(profiles->count() - 1);
-    QVERIFY(edit->isEnabled());
-    QVERIFY(duplicate->isEnabled());
-    QVERIFY(remove->isEnabled());
-
-    profiles->setCurrentRow(0);
-    QVERIFY(!edit->isEnabled());
-    QVERIFY(!duplicate->isEnabled());
-    QVERIFY(!remove->isEnabled());
-}
-
-void NetworkSettingsAndAuthTests::dnsSettingsRoundTripCustomProvidersAndCreateBackup()
-{
-    QTemporaryDir directory;
-    QVERIFY(directory.isValid());
-    const QString path = directory.filePath(QStringLiteral("dns-settings.json"));
-
-    DnsSettings settings = DnsSettings::defaults();
-    DnsProvider custom;
-    custom.id = QStringLiteral("custom-test");
-    custom.name = QStringLiteral("Private resolver");
-    custom.description = QStringLiteral("Test provider");
-    custom.serverTemplates = {
-        QStringLiteral("https://resolver.example/profile-id/dns-query{?dns}"),
-        QStringLiteral("https://backup.example/dns-query"),
-    };
-    settings.providers().append(custom);
-    settings.setSelectedProviderId(custom.id);
-    settings.setMode(DnsResolutionMode::SecureOnly);
-
-    QString error;
-    QVERIFY2(settings.save(path, &error), qPrintable(error));
-#if defined(Q_OS_UNIX)
-    const QFileDevice::Permissions permissions = QFileInfo(path).permissions();
-    QVERIFY(permissions.testFlag(QFileDevice::ReadOwner));
-    QVERIFY(permissions.testFlag(QFileDevice::WriteOwner));
-    QVERIFY(!permissions.testFlag(QFileDevice::ReadGroup));
-    QVERIFY(!permissions.testFlag(QFileDevice::ReadOther));
-#endif
-
-    settings.setMode(DnsResolutionMode::SecureWithFallback);
-    QVERIFY2(settings.save(path, &error), qPrintable(error));
-    const QString backupPath = path + QStringLiteral(".backup");
-    QVERIFY(QFileInfo::exists(backupPath));
-#if defined(Q_OS_UNIX)
-    const QFileDevice::Permissions backupPermissions = QFileInfo(backupPath).permissions();
-    QVERIFY(backupPermissions.testFlag(QFileDevice::ReadOwner));
-    QVERIFY(!backupPermissions.testFlag(QFileDevice::ReadGroup));
-    QVERIFY(!backupPermissions.testFlag(QFileDevice::ReadOther));
-#endif
-
-    DnsSettings loaded;
-    QVERIFY2(loaded.load(path, &error), qPrintable(error));
-    QCOMPARE(loaded.mode(), DnsResolutionMode::SecureWithFallback);
-    QCOMPARE(loaded.selectedProviderId(), custom.id);
-    const DnsProvider *restored = loaded.providerById(custom.id);
-    QVERIFY(restored);
-    QCOMPARE(restored->name, custom.name);
-    QCOMPARE(restored->serverTemplates, custom.serverTemplates);
-    QVERIFY(!restored->builtIn);
-}
-
-void NetworkSettingsAndAuthTests::dnsSettingsRejectOversizedConfigurationWithoutWriting()
-{
-    QTemporaryDir directory;
-    QVERIFY(directory.isValid());
-    const QString path = directory.filePath(QStringLiteral("dns-settings.json"));
-
-    DnsSettings settings = DnsSettings::defaults();
-    QString error;
-    QVERIFY2(settings.save(path, &error), qPrintable(error));
-    QFile original(path);
-    QVERIFY(original.open(QIODevice::ReadOnly));
-    const QByteArray originalContents = original.readAll();
-    original.close();
-
-    DnsProvider custom;
-    custom.id = QStringLiteral("custom-oversized");
-    custom.name = QStringLiteral("Oversized resolver");
-    custom.description = QString(300 * 1024, QLatin1Char('x'));
-    custom.serverTemplates = {QStringLiteral("https://resolver.example/dns-query")};
-    settings.providers().append(custom);
-
-    QVERIFY(!settings.save(path, &error));
-    QVERIFY(error.contains(QStringLiteral("too large")));
-    QFile unchanged(path);
-    QVERIFY(unchanged.open(QIODevice::ReadOnly));
-    QCOMPARE(unchanged.readAll(), originalContents);
-    QVERIFY(!QFileInfo::exists(path + QStringLiteral(".backup")));
-}
-
-void NetworkSettingsAndAuthTests::dnsSettingsRejectUnsafeTemplatesAndApplyModes()
-{
-    DnsSettings settings = DnsSettings::defaults();
-    DnsProvider custom;
-    custom.id = QStringLiteral("custom-invalid");
-    custom.name = QStringLiteral("Invalid resolver");
-    custom.serverTemplates = {QStringLiteral("http://resolver.example/dns-query")};
-    settings.providers().append(custom);
-    settings.setSelectedProviderId(custom.id);
-
-    QString error;
-    QVERIFY(!settings.validate(&error));
-    QVERIFY(error.contains(QStringLiteral("HTTPS")));
-
-    settings.providers().last().serverTemplates = {
-        QStringLiteral("https://user:secret@resolver.example/dns-query")
-    };
-    QVERIFY(!settings.validate(&error));
-    QVERIFY(error.contains(QStringLiteral("credentials")));
-
-    settings.providers().last().serverTemplates = {
-        QStringLiteral("https://resolver.example/dns-query{?unsupported}")
-    };
-    QVERIFY(!settings.validate(&error));
-    QVERIFY(error.contains(QStringLiteral("unsupported")));
-
-    settings.providers().removeLast();
-    settings.setSelectedProviderId(QStringLiteral("builtin-adguard"));
-    settings.setMode(DnsResolutionMode::SecureWithFallback);
-    const bool fallbackApplied = applyDnsSettings(settings, &error);
-    settings.setMode(DnsResolutionMode::SecureOnly);
-    const bool strictApplied = applyDnsSettings(settings, &error);
-    settings.setMode(DnsResolutionMode::System);
-    QString resetError;
-    const bool systemRestored = applyDnsSettings(settings, &resetError);
-    QVERIFY2(fallbackApplied, qPrintable(error));
-    QVERIFY2(strictApplied, qPrintable(error));
-    QVERIFY2(systemRestored, qPrintable(resetError));
-}
-
-void NetworkSettingsAndAuthTests::proxySettingsDefaultToSystemAndRoundTrip()
-{
-    QTemporaryDir directory;
-    QVERIFY(directory.isValid());
-    const QString path = directory.filePath(QStringLiteral("proxy-settings.json"));
-
-    ProxySettings settings = ProxySettings::defaults();
-    QCOMPARE(settings.mode(), ProxyMode::System);
-    settings.setMode(ProxyMode::Manual);
-    settings.setManualType(ManualProxyType::Http);
-    settings.setHost(QStringLiteral("proxy.example.com"));
-    settings.setPort(3128);
-    settings.setUsername(QStringLiteral("alice"));
-
-    QString error;
-    QVERIFY2(settings.save(path, &error), qPrintable(error));
-#if defined(Q_OS_UNIX)
-    const QFileDevice::Permissions permissions = QFileInfo(path).permissions();
-    QVERIFY(permissions.testFlag(QFileDevice::ReadOwner));
-    QVERIFY(permissions.testFlag(QFileDevice::WriteOwner));
-    QVERIFY(!permissions.testFlag(QFileDevice::ReadGroup));
-    QVERIFY(!permissions.testFlag(QFileDevice::ReadOther));
-#endif
-    settings.setManualType(ManualProxyType::Socks5);
-    QVERIFY2(settings.save(path, &error), qPrintable(error));
-    const QString backupPath = path + QStringLiteral(".backup");
-    QVERIFY(QFileInfo::exists(backupPath));
-#if defined(Q_OS_UNIX)
-    const QFileDevice::Permissions backupPermissions = QFileInfo(backupPath).permissions();
-    QVERIFY(backupPermissions.testFlag(QFileDevice::ReadOwner));
-    QVERIFY(!backupPermissions.testFlag(QFileDevice::ReadGroup));
-    QVERIFY(!backupPermissions.testFlag(QFileDevice::ReadOther));
-#endif
-
-    QFile file(path);
-    QVERIFY(file.open(QIODevice::ReadOnly));
-    const QByteArray contents = file.readAll();
-    QVERIFY(!contents.contains("password"));
-    QVERIFY(!contents.contains("secret"));
-
-    ProxySettings loaded;
-    QVERIFY2(loaded.load(path, &error), qPrintable(error));
-    QCOMPARE(loaded, settings);
-}
-
-void NetworkSettingsAndAuthTests::proxySettingsRejectUnsafeManualConfiguration()
-{
-    ProxySettings settings = ProxySettings::defaults();
-    settings.setMode(ProxyMode::Manual);
-    QString error;
-    QVERIFY(!settings.validate(&error));
-    QVERIFY(error.contains(QStringLiteral("host"), Qt::CaseInsensitive));
-
-    settings.setHost(QStringLiteral("https://proxy.example.com/path"));
-    QVERIFY(!settings.validate(&error));
-    settings.setHost(QStringLiteral("user@proxy.example.com"));
-    QVERIFY(!settings.validate(&error));
-    settings.setHost(QStringLiteral("2001:db8::1"));
-    settings.setPort(1080);
-    QVERIFY2(settings.validate(&error), qPrintable(error));
-    settings.setUsername(QStringLiteral("bad\nuser"));
-    QVERIFY(!settings.validate(&error));
-}
-
-void NetworkSettingsAndAuthTests::proxySettingsApplyGlobalModes()
-{
-    QString error;
-    ProxySettings settings = ProxySettings::defaults();
-    const bool systemApplied = applyProxySettings(settings, &error);
-    const bool systemEnabled = QNetworkProxyFactory::usesSystemConfiguration();
-
-    settings.setMode(ProxyMode::NoProxy);
-    const bool directApplied = applyProxySettings(settings, &error);
-    const bool systemDisabledForDirect = !QNetworkProxyFactory::usesSystemConfiguration();
-    const QNetworkProxy directProxy = QNetworkProxy::applicationProxy();
-
-    settings.setMode(ProxyMode::Manual);
-    settings.setManualType(ManualProxyType::Http);
-    settings.setHost(QStringLiteral("proxy.example.com"));
-    settings.setPort(3128);
-    settings.setUsername(QStringLiteral("alice"));
-    const bool httpApplied = applyProxySettings(settings, &error);
-    const QNetworkProxy httpProxy = QNetworkProxy::applicationProxy();
-
-    settings.setManualType(ManualProxyType::Socks5);
-    settings.setPort(1080);
-    const bool socksApplied = applyProxySettings(settings, &error);
-    const QNetworkProxy socksProxy = QNetworkProxy::applicationProxy();
-
-    ProxySettings restore = ProxySettings::defaults();
-    QString restoreError;
-    const bool restored = applyProxySettings(restore, &restoreError);
-
-    QVERIFY2(systemApplied, qPrintable(error));
-    QVERIFY(systemEnabled);
-    QVERIFY2(directApplied, qPrintable(error));
-    QVERIFY(systemDisabledForDirect);
-    QCOMPARE(directProxy.type(), QNetworkProxy::NoProxy);
-    QVERIFY2(httpApplied, qPrintable(error));
-    QCOMPARE(httpProxy.type(), QNetworkProxy::HttpProxy);
-    QCOMPARE(httpProxy.hostName(), QStringLiteral("proxy.example.com"));
-    QCOMPARE(httpProxy.port(), quint16(3128));
-    QVERIFY(httpProxy.user().isEmpty());
-    QVERIFY(httpProxy.password().isEmpty());
-    QVERIFY2(socksApplied, qPrintable(error));
-    QCOMPARE(socksProxy.type(), QNetworkProxy::Socks5Proxy);
-    QCOMPARE(socksProxy.port(), quint16(1080));
-    QVERIFY2(restored, qPrintable(restoreError));
-}
-
-void NetworkSettingsAndAuthTests::proxySettingsCompareOnlyEffectiveConfiguration()
-{
-    QVERIFY(manualProxyAuthenticationSupported(ManualProxyType::Http));
-    QVERIFY(!manualProxyAuthenticationSupported(ManualProxyType::Socks5));
-
-    ProxySettings active = ProxySettings::defaults();
-    ProxySettings configured = active;
-    configured.setHost(QStringLiteral("draft.example.com"));
-    configured.setPort(3128);
-    configured.setUsername(QStringLiteral("draft-user"));
-    QVERIFY(hasSameEffectiveProxyConfiguration(active, configured));
-
-    configured.setMode(ProxyMode::Manual);
-    QVERIFY(!hasSameEffectiveProxyConfiguration(active, configured));
-    active = configured;
-    QVERIFY(hasSameEffectiveProxyConfiguration(active, configured));
-
-    configured.setUsername(QStringLiteral("different-user"));
-    QVERIFY(!hasSameEffectiveProxyConfiguration(active, configured));
-    active.setManualType(ManualProxyType::Socks5);
-    configured.setManualType(ManualProxyType::Socks5);
-    QVERIFY(hasSameEffectiveProxyConfiguration(active, configured));
-
-    configured.setPort(1080);
-    QVERIFY(!hasSameEffectiveProxyConfiguration(active, configured));
-}
-
-void NetworkSettingsAndAuthTests::proxyFailureBlocksWebEngineNetworkSchemes()
-{
-    for (const QString &url : {
-             QStringLiteral("http://example.com"),
-             QStringLiteral("https://example.com"),
-             QStringLiteral("ws://example.com/socket"),
-             QStringLiteral("wss://example.com/socket"),
-         }) {
-        QVERIFY(BrowserProfile::shouldBlockForProxyConfigurationError(QUrl(url)));
-    }
-    QVERIFY(!BrowserProfile::shouldBlockForProxyConfigurationError(
-        QUrl(QStringLiteral("about:blank"))
-    ));
-    QVERIFY(!BrowserProfile::shouldBlockForProxyConfigurationError(
-        QUrl(QStringLiteral("data:text/plain,offline"))
-    ));
-}
-
-void NetworkSettingsAndAuthTests::credentialTargetsAreOriginScopedAndDeterministic()
+void CredentialsAndAuthTests::credentialTargetsAreOriginScopedAndDeterministic()
 {
     const auto first = CredentialTarget::forHttpServer(
         QUrl(QStringLiteral("https://EXAMPLE.com/private?token=secret")),
@@ -721,7 +234,7 @@ void NetworkSettingsAndAuthTests::credentialTargetsAreOriginScopedAndDeterminist
     QVERIFY(!first->identifier().contains(QStringLiteral("example")));
 }
 
-void NetworkSettingsAndAuthTests::credentialPayloadRoundTripsMetadataAndLegacyRecords()
+void CredentialsAndAuthTests::credentialPayloadRoundTripsMetadataAndLegacyRecords()
 {
     const auto target = CredentialTarget::forHttpServer(
         QUrl(QStringLiteral("https://example.com/private")),
@@ -781,7 +294,7 @@ void NetworkSettingsAndAuthTests::credentialPayloadRoundTripsMetadataAndLegacyRe
     QCOMPARE(notFound.code, CredentialStoreErrorCode::None);
 }
 
-void NetworkSettingsAndAuthTests::httpAuthenticationAcceptsCredentialsAndSanitizesDisplay()
+void CredentialsAndAuthTests::httpAuthenticationAcceptsCredentialsAndSanitizesDisplay()
 {
     FakeCredentialStore store(false);
     HttpAuthenticationController controller(nullptr, &store);
@@ -835,7 +348,7 @@ void NetworkSettingsAndAuthTests::httpAuthenticationAcceptsCredentialsAndSanitiz
     QCOMPARE(authenticator.password(), QStringLiteral("top-secret"));
 }
 
-void NetworkSettingsAndAuthTests::httpAuthenticationCancelClearsAuthenticator()
+void CredentialsAndAuthTests::httpAuthenticationCancelClearsAuthenticator()
 {
     FakeCredentialStore store(false);
     HttpAuthenticationController controller(nullptr, &store);
@@ -863,7 +376,7 @@ void NetworkSettingsAndAuthTests::httpAuthenticationCancelClearsAuthenticator()
     QVERIFY(authenticator.password().isEmpty());
 }
 
-void NetworkSettingsAndAuthTests::httpAuthenticationRetriesAndWarnsForPlainHttp()
+void CredentialsAndAuthTests::httpAuthenticationRetriesAndWarnsForPlainHttp()
 {
     FakeCredentialStore store(true);
     HttpAuthenticationController controller(nullptr, &store);
@@ -929,7 +442,7 @@ void NetworkSettingsAndAuthTests::httpAuthenticationRetriesAndWarnsForPlainHttp(
     QCOMPARE(store.writeCount, 0);
 }
 
-void NetworkSettingsAndAuthTests::httpAuthenticationUsesAndRejectsSavedCredentialsWithoutLooping()
+void CredentialsAndAuthTests::httpAuthenticationUsesAndRejectsSavedCredentialsWithoutLooping()
 {
     FakeCredentialStore store;
     const QUrl url(QStringLiteral("https://example.com/private"));
@@ -978,7 +491,7 @@ void NetworkSettingsAndAuthTests::httpAuthenticationUsesAndRejectsSavedCredentia
     QVERIFY(!store.credentials.contains(target->identifier()));
 }
 
-void NetworkSettingsAndAuthTests::httpAuthenticationDoesNotPersistNonRealmSchemes()
+void CredentialsAndAuthTests::httpAuthenticationDoesNotPersistNonRealmSchemes()
 {
     FakeCredentialStore store;
     HttpAuthenticationController controller(nullptr, &store);
@@ -1005,7 +518,7 @@ void NetworkSettingsAndAuthTests::httpAuthenticationDoesNotPersistNonRealmScheme
     QCOMPARE(store.writeCount, 0);
 }
 
-void NetworkSettingsAndAuthTests::httpAuthenticationDoesNotSaveWithoutOptIn()
+void CredentialsAndAuthTests::httpAuthenticationDoesNotSaveWithoutOptIn()
 {
     FakeCredentialStore store;
     HttpAuthenticationController controller(nullptr, &store);
@@ -1041,7 +554,7 @@ void NetworkSettingsAndAuthTests::httpAuthenticationDoesNotSaveWithoutOptIn()
     QCOMPARE(authenticator.password(), QStringLiteral("session-secret"));
 }
 
-void NetworkSettingsAndAuthTests::httpAuthenticationSavesOnlyWithExplicitOptIn()
+void CredentialsAndAuthTests::httpAuthenticationSavesOnlyWithExplicitOptIn()
 {
     FakeCredentialStore store;
     HttpAuthenticationController controller(nullptr, &store);
@@ -1115,7 +628,7 @@ void NetworkSettingsAndAuthTests::httpAuthenticationSavesOnlyWithExplicitOptIn()
     QVERIFY(store.credentials.isEmpty());
 }
 
-void NetworkSettingsAndAuthTests::httpAuthenticationPolicyRejectsUnsafePromptContexts()
+void CredentialsAndAuthTests::httpAuthenticationPolicyRejectsUnsafePromptContexts()
 {
     const QUrl requestUrl(QStringLiteral("https://auth.example.com/private"));
     const QUrl sameOrigin(QStringLiteral("https://AUTH.example.com:443/login"));
@@ -1164,7 +677,7 @@ void NetworkSettingsAndAuthTests::httpAuthenticationPolicyRejectsUnsafePromptCon
     ));
 }
 
-void NetworkSettingsAndAuthTests::httpAuthenticationRealmDisplayRemovesControlCharacters()
+void CredentialsAndAuthTests::httpAuthenticationRealmDisplayRemovesControlCharacters()
 {
     const QString maliciousRealm = QStringLiteral("  Bank")
         + QChar(0x202e) + QStringLiteral("evil") + QChar(0x202c)
@@ -1187,7 +700,7 @@ void NetworkSettingsAndAuthTests::httpAuthenticationRealmDisplayRemovesControlCh
     QVERIFY(truncated.endsWith(QChar(0x2026)));
 }
 
-void NetworkSettingsAndAuthTests::proxyAuthenticationUsesSharedCredentialDialog()
+void CredentialsAndAuthTests::proxyAuthenticationUsesSharedCredentialDialog()
 {
     ProxySettings settings = ProxySettings::defaults();
     settings.setMode(ProxyMode::Manual);
@@ -1233,7 +746,7 @@ void NetworkSettingsAndAuthTests::proxyAuthenticationUsesSharedCredentialDialog(
     QCOMPARE(authenticator.password(), QStringLiteral("proxy-password"));
 }
 
-void NetworkSettingsAndAuthTests::manualProxyAuthenticationUsesSavedCredentials()
+void CredentialsAndAuthTests::manualProxyAuthenticationUsesSavedCredentials()
 {
     ProxySettings settings = ProxySettings::defaults();
     settings.setMode(ProxyMode::Manual);
@@ -1267,7 +780,7 @@ void NetworkSettingsAndAuthTests::manualProxyAuthenticationUsesSavedCredentials(
     QCOMPARE(authenticator.password(), QStringLiteral("proxy-secret"));
 }
 
-void NetworkSettingsAndAuthTests::credentialsSettingsPageListsAndRemovesSavedCredentials()
+void CredentialsAndAuthTests::credentialsSettingsPageListsAndRemovesSavedCredentials()
 {
     FakeCredentialStore store;
     const auto websiteTarget = CredentialTarget::forHttpServer(
@@ -1420,7 +933,7 @@ void NetworkSettingsAndAuthTests::credentialsSettingsPageListsAndRemovesSavedCre
     );
 }
 
-void NetworkSettingsAndAuthTests::nativeCredentialStoreRoundTripsWhenEnabled()
+void CredentialsAndAuthTests::nativeCredentialStoreRoundTripsWhenEnabled()
 {
 #if !defined(Q_OS_MACOS) && !defined(Q_OS_WIN) && !defined(Q_OS_LINUX)
     QSKIP("The native credential-store integration test is unavailable on this platform");
@@ -1497,12 +1010,13 @@ void NetworkSettingsAndAuthTests::nativeCredentialStoreRoundTripsWhenEnabled()
 }
 
 
-int runNetworkSettingsAndAuthTests(int argc, char **argv)
+
+int runCredentialsAndAuthTests(int argc, char **argv)
 {
     QApplication application(argc, argv);
     application.setAttribute(Qt::AA_Use96Dpi, true);
-    NetworkSettingsAndAuthTests tests;
+    CredentialsAndAuthTests tests;
     return QTest::qExec(&tests, argc, argv);
 }
 
-#include "NetworkSettingsAndAuthTests.moc"
+#include "CredentialsAndAuthTests.moc"
