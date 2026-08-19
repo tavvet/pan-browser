@@ -113,6 +113,7 @@ private slots:
     void votRequestsUseCrossDomainAndFailClosedPolicies();
     void votUserscriptBridgeInjectsOnlyOnMatchingPages();
     void votUserscriptBridgeInjectsIntoMatchingSubframes();
+    void votUserscriptManagerForgetsClosedPages();
 };
 
 void VotIntegrationTests::videoTranslationSettingsRoundTripAndValidateSource()
@@ -1093,6 +1094,41 @@ void VotIntegrationTests::votUserscriptBridgeInjectsIntoMatchingSubframes()
     );
     QTRY_VERIFY_WITH_TIMEOUT(callbackFinished, 15'000);
     QCOMPARE(result.toString(), QStringLiteral("/frame"));
+}
+
+void VotIntegrationTests::votUserscriptManagerForgetsClosedPages()
+{
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+    BrowserProfile profile(false);
+    VotUserscriptManager manager(
+        directory.filePath(QStringLiteral("vot-storage.json")),
+        &profile
+    );
+    BrowserPage page(&profile);
+    manager.configurePage(&page);
+
+    VotUserscript userscript;
+    userscript.version = VotUserscriptPackage::supportedVersion();
+    userscript.matchPatterns = {QStringLiteral("https://example.com/*")};
+    userscript.sourceCode = QStringLiteral("globalThis.__votClosingProbe = true;");
+    auto *bridge = new VotUserscriptBridge(
+        &page,
+        userscript,
+        nullptr,
+        nullptr,
+        &page
+    );
+    QPointer<VotUserscriptBridge> guardedBridge(bridge);
+    QCOMPARE(
+        page.scripts().find(VotUserscriptBridge::scriptName()).size(),
+        1
+    );
+
+    manager.forgetPage(&page);
+
+    QVERIFY(guardedBridge.isNull());
+    QVERIFY(page.scripts().find(VotUserscriptBridge::scriptName()).isEmpty());
 }
 
 

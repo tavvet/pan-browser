@@ -905,17 +905,35 @@ void MainWindow::showTabContextMenu(const QPoint &position)
     const int index = m_ui->tabBar->tabAt(position);
     if (index < 0)
         return;
+    QWebEngineView *webView = qobject_cast<QWebEngineView *>(
+        m_ui->tabStack->widget(index)
+    );
+    if (!webView || m_closingTabs.contains(webView))
+        return;
 
     QMenu menu(this);
     const bool pinned = m_ui->tabBar->isTabPinned(index);
+    const QPointer<QWebEngineView> targetView(webView);
     QAction *pinAction = menu.addAction(pinned ? tr("Unpin Tab") : tr("Pin Tab"));
-    connect(pinAction, &QAction::triggered, this, [this, index, pinned] {
-        setTabPinned(index, !pinned);
+    connect(pinAction, &QAction::triggered, this, [this, targetView] {
+        if (!targetView)
+            return;
+        const int currentIndex = m_ui->tabStack->indexOf(targetView);
+        if (currentIndex >= 0) {
+            setTabPinned(
+                currentIndex,
+                !m_ui->tabBar->isTabPinned(currentIndex)
+            );
+        }
     });
     menu.addSeparator();
     QAction *closeAction = menu.addAction(tr("Close Tab"));
-    connect(closeAction, &QAction::triggered, this, [this, index] {
-        closeTab(index);
+    connect(closeAction, &QAction::triggered, this, [this, targetView] {
+        if (!targetView)
+            return;
+        const int currentIndex = m_ui->tabStack->indexOf(targetView);
+        if (currentIndex >= 0)
+            closeTab(currentIndex);
     });
     menu.exec(m_ui->tabBar->mapToGlobal(position));
 }
@@ -928,10 +946,15 @@ void MainWindow::setTabPinned(int index, bool pinned)
         return;
     }
 
-    QWebEngineView *webView = qobject_cast<QWebEngineView *>(m_ui->tabStack->widget(index));
+    QWebEngineView *webView = qobject_cast<QWebEngineView *>(
+        m_ui->tabStack->widget(index)
+    );
     auto state = m_tabStates.find(webView);
-    if (state == m_tabStates.end() || state->pinned == pinned)
+    if (state == m_tabStates.end()
+        || m_closingTabs.contains(webView)
+        || state->pinned == pinned) {
         return;
+    }
 
     state->pinned = pinned;
     m_ui->tabBar->setTabPinned(index, pinned);
@@ -992,8 +1015,14 @@ void MainWindow::openNewTab()
 
 void MainWindow::closeCurrentTab()
 {
-    if (m_ui->tabBar)
-        closeTab(m_ui->tabBar->currentIndex());
+    if (!m_ui->tabBar)
+        return;
+    const int index = m_ui->tabBar->currentIndex();
+    QWebEngineView *webView = qobject_cast<QWebEngineView *>(
+        m_ui->tabStack->widget(index)
+    );
+    if (webView && !m_closingTabs.contains(webView))
+        closeTab(index);
 }
 
 void MainWindow::closeActiveBrowserSurface(QWebEngineView *webView)
@@ -1037,22 +1066,46 @@ void MainWindow::activateAdjacentTab(int offset)
 {
     if (!m_ui->tabBar)
         return;
-    const int index = TabNavigation::adjacentTabIndex(
-        m_ui->tabBar->currentIndex(),
-        m_ui->tabBar->count(),
+    const QList<int> indices = openTabIndices();
+    const int currentPosition = static_cast<int>(
+        indices.indexOf(m_ui->tabBar->currentIndex())
+    );
+    const int position = TabNavigation::adjacentTabIndex(
+        currentPosition,
+        static_cast<int>(indices.size()),
         offset
     );
-    if (index >= 0)
-        m_ui->tabBar->setCurrentIndex(index);
+    if (position >= 0)
+        m_ui->tabBar->setCurrentIndex(indices.at(position));
 }
 
 void MainWindow::activateNumberedTab(int position)
 {
     if (!m_ui->tabBar)
         return;
-    const int index = TabNavigation::numberedTabIndex(position, m_ui->tabBar->count());
-    if (index >= 0)
-        m_ui->tabBar->setCurrentIndex(index);
+    const QList<int> indices = openTabIndices();
+    const int logicalIndex = TabNavigation::numberedTabIndex(
+        position,
+        static_cast<int>(indices.size())
+    );
+    if (logicalIndex >= 0)
+        m_ui->tabBar->setCurrentIndex(indices.at(logicalIndex));
+}
+
+QList<int> MainWindow::openTabIndices() const
+{
+    QList<int> result;
+    if (!m_ui->tabStack)
+        return result;
+    result.reserve(m_ui->tabStack->count());
+    for (int index = 0; index < m_ui->tabStack->count(); ++index) {
+        QWebEngineView *webView = qobject_cast<QWebEngineView *>(
+            m_ui->tabStack->widget(index)
+        );
+        if (webView && !m_closingTabs.contains(webView))
+            result.append(index);
+    }
+    return result;
 }
 
 void MainWindow::closeTab(int index)
@@ -1060,10 +1113,13 @@ void MainWindow::closeTab(int index)
     if (index < 0 || index >= m_ui->tabBar->count())
         return;
 
-    QWebEngineView *webView = qobject_cast<QWebEngineView *>(m_ui->tabStack->widget(index));
-    if (!webView)
+    QWebEngineView *webView = qobject_cast<QWebEngineView *>(
+        m_ui->tabStack->widget(index)
+    );
+    if (!webView || m_closingTabs.contains(webView))
         return;
 
+    m_closingTabs.insert(webView);
     if (m_windowRole == WindowRole::Primary) {
         const auto state = m_tabStates.constFind(webView);
         if (state != m_tabStates.cend()) {
@@ -1075,6 +1131,50 @@ void MainWindow::closeTab(int index)
             while (m_closedTabs.size() > maximumClosedTabs)
                 m_closedTabs.removeLast();
         }
+    }
+
+    prepareTabForClosing(webView);
+
+    if (m_ui->tabBar->currentIndex() == index) {
+        int replacementIndex = -1;
+        const QList<int> remainingIndices = openTabIndices();
+        const auto next = std::upper_bound(
+            remainingIndices.cbegin(),
+            remainingIndices.cend(),
+            index
+        );
+        if (next != remainingIndices.cend())
+            replacementIndex = *next;
+        else if (!remainingIndices.isEmpty())
+            replacementIndex = remainingIndices.constLast();
+        if (replacementIndex >= 0)
+            m_ui->tabBar->setCurrentIndex(replacementIndex);
+    }
+    m_ui->tabBar->setTabEnabled(index, false);
+    updateTabNavigationActions();
+    scheduleSessionSave();
+
+    const QPointer<QWebEngineView> guardedWebView(webView);
+    if (!m_ui->tabBar->animateTabClosing(index, [this, guardedWebView] {
+            if (guardedWebView)
+                finishClosingTab(guardedWebView);
+        })) {
+        finishClosingTab(webView);
+    }
+}
+
+void MainWindow::prepareTabForClosing(QWebEngineView *webView)
+{
+    if (!webView)
+        return;
+
+    BrowserPage *browserPage = qobject_cast<BrowserPage *>(pageForTab(webView));
+    QPointer<ReaderModeController> readerModeController;
+    QPointer<DetachedVideoSession> detachedVideoSession;
+    const auto tabState = m_tabStates.constFind(webView);
+    if (tabState != m_tabStates.cend()) {
+        readerModeController = tabState->readerModeController;
+        detachedVideoSession = tabState->detachedVideoSession;
     }
 
     m_expectedDetachedVideoExits.remove(webView);
@@ -1091,14 +1191,42 @@ void MainWindow::closeTab(int index)
         if (m_ui->findBar)
             m_ui->findBar->clearResults();
     }
+    if (m_lastInteractionWebView == webView)
+        m_lastInteractionWebView.clear();
+    if (readerModeController)
+        delete readerModeController.data();
+    if (detachedVideoSession) {
+        detachedVideoSession->reset();
+        delete detachedVideoSession.data();
+    }
+    if (m_votUserscriptManager && browserPage)
+        m_votUserscriptManager->forgetPage(browserPage);
     disconnect(webView, nullptr, this, nullptr);
-    disconnect(webView->page(), nullptr, this, nullptr);
+    if (browserPage)
+        disconnect(browserPage, nullptr, this, nullptr);
     if (m_webAppInstallController)
         m_webAppInstallController->forgetView(webView);
     webView->stop();
+    webView->hide();
+    if (browserPage)
+        browserPage->retire();
+}
+
+void MainWindow::finishClosingTab(QWebEngineView *webView)
+{
+    if (!webView)
+        return;
+
+    const int index = m_ui->tabStack->indexOf(webView);
+    if (index < 0 || index >= m_ui->tabBar->count()) {
+        m_closingTabs.remove(webView);
+        return;
+    }
+
     m_tabStates.remove(webView);
     m_ui->tabStack->removeWidget(webView);
     m_ui->tabBar->removeTab(index);
+    m_closingTabs.remove(webView);
     webView->deleteLater();
     updateTabNavigationActions();
 
@@ -1136,7 +1264,7 @@ QWebEngineView *MainWindow::webViewForPage(const BrowserPage *page) const
     if (!page)
         return nullptr;
     for (auto iterator = m_tabStates.cbegin(); iterator != m_tabStates.cend(); ++iterator) {
-        if (iterator->page == page)
+        if (iterator->page == page && !m_closingTabs.contains(iterator.key()))
             return iterator.key();
     }
     return nullptr;
@@ -1161,14 +1289,19 @@ QWebEngineView *MainWindow::activeInteractionWebView() const
     QWidget *activeWindow = QApplication::activeWindow();
     QVarLengthArray<BrowserInteractionSurface, 4> detachedSurfaces;
     for (auto state = m_tabStates.cbegin(); state != m_tabStates.cend(); ++state) {
+        if (m_closingTabs.contains(state.key()))
+            continue;
         DetachedVideoWindow *detachedWindow = state->detachedVideoWindow;
         if (detachedWindow)
             detachedSurfaces.append({state.key(), detachedWindow});
     }
+    QWebEngineView *currentView = currentWebView();
+    if (m_closingTabs.contains(currentView))
+        currentView = nullptr;
     return resolveActiveBrowserView(
         activeWindow,
         this,
-        currentWebView(),
+        currentView,
         std::span<const BrowserInteractionSurface>(
             detachedSurfaces.constData(),
             static_cast<std::size_t>(detachedSurfaces.size())
@@ -1187,12 +1320,18 @@ QWebEngineView *MainWindow::commandTargetWebView() const
         return nullptr;
 
     QWebEngineView *lastActiveView = m_lastInteractionWebView;
-    if (lastActiveView && !m_tabStates.contains(lastActiveView))
+    if (lastActiveView
+        && (!m_tabStates.contains(lastActiveView)
+            || m_closingTabs.contains(lastActiveView))) {
         lastActiveView = nullptr;
+    }
+    QWebEngineView *currentView = currentWebView();
+    if (m_closingTabs.contains(currentView))
+        currentView = nullptr;
     return resolveBrowserCommandTarget(
         nullptr,
         lastActiveView,
-        currentWebView()
+        currentView
     );
 }
 
@@ -1217,7 +1356,9 @@ QWidget *MainWindow::interactionParentForTab(QWebEngineView *webView)
 
 bool MainWindow::isTabInteractionActive(QWebEngineView *webView) const
 {
-    return webView && activeInteractionWebView() == webView;
+    return webView
+        && !m_closingTabs.contains(webView)
+        && activeInteractionWebView() == webView;
 }
 
 void MainWindow::returnDetachedVideoForPermissionPrompt(QWebEngineView *webView)
@@ -2186,12 +2327,15 @@ void MainWindow::updateNavigationActions()
 
 void MainWindow::updateTabNavigationActions()
 {
-    const int tabCount = m_ui->tabBar ? m_ui->tabBar->count() : 0;
+    const int tabCount = static_cast<int>(openTabIndices().size());
     const bool tabNavigationAvailable = m_windowRole != WindowRole::WebApp;
+    QWebEngineView *currentView = currentWebView();
     if (m_ui->newTabAction)
         m_ui->newTabAction->setEnabled(tabNavigationAvailable);
     if (m_ui->closeTabAction)
-        m_ui->closeTabAction->setEnabled(tabCount > 0);
+        m_ui->closeTabAction->setEnabled(
+            currentView && !m_closingTabs.contains(currentView)
+        );
     if (m_ui->reopenClosedTabAction) {
         m_ui->reopenClosedTabAction->setEnabled(
             m_windowRole == WindowRole::Primary && !m_closedTabs.isEmpty()
@@ -2991,7 +3135,7 @@ BrowserSession MainWindow::currentSession(bool includeRegularTabs) const
     const int activeTabIndex = m_ui->tabBar ? m_ui->tabBar->currentIndex() : 0;
     for (int index = 0; index < m_ui->tabStack->count(); ++index) {
         QWebEngineView *webView = qobject_cast<QWebEngineView *>(m_ui->tabStack->widget(index));
-        if (!webView)
+        if (!webView || m_closingTabs.contains(webView))
             continue;
         const BrowserTabState state = m_tabStates.value(webView);
         if (!includeRegularTabs && !state.pinned)

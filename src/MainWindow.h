@@ -157,7 +157,10 @@ private:
     void reopenLastClosedTab();
     void activateAdjacentTab(int offset);
     void activateNumberedTab(int position);
+    [[nodiscard]] QList<int> openTabIndices() const;
     void closeTab(int index);
+    void prepareTabForClosing(QWebEngineView *webView);
+    void finishClosingTab(QWebEngineView *webView);
     void showTabContextMenu(const QPoint &position);
     void setTabPinned(int index, bool pinned);
     void updateTabPresentation(QWebEngineView *webView);
@@ -285,6 +288,7 @@ private:
     QTimer *m_sessionSaveTimer = nullptr;
     QTimer *m_addressSuggestionTimer = nullptr;
     QHash<QWebEngineView *, BrowserTabState> m_tabStates;
+    QSet<QWebEngineView *> m_closingTabs;
     QList<SessionTab> m_closedTabs;
     BrowserPreferences m_preferences;
     SearchSettings m_searchSettings;

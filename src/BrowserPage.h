@@ -24,6 +24,7 @@ public:
         qsizetype maximumBytes
     );
     void cancelWebAppManifestFetch(const QString &requestId);
+    void retire();
 
 signals:
     void externalUrlRequested(const QUrl &url);

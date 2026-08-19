@@ -187,6 +187,13 @@ void BrowserPage::cancelWebAppManifestFetch(const QString &requestId)
     runJavaScript(script, QWebEngineScript::ApplicationWorld);
 }
 
+void BrowserPage::retire()
+{
+    setVisible(false);
+    setLifecycleState(QWebEnginePage::LifecycleState::Discarded);
+    setAudioMuted(true);
+}
+
 bool BrowserPage::acceptNavigationRequest(
     const QUrl &url,
     NavigationType type,

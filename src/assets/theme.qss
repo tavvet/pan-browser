@@ -7,7 +7,7 @@ QToolBar#tabsBar {
     border: none;
     border-bottom: 1px solid #292e37;
     spacing: 6px;
-    padding: 5px 8px 0 8px;
+    padding: 5px 8px;
 }
 
 QTabBar#browserTabBar {
@@ -15,15 +15,17 @@ QTabBar#browserTabBar {
 }
 
 QTabBar#browserTabBar::tab {
-    min-height: 31px;
+    min-height: 30px;
     color: #929baa;
     background: #1b1f26;
     border: 1px solid #292e37;
-    border-bottom: none;
-    border-top-left-radius: 8px;
-    border-top-right-radius: 8px;
+    border-radius: 16px;
     padding: 0 28px 0 11px;
-    margin-right: 3px;
+    margin-right: 4px;
+}
+
+QTabBar#browserTabBar[closeButtonsOnLeft="true"]::tab {
+    padding: 0 11px 0 8px;
 }
 
 QTabBar#browserTabBar::tab:hover:!selected {
@@ -45,12 +47,31 @@ QTabBar#browserTabBar::close-button {
     margin-right: 8px;
 }
 
+QTabBar#browserTabBar QToolButton#tabLeadingButton {
+    min-width: 16px;
+    max-width: 16px;
+    min-height: 16px;
+    max-height: 16px;
+    padding: 0;
+    margin: 0 2px 0 8px;
+    background: transparent;
+    border: none;
+    border-radius: 8px;
+}
+
+QTabBar#browserTabBar QToolButton#tabLeadingButton[showsClose="true"]:hover {
+    background: #3a414d;
+}
+
+QTabBar#browserTabBar QToolButton#tabLeadingButton[showsClose="true"]:pressed {
+    background: #4a5361;
+}
+
 QToolBar#tabsBar QToolButton#newTabButton {
     min-width: 30px;
     max-width: 30px;
     min-height: 30px;
     max-height: 30px;
-    margin-bottom: 1px;
     background: transparent;
     border: none;
     border-radius: 7px;

@@ -9,6 +9,30 @@
 
 #include <utility>
 
+namespace {
+
+void clearPageConfiguration(BrowserPage *page)
+{
+    if (!page)
+        return;
+
+    const QList<QWebEngineScript> oldScripts = page->scripts().find(
+        VotUserscriptBridge::scriptName()
+    );
+    for (const QWebEngineScript &script : oldScripts)
+        page->scripts().remove(script);
+
+    const QList<VotUserscriptBridge *> oldBridges =
+        page->findChildren<VotUserscriptBridge *>(
+            QString(),
+            Qt::FindDirectChildrenOnly
+        );
+    for (VotUserscriptBridge *bridge : oldBridges)
+        delete bridge;
+}
+
+} // namespace
+
 VotUserscriptManager::VotUserscriptManager(
     const QString &storagePath,
     BrowserProfile *profile,
@@ -78,17 +102,7 @@ void VotUserscriptManager::configurePage(BrowserPage *page)
     });
     if (!m_pages.contains(page))
         m_pages.append(page);
-    const QList<QWebEngineScript> oldScripts = page->scripts().find(
-        VotUserscriptBridge::scriptName()
-    );
-    for (const QWebEngineScript &script : oldScripts)
-        page->scripts().remove(script);
-    const QList<VotUserscriptBridge *> oldBridges = page->findChildren<VotUserscriptBridge *>(
-        QString(),
-        Qt::FindDirectChildrenOnly
-    );
-    for (VotUserscriptBridge *bridge : oldBridges)
-        delete bridge;
+    clearPageConfiguration(page);
 
     if ((m_state == VotUserscriptState::Preparing
             || m_state == VotUserscriptState::Ready)
@@ -101,6 +115,17 @@ void VotUserscriptManager::configurePage(BrowserPage *page)
             page
         );
     }
+}
+
+void VotUserscriptManager::forgetPage(BrowserPage *page)
+{
+    if (!page)
+        return;
+
+    m_pages.removeIf([page](const QPointer<BrowserPage> &candidate) {
+        return candidate.isNull() || candidate.data() == page;
+    });
+    clearPageConfiguration(page);
 }
 
 VideoTranslationSettings VotUserscriptManager::settings() const

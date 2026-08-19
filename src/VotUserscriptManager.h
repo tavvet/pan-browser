@@ -36,6 +36,7 @@ public:
 
     void applySettings(const VideoTranslationSettings &settings);
     void configurePage(BrowserPage *page);
+    void forgetPage(BrowserPage *page);
 
     [[nodiscard]] VideoTranslationSettings settings() const;
     [[nodiscard]] VotUserscriptState state() const;

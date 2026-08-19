@@ -22,12 +22,14 @@
 #include <QAction>
 #include <QApplication>
 #include <QDesktopServices>
+#include <QEvent>
 #include <QFile>
 #include <QFileInfo>
 #include <QHBoxLayout>
 #include <QIcon>
 #include <QKeySequence>
 #include <QLabel>
+#include <QLayout>
 #include <QLineEdit>
 #include <QMenu>
 #include <QMenuBar>
@@ -44,6 +46,69 @@
 #include <QWebEnginePage>
 #include <QWebEngineView>
 #include <QWidget>
+
+#include <algorithm>
+
+namespace {
+
+class BrowserTabsContainer final : public QWidget {
+public:
+    using QWidget::QWidget;
+
+    void setTabControls(BrowserTabBar *tabBar, QWidget *trailingControl)
+    {
+        m_tabBar = tabBar;
+        m_trailingControl = trailingControl;
+        scheduleAvailableWidthUpdate();
+    }
+
+protected:
+    bool event(QEvent *event) override
+    {
+        const bool handled = QWidget::event(event);
+        if (event && (event->type() == QEvent::Resize
+                      || event->type() == QEvent::Show
+                      || event->type() == QEvent::LayoutRequest)) {
+            scheduleAvailableWidthUpdate();
+        }
+        return handled;
+    }
+
+private:
+    void scheduleAvailableWidthUpdate()
+    {
+        if (m_updateScheduled)
+            return;
+        m_updateScheduled = true;
+        QTimer::singleShot(0, this, [this] {
+            m_updateScheduled = false;
+            updateAvailableWidth();
+        });
+    }
+
+    void updateAvailableWidth()
+    {
+        if (!m_tabBar)
+            return;
+
+        int availableWidth = width();
+        if (QLayout *containerLayout = layout()) {
+            const QMargins margins = containerLayout->contentsMargins();
+            availableWidth -= margins.left() + margins.right();
+            if (m_trailingControl) {
+                availableWidth -= m_trailingControl->sizeHint().width();
+                availableWidth -= containerLayout->spacing();
+            }
+        }
+        m_tabBar->setAvailableWidth(std::max(0, availableWidth));
+    }
+
+    BrowserTabBar *m_tabBar = nullptr;
+    QWidget *m_trailingControl = nullptr;
+    bool m_updateScheduled = false;
+};
+
+} // namespace
 
 void BrowserWindowUi::build(MainWindow *window)
 {
@@ -74,7 +139,7 @@ void BrowserWindowUi::build(MainWindow *window)
     tabsToolbar->setIconSize(QSize(17, 17));
     tabsToolbar->setProperty("integratedChrome", window->m_integratedWindowChrome);
 
-    QWidget *tabsContainer = new QWidget(tabsToolbar);
+    auto *tabsContainer = new BrowserTabsContainer(tabsToolbar);
     tabsContainer->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
     QHBoxLayout *tabsLayout = new QHBoxLayout(tabsContainer);
     tabsLayout->setContentsMargins(0, 0, 0, 0);
@@ -108,6 +173,7 @@ void BrowserWindowUi::build(MainWindow *window)
     );
     tabsLayout->addWidget(newTabButton, 0, Qt::AlignBottom);
     tabsLayout->addStretch(1);
+    tabsContainer->setTabControls(tabBar, newTabButton);
     tabsToolbar->addWidget(tabsContainer);
 
     if (window->m_integratedWindowChrome) {

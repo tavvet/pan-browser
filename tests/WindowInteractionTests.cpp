@@ -1,6 +1,7 @@
 #include "PanBrowserTestCommon.h"
 
 #include <QStyle>
+#include <QVariantAnimation>
 
 class UnavailableTestCredentialStore final : public CredentialStore {
 public:
@@ -57,8 +58,12 @@ private slots:
     void browserPreferencesValidateStartPage();
     void browserTabBarKeepsPinnedTabsInTheirGroup();
     void browserTabBarFitsPinnedOnlyContent();
+    void browserTabBarKeepsRegularTabsUsableWhenCrowded();
     void browserTabBarRestoresBoundaryAfterMouseDrag();
     void browserTabBarAnimatesNewTabExpansion();
+    void browserTabBarRetargetsOpeningAnimationWhenWidthChanges();
+    void browserTabBarAnimatesTabCollapseBeforeClosing();
+    void browserPageRetiresRendererImmediately();
     void developerToolsPreferenceDefaultsToDisabled();
     void browserShortcutFallbackMatchesRegisteredKeys();
     void tabNavigationWrapsAndTargetsNumberedTabs();
@@ -101,14 +106,22 @@ void WindowInteractionTests::browserTabBarKeepsPinnedTabsInTheirGroup()
     QVERIFY(tabBar.tabRect(0).width() < tabBar.tabRect(2).width());
     tabBar.setCurrentIndex(0);
     const int activePinnedWidth = tabBar.tabRect(0).width();
-    QCOMPARE(activePinnedWidth, 42);
+    QCOMPARE(activePinnedWidth, 40);
     tabBar.setCurrentIndex(2);
     QCOMPARE(tabBar.tabRect(0).width(), activePinnedWidth);
     QWidget *pinnedCloseButton = tabBar.tabButton(0, QTabBar::RightSide);
     if (!pinnedCloseButton)
         pinnedCloseButton = tabBar.tabButton(0, QTabBar::LeftSide);
     QVERIFY(pinnedCloseButton);
+#if defined(Q_OS_MACOS)
+    QVERIFY(!pinnedCloseButton->isHidden());
+    QVERIFY(!pinnedCloseButton->property("showsClose").toBool());
+    auto *pinnedLeadingButton = qobject_cast<QToolButton *>(pinnedCloseButton);
+    QVERIFY(pinnedLeadingButton);
+    QVERIFY(!pinnedLeadingButton->icon().isNull());
+#else
     QVERIFY(pinnedCloseButton->isHidden());
+#endif
 
     tabBar.moveTab(0, 2);
     QCOMPARE(tabBar.normalizedMoveDestination(2), 1);
@@ -122,10 +135,41 @@ void WindowInteractionTests::browserTabBarKeepsPinnedTabsInTheirGroup()
 
     tabBar.setTabPinned(1, false);
     QCOMPARE(tabBar.pinnedTabCount(), 1);
+#if defined(Q_OS_MACOS)
+    QWidget *unpinnedCloseButton = tabBar.tabButton(1, QTabBar::LeftSide);
+    QVERIFY(unpinnedCloseButton);
+    QVERIFY(!tabBar.tabButton(1, QTabBar::RightSide));
+    auto *closeButton = qobject_cast<QToolButton *>(unpinnedCloseButton);
+    QVERIFY(closeButton);
+    QCOMPARE(closeButton->focusPolicy(), Qt::NoFocus);
+    QVERIFY(!closeButton->property("showsClose").toBool());
+    QVERIFY(!closeButton->icon().isNull());
+    const qint64 faviconCacheKey = closeButton->icon().cacheKey();
+    tabBar.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&tabBar));
+    const QPoint hoverPosition = tabBar.tabRect(1).center();
+    QMouseEvent hoverEvent(
+        QEvent::MouseMove,
+        QPointF(hoverPosition),
+        QPointF(hoverPosition),
+        QPointF(tabBar.mapToGlobal(hoverPosition)),
+        Qt::NoButton,
+        Qt::NoButton,
+        Qt::NoModifier
+    );
+    QCoreApplication::sendEvent(&tabBar, &hoverEvent);
+    QVERIFY(closeButton->property("showsClose").toBool());
+    QVERIFY(closeButton->icon().cacheKey() != faviconCacheKey);
+    QSignalSpy closeSpy(&tabBar, &QTabBar::tabCloseRequested);
+    closeButton->click();
+    QCOMPARE(closeSpy.count(), 1);
+    QCOMPARE(closeSpy.constFirst().constFirst().toInt(), 1);
+#else
     QWidget *unpinnedCloseButton = tabBar.tabButton(1, QTabBar::RightSide);
     if (!unpinnedCloseButton)
         unpinnedCloseButton = tabBar.tabButton(1, QTabBar::LeftSide);
     QVERIFY(unpinnedCloseButton);
+#endif
     QVERIFY(!unpinnedCloseButton->isHidden());
 }
 
@@ -159,13 +203,41 @@ void WindowInteractionTests::browserTabBarFitsPinnedOnlyContent()
     container.show();
     QVERIFY(QTest::qWaitForWindowExposed(&container));
 
-    QCOMPARE(tabBar->sizeHint().width(), 42);
-    QCOMPARE(tabBar->minimumSizeHint().width(), 42);
-    QCOMPARE(tabBar->width(), 42);
+    QCOMPARE(tabBar->sizeHint().width(), 40);
+    QCOMPARE(tabBar->minimumSizeHint().width(), 40);
+    QCOMPARE(tabBar->width(), 40);
     QCOMPARE(
         newTabButton->geometry().left() - tabBar->geometry().right() - 1,
         layout->spacing()
     );
+}
+
+void WindowInteractionTests::browserTabBarKeepsRegularTabsUsableWhenCrowded()
+{
+    BrowserTabBar tabBar;
+    tabBar.setObjectName(QStringLiteral("browserTabBar"));
+    QFile theme(QStringLiteral(":/assets/theme.qss"));
+    QVERIFY(theme.open(QIODevice::ReadOnly));
+    tabBar.setStyleSheet(QString::fromUtf8(theme.readAll()));
+    tabBar.setTabsClosable(true);
+    tabBar.setExpanding(false);
+    tabBar.setUsesScrollButtons(true);
+    for (int index = 0; index < 8; ++index)
+        tabBar.addTab(QStringLiteral("Regular tab %1").arg(index + 1));
+    tabBar.setAvailableWidth(1760);
+    tabBar.resize(1760, 40);
+    tabBar.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&tabBar));
+
+    for (int index = 0; index < tabBar.count(); ++index)
+        QCOMPARE(tabBar.tabRect(index).width(), 220);
+
+    tabBar.setAvailableWidth(360);
+    tabBar.resize(360, 40);
+    QCoreApplication::processEvents();
+    QCOMPARE(tabBar.maximumWidth(), 360);
+    for (int index = 0; index < tabBar.count(); ++index)
+        QCOMPARE(tabBar.tabRect(index).width(), 112);
 }
 
 void WindowInteractionTests::browserTabBarRestoresBoundaryAfterMouseDrag()
@@ -229,6 +301,106 @@ void WindowInteractionTests::browserTabBarAnimatesNewTabExpansion()
     QCOMPARE(tabBar.minimumSizeHint(), stableMinimum);
     QVERIFY(tabBar.tabRect(index).width() < naturalWidth);
     QTRY_COMPARE_WITH_TIMEOUT(tabBar.tabRect(index).width(), naturalWidth, 1000);
+}
+
+void WindowInteractionTests::browserTabBarRetargetsOpeningAnimationWhenWidthChanges()
+{
+    BrowserTabBar tabBar;
+    tabBar.setObjectName(QStringLiteral("browserTabBar"));
+    QFile theme(QStringLiteral(":/assets/theme.qss"));
+    QVERIFY(theme.open(QIODevice::ReadOnly));
+    tabBar.setStyleSheet(QString::fromUtf8(theme.readAll()));
+    tabBar.setTabsClosable(true);
+    tabBar.setExpanding(false);
+    tabBar.setAvailableWidth(360);
+    tabBar.resize(360, 40);
+    tabBar.addTab(QStringLiteral("Existing tab"));
+    tabBar.show();
+    QCoreApplication::processEvents();
+    QVERIFY(tabBar.isVisible());
+
+    if (tabBar.style()->styleHint(
+            QStyle::SH_Widget_Animation_Duration,
+            nullptr,
+            &tabBar
+        ) <= 0) {
+        QSKIP("The active Qt style disables widget animations");
+    }
+
+    const int openingIndex = tabBar.addTab(QStringLiteral("Opening tab"));
+    tabBar.animateTabOpening(openingIndex);
+    const QList<QVariantAnimation *> animations =
+        tabBar.findChildren<QVariantAnimation *>(
+            QString(),
+            Qt::FindDirectChildrenOnly
+        );
+    QCOMPARE(animations.size(), 1);
+    QVariantAnimation *animation = animations.constFirst();
+    QCOMPARE(animation->endValue().toInt(), 180);
+
+    tabBar.setAvailableWidth(440);
+    tabBar.resize(440, 40);
+    QCOMPARE(animation->endValue().toInt(), 220);
+    QTRY_COMPARE_WITH_TIMEOUT(tabBar.tabRect(openingIndex).width(), 220, 1000);
+}
+
+void WindowInteractionTests::browserTabBarAnimatesTabCollapseBeforeClosing()
+{
+    BrowserTabBar tabBar;
+    tabBar.setObjectName(QStringLiteral("browserTabBar"));
+    QFile theme(QStringLiteral(":/assets/theme.qss"));
+    QVERIFY(theme.open(QIODevice::ReadOnly));
+    tabBar.setStyleSheet(QString::fromUtf8(theme.readAll()));
+    tabBar.setTabsClosable(true);
+    tabBar.setExpanding(false);
+    tabBar.resize(440, 40);
+    tabBar.addTab(QStringLiteral("First tab"));
+    const int closingIndex = tabBar.addTab(QStringLiteral("Closing tab"));
+    tabBar.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&tabBar));
+
+    if (tabBar.style()->styleHint(
+            QStyle::SH_Widget_Animation_Duration,
+            nullptr,
+            &tabBar
+        ) <= 0) {
+        QSKIP("The active Qt style disables widget animations");
+    }
+
+    const int naturalWidth = tabBar.tabRect(closingIndex).width();
+    int widthAtCompletion = -1;
+    QVERIFY(tabBar.animateTabClosing(closingIndex, [&] {
+        widthAtCompletion = tabBar.tabRect(closingIndex).width();
+        tabBar.removeTab(closingIndex);
+    }));
+
+    QTRY_VERIFY_WITH_TIMEOUT(tabBar.count() == 1, 1000);
+    QVERIFY(widthAtCompletion > 0);
+    QVERIFY(widthAtCompletion < naturalWidth);
+}
+
+void WindowInteractionTests::browserPageRetiresRendererImmediately()
+{
+    BrowserProfile profile(false);
+    QWebEngineView view;
+    auto *page = new BrowserPage(&profile, &view);
+    view.setPage(page);
+    QSignalSpy loadSpy(page, &QWebEnginePage::loadFinished);
+    page->setHtml(
+        QStringLiteral("<html><body>retirement test</body></html>"),
+        QUrl(QStringLiteral("https://retire.example/"))
+    );
+    QTRY_VERIFY_WITH_TIMEOUT(!loadSpy.isEmpty(), 5000);
+    QVERIFY(loadSpy.constLast().constFirst().toBool());
+
+    page->retire();
+
+    QVERIFY(page->isAudioMuted());
+    QVERIFY(!page->isVisible());
+    QCOMPARE(
+        page->lifecycleState(),
+        QWebEnginePage::LifecycleState::Discarded
+    );
 }
 
 void WindowInteractionTests::visibleWindowPlacementIsPreserved()
