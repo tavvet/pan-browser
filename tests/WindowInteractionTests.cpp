@@ -62,6 +62,9 @@ private slots:
     void browserTabBarRestoresBoundaryAfterMouseDrag();
     void browserTabBarAnimatesNewTabExpansion();
     void browserTabBarRetargetsOpeningAnimationWhenWidthChanges();
+    void browserTabBarAnimatesPinningTransitions();
+    void browserTabBarPinningPreservesScrollableMinimum();
+    void browserTabBarPinningHandlesPinnedOnlyBoundary();
     void browserTabBarAnimatesTabCollapseBeforeClosing();
     void browserPageRetiresRendererImmediately();
     void developerToolsPreferenceDefaultsToDisabled();
@@ -377,6 +380,172 @@ void WindowInteractionTests::browserTabBarAnimatesTabCollapseBeforeClosing()
     QTRY_VERIFY_WITH_TIMEOUT(tabBar.count() == 1, 1000);
     QVERIFY(widthAtCompletion > 0);
     QVERIFY(widthAtCompletion < naturalWidth);
+}
+
+void WindowInteractionTests::browserTabBarAnimatesPinningTransitions()
+{
+    QWidget container;
+    auto *layout = new QHBoxLayout(&container);
+    layout->setContentsMargins(0, 0, 0, 0);
+    layout->addStretch(1);
+
+    auto *tabBar = new BrowserTabBar(&container);
+    tabBar->setObjectName(QStringLiteral("browserTabBar"));
+    QFile theme(QStringLiteral(":/assets/theme.qss"));
+    QVERIFY(theme.open(QIODevice::ReadOnly));
+    tabBar->setStyleSheet(QString::fromUtf8(theme.readAll()));
+    tabBar->setTabsClosable(true);
+    tabBar->setExpanding(false);
+    const int index = tabBar->addTab(QStringLiteral("Animated pinning tab"));
+    tabBar->setAvailableWidth(440);
+    layout->insertWidget(0, tabBar);
+    container.resize(600, 40);
+    container.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&container));
+
+    if (tabBar->style()->styleHint(
+            QStyle::SH_Widget_Animation_Duration,
+            nullptr,
+            tabBar
+        ) <= 0) {
+        QSKIP("The active Qt style disables widget animations");
+    }
+
+    const int regularWidth = tabBar->tabRect(index).width();
+    QVERIFY(regularWidth > 40);
+
+    tabBar->animateTabPinning(index, true);
+    QVERIFY(tabBar->isTabPinned(index));
+    QCOMPARE(tabBar->tabRect(index).width(), regularWidth);
+    QTRY_COMPARE_WITH_TIMEOUT(tabBar->tabRect(index).width(), 40, 1000);
+
+    tabBar->animateTabPinning(index, false);
+    QVERIFY(!tabBar->isTabPinned(index));
+    QCOMPARE(tabBar->tabRect(index).width(), 40);
+    QTRY_COMPARE_WITH_TIMEOUT(tabBar->tabRect(index).width(), regularWidth, 1000);
+
+    tabBar->animateTabPinning(index, true);
+    QTRY_VERIFY_WITH_TIMEOUT(
+        tabBar->tabRect(index).width() > 40
+            && tabBar->tabRect(index).width() < regularWidth,
+        1000
+    );
+    const int interruptedWidth = tabBar->tabRect(index).width();
+    const int interruptedMinimum = tabBar->minimumSizeHint().width();
+
+    tabBar->animateTabPinning(index, false);
+    QCOMPARE(tabBar->tabRect(index).width(), interruptedWidth);
+    QCOMPARE(tabBar->minimumSizeHint().width(), interruptedMinimum);
+    QTRY_COMPARE_WITH_TIMEOUT(tabBar->tabRect(index).width(), regularWidth, 1000);
+}
+
+void WindowInteractionTests::browserTabBarPinningPreservesScrollableMinimum()
+{
+    QWidget container;
+    auto *layout = new QHBoxLayout(&container);
+    layout->setContentsMargins(0, 0, 0, 0);
+
+    auto *tabBar = new BrowserTabBar(&container);
+    tabBar->setTabsClosable(true);
+    tabBar->setExpanding(false);
+    tabBar->setUsesScrollButtons(true);
+    for (int index = 0; index < 8; ++index)
+        tabBar->addTab(QStringLiteral("Regular tab %1").arg(index + 1));
+    tabBar->setAvailableWidth(360);
+    layout->addWidget(tabBar);
+    container.resize(420, 40);
+    container.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&container));
+
+    if (tabBar->style()->styleHint(
+            QStyle::SH_Widget_Animation_Duration,
+            nullptr,
+            tabBar
+        ) <= 0) {
+        QSKIP("The active Qt style disables widget animations");
+    }
+
+    BrowserTabBar pinnedReference;
+    pinnedReference.setTabsClosable(true);
+    pinnedReference.setExpanding(false);
+    pinnedReference.setUsesScrollButtons(true);
+    for (int index = 0; index < tabBar->count(); ++index)
+        pinnedReference.addTab(tabBar->tabText(index));
+    pinnedReference.setTabPinned(0, true);
+    pinnedReference.setAvailableWidth(360);
+
+    const int startWidth = tabBar->tabRect(0).width();
+    const int scrollableMinimum = tabBar->minimumSizeHint().width();
+    const int pinnedMinimum = pinnedReference.minimumSizeHint().width();
+    tabBar->animateTabPinning(0, true);
+
+    QCOMPARE(tabBar->minimumSizeHint().width(), scrollableMinimum);
+    QTRY_COMPARE_WITH_TIMEOUT(tabBar->tabRect(0).width(), 40, 1000);
+    QTRY_COMPARE_WITH_TIMEOUT(tabBar->minimumSizeHint().width(), pinnedMinimum, 1000);
+
+    tabBar->animateTabPinning(0, false);
+    QVERIFY(!tabBar->isTabPinned(0));
+    QCOMPARE(tabBar->minimumSizeHint().width(), pinnedMinimum);
+    QTRY_COMPARE_WITH_TIMEOUT(tabBar->tabRect(0).width(), startWidth, 1000);
+    QTRY_COMPARE_WITH_TIMEOUT(
+        tabBar->minimumSizeHint().width(),
+        scrollableMinimum,
+        1000
+    );
+}
+
+void WindowInteractionTests::browserTabBarPinningHandlesPinnedOnlyBoundary()
+{
+    QWidget container;
+    auto *layout = new QHBoxLayout(&container);
+    layout->setContentsMargins(0, 0, 0, 0);
+
+    auto *tabBar = new BrowserTabBar(&container);
+    tabBar->setTabsClosable(true);
+    tabBar->setExpanding(false);
+    tabBar->setUsesScrollButtons(true);
+    for (int index = 0; index < 3; ++index)
+        tabBar->addTab(QStringLiteral("Tab %1").arg(index + 1));
+    tabBar->setTabPinned(0, true);
+    tabBar->setTabPinned(1, true);
+    tabBar->setAvailableWidth(440);
+    layout->addWidget(tabBar);
+    container.resize(500, 40);
+    container.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&container));
+
+    if (tabBar->style()->styleHint(
+            QStyle::SH_Widget_Animation_Duration,
+            nullptr,
+            tabBar
+        ) <= 0) {
+        QSKIP("The active Qt style disables widget animations");
+    }
+
+    BrowserTabBar pinnedReference;
+    pinnedReference.setTabsClosable(true);
+    pinnedReference.setExpanding(false);
+    pinnedReference.setUsesScrollButtons(true);
+    for (int index = 0; index < tabBar->count(); ++index) {
+        pinnedReference.addTab(tabBar->tabText(index));
+        pinnedReference.setTabPinned(index, true);
+    }
+    pinnedReference.setAvailableWidth(440);
+
+    const int regularWidth = tabBar->tabRect(2).width();
+    const int mixedMinimum = tabBar->minimumSizeHint().width();
+    const int pinnedMinimum = pinnedReference.minimumSizeHint().width();
+    QVERIFY(regularWidth > 40);
+
+    tabBar->animateTabPinning(2, true);
+    QCOMPARE(tabBar->minimumSizeHint().width(), mixedMinimum);
+    QTRY_COMPARE_WITH_TIMEOUT(tabBar->tabRect(2).width(), 40, 1000);
+    QTRY_COMPARE_WITH_TIMEOUT(tabBar->minimumSizeHint().width(), pinnedMinimum, 1000);
+
+    tabBar->animateTabPinning(2, false);
+    QCOMPARE(tabBar->minimumSizeHint().width(), pinnedMinimum);
+    QTRY_COMPARE_WITH_TIMEOUT(tabBar->tabRect(2).width(), regularWidth, 1000);
+    QTRY_COMPARE_WITH_TIMEOUT(tabBar->minimumSizeHint().width(), mixedMinimum, 1000);
 }
 
 void WindowInteractionTests::browserPageRetiresRendererImmediately()

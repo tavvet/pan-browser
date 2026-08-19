@@ -957,7 +957,7 @@ void MainWindow::setTabPinned(int index, bool pinned)
     }
 
     state->pinned = pinned;
-    m_ui->tabBar->setTabPinned(index, pinned);
+    m_ui->tabBar->animateTabPinning(index, pinned);
     updateTabPresentation(webView);
 
     const int destination = pinned

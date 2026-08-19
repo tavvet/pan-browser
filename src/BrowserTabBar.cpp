@@ -52,13 +52,9 @@ BrowserTabBar::BrowserTabBar(QWidget *parent)
 
 QSize BrowserTabBar::minimumSizeHint() const
 {
-    QSize minimum = QTabBar::minimumSizeHint();
-    if (count() > 0 && pinnedTabCount() == count()) {
-        minimum.setWidth(std::min(
-            minimum.width(),
-            count() * pinnedTabWidth
-        ));
-    }
+    QSize minimum = naturalMinimumSizeHint();
+    if (m_animatedMinimumWidth >= 0)
+        minimum.setWidth(m_animatedMinimumWidth);
     return minimum;
 }
 
@@ -172,7 +168,7 @@ QSize BrowserTabBar::tabSizeHint(int index) const
     const QVariantMap metadata = tabMetadata(tabData(index));
     const QVariant animatedWidth = metadata.value(QString::fromLatin1(animatedWidthKey));
     if (animatedWidth.isValid())
-        size.setWidth(std::clamp(animatedWidth.toInt(), 1, size.width()));
+        size.setWidth(std::max(1, animatedWidth.toInt()));
     return size;
 }
 
@@ -313,6 +309,123 @@ void BrowserTabBar::animateTabOpening(int index)
     animation->start();
 }
 
+void BrowserTabBar::animateTabPinning(int index, bool pinned)
+{
+    if (index < 0 || index >= count() || isTabPinned(index) == pinned)
+        return;
+
+    const quint64 identity = ensureTabIdentity(index);
+    if (identity == 0 || m_closingAnimations.contains(identity))
+        return;
+
+    const int visibleWidth = tabRect(index).width();
+    const int startWidth = visibleWidth > 0
+        ? visibleWidth
+        : tabSizeHint(index).width();
+    const int startMinimumWidth = minimumSizeHint().width();
+    if (QVariantAnimation *openingAnimation = m_openingAnimations.take(identity)) {
+        openingAnimation->stop();
+        openingAnimation->deleteLater();
+    }
+    if (QVariantAnimation *pinningAnimation = m_pinningAnimations.take(identity)) {
+        pinningAnimation->stop();
+        pinningAnimation->deleteLater();
+    }
+
+    const int styleDuration = style()->styleHint(
+        QStyle::SH_Widget_Animation_Duration,
+        nullptr,
+        this
+    );
+    if (!isVisible() || styleDuration <= 0) {
+        stopPinningMinimumAnimation();
+        QVariantMap metadata = tabMetadata(tabData(index));
+        metadata.insert(QString::fromLatin1(pinnedKey), pinned);
+        metadata.remove(QString::fromLatin1(animatedWidthKey));
+        setTabData(index, metadata);
+        updateCloseButtonVisibility(index);
+        updateTabWidths();
+        refreshTabLayout();
+        return;
+    }
+
+    stopPinningMinimumAnimation();
+    m_animatedMinimumWidth = startMinimumWidth;
+    updateGeometry();
+
+    auto *animation = new QVariantAnimation(this);
+    animation->setDuration(std::min(
+        styleDuration,
+        maximumTabAnimationDurationMilliseconds
+    ));
+    animation->setStartValue(startWidth);
+    animation->setEndValue(startWidth);
+    animation->setEasingCurve(QEasingCurve::InOutCubic);
+    m_pinningAnimations.insert(identity, animation);
+
+    QVariantMap metadata = tabMetadata(tabData(index));
+    metadata.insert(QString::fromLatin1(pinnedKey), pinned);
+    metadata.insert(QString::fromLatin1(animatedWidthKey), startWidth);
+    setTabData(index, metadata);
+    updateCloseButtonVisibility(index);
+    updateTabWidths();
+    refreshTabLayout();
+
+    const int targetWidth = naturalTabSizeHint(index).width();
+    startPinningMinimumAnimation(
+        startMinimumWidth,
+        naturalMinimumSizeHint().width(),
+        animation->duration()
+    );
+    if (startWidth == targetWidth) {
+        m_pinningAnimations.remove(identity);
+        metadata = tabMetadata(tabData(index));
+        metadata.remove(QString::fromLatin1(animatedWidthKey));
+        setTabData(index, metadata);
+        updateTabWidths();
+        refreshTabLayout();
+        animation->deleteLater();
+        return;
+    }
+    animation->setEndValue(targetWidth);
+
+    connect(
+        animation,
+        &QVariantAnimation::valueChanged,
+        this,
+        [this, identity](const QVariant &value) {
+            const int animatedIndex = indexForIdentity(identity);
+            if (animatedIndex < 0)
+                return;
+            QVariantMap animatedMetadata = tabMetadata(tabData(animatedIndex));
+            animatedMetadata.insert(
+                QString::fromLatin1(animatedWidthKey),
+                value.toInt()
+            );
+            setTabData(animatedIndex, animatedMetadata);
+            updateTabWidths();
+            refreshTabLayout();
+        }
+    );
+    connect(animation, &QVariantAnimation::finished, this, [this, identity, animation] {
+        if (m_pinningAnimations.value(identity) != animation) {
+            animation->deleteLater();
+            return;
+        }
+        m_pinningAnimations.remove(identity);
+        const int animatedIndex = indexForIdentity(identity);
+        if (animatedIndex >= 0) {
+            QVariantMap metadata = tabMetadata(tabData(animatedIndex));
+            metadata.remove(QString::fromLatin1(animatedWidthKey));
+            setTabData(animatedIndex, metadata);
+            updateTabWidths();
+            refreshTabLayout();
+        }
+        animation->deleteLater();
+    });
+    animation->start();
+}
+
 bool BrowserTabBar::animateTabClosing(
     int index,
     std::function<void()> completion
@@ -330,6 +443,10 @@ bool BrowserTabBar::animateTabClosing(
     if (QVariantAnimation *openingAnimation = m_openingAnimations.take(identity)) {
         openingAnimation->stop();
         openingAnimation->deleteLater();
+    }
+    if (QVariantAnimation *pinningAnimation = m_pinningAnimations.take(identity)) {
+        pinningAnimation->stop();
+        pinningAnimation->deleteLater();
     }
 
     const int styleDuration = style()->styleHint(
@@ -410,6 +527,18 @@ QSize BrowserTabBar::naturalTabSizeHint(int index) const
     QSize size = QTabBar::tabSizeHint(index);
     size.setWidth(isTabPinned(index) ? pinnedTabWidth : m_regularTabWidth);
     return size;
+}
+
+QSize BrowserTabBar::naturalMinimumSizeHint() const
+{
+    QSize minimum = QTabBar::minimumSizeHint();
+    if (count() > 0 && pinnedTabCount() == count()) {
+        minimum.setWidth(std::min(
+            minimum.width(),
+            count() * pinnedTabWidth
+        ));
+    }
+    return minimum;
 }
 
 void BrowserTabBar::mousePressEvent(QMouseEvent *event)
@@ -556,6 +685,97 @@ void BrowserTabBar::retargetOpeningAnimations()
     }
 }
 
+void BrowserTabBar::retargetPinningAnimations()
+{
+    for (auto iterator = m_pinningAnimations.cbegin();
+         iterator != m_pinningAnimations.cend();
+         ++iterator) {
+        QVariantAnimation *animation = iterator.value();
+        const int index = indexForIdentity(iterator.key());
+        if (!animation || index < 0)
+            continue;
+
+        const int targetWidth = naturalTabSizeHint(index).width();
+        if (animation->endValue().toInt() != targetWidth)
+            animation->setEndValue(targetWidth);
+    }
+}
+
+void BrowserTabBar::retargetPinningMinimumAnimation()
+{
+    if (!m_pinningMinimumAnimation)
+        return;
+
+    const int targetWidth = naturalMinimumSizeHint().width();
+    if (m_pinningMinimumAnimation->endValue().toInt() != targetWidth)
+        m_pinningMinimumAnimation->setEndValue(targetWidth);
+}
+
+void BrowserTabBar::startPinningMinimumAnimation(
+    int startWidth,
+    int targetWidth,
+    int duration
+)
+{
+    if (m_pinningMinimumAnimation) {
+        QVariantAnimation *animation = m_pinningMinimumAnimation;
+        m_pinningMinimumAnimation = nullptr;
+        animation->stop();
+        animation->deleteLater();
+    }
+    m_animatedMinimumWidth = startWidth;
+    if (startWidth == targetWidth || duration <= 0) {
+        m_animatedMinimumWidth = -1;
+        updateGeometry();
+        return;
+    }
+
+    auto *animation = new QVariantAnimation(this);
+    animation->setDuration(duration);
+    animation->setStartValue(startWidth);
+    animation->setEndValue(targetWidth);
+    animation->setEasingCurve(QEasingCurve::InOutCubic);
+    m_pinningMinimumAnimation = animation;
+    updateGeometry();
+
+    connect(
+        animation,
+        &QVariantAnimation::valueChanged,
+        this,
+        [this, animation](const QVariant &value) {
+            if (m_pinningMinimumAnimation != animation)
+                return;
+            m_animatedMinimumWidth = std::max(0, value.toInt());
+            updateGeometry();
+        }
+    );
+    connect(animation, &QVariantAnimation::finished, this, [this, animation] {
+        if (m_pinningMinimumAnimation != animation) {
+            animation->deleteLater();
+            return;
+        }
+        m_pinningMinimumAnimation = nullptr;
+        m_animatedMinimumWidth = -1;
+        updateGeometry();
+        animation->deleteLater();
+    });
+    animation->start();
+}
+
+void BrowserTabBar::stopPinningMinimumAnimation()
+{
+    if (m_pinningMinimumAnimation) {
+        QVariantAnimation *animation = m_pinningMinimumAnimation;
+        m_pinningMinimumAnimation = nullptr;
+        animation->stop();
+        animation->deleteLater();
+    }
+    if (m_animatedMinimumWidth >= 0) {
+        m_animatedMinimumWidth = -1;
+        updateGeometry();
+    }
+}
+
 void BrowserTabBar::updateTabWidths()
 {
     const int pinnedCount = pinnedTabCount();
@@ -573,16 +793,23 @@ void BrowserTabBar::updateTabWidths()
         );
     }
 
-    const int preferredWidth = pinnedCount * pinnedTabWidth
+    const bool widthChanged = m_regularTabWidth != nextRegularWidth;
+    m_regularTabWidth = nextRegularWidth;
+    int preferredWidth = pinnedCount * pinnedTabWidth
         + regularCount * nextRegularWidth;
+    if (!m_pinningAnimations.isEmpty()) {
+        preferredWidth = 0;
+        for (int index = 0; index < count(); ++index)
+            preferredWidth += tabSizeHint(index).width();
+    }
     const int maximumStripWidth = m_availableWidth >= 0
         ? std::min(m_availableWidth, preferredWidth)
         : QWIDGETSIZE_MAX;
-    const bool widthChanged = m_regularTabWidth != nextRegularWidth;
-    m_regularTabWidth = nextRegularWidth;
     if (maximumWidth() != maximumStripWidth)
         setMaximumWidth(maximumStripWidth);
     retargetOpeningAnimations();
+    retargetPinningAnimations();
+    retargetPinningMinimumAnimation();
 
     updateGeometry();
     if (widthChanged)

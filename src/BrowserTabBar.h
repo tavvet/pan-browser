@@ -24,6 +24,7 @@ public:
     void setTabsClosable(bool closable);
     void setAvailableWidth(int width);
     void animateTabOpening(int index);
+    void animateTabPinning(int index, bool pinned);
     bool animateTabClosing(int index, std::function<void()> completion);
 
 protected:
@@ -38,14 +39,23 @@ protected:
     void tabRemoved(int index) override;
 
 private:
+    [[nodiscard]] QSize naturalMinimumSizeHint() const;
     [[nodiscard]] QSize naturalTabSizeHint(int index) const;
     [[nodiscard]] quint64 ensureTabIdentity(int index);
     [[nodiscard]] int indexForIdentity(quint64 identity) const;
     void configureLeadingButton(int index);
     void refreshTabLayout();
     void retargetOpeningAnimations();
+    void retargetPinningMinimumAnimation();
+    void retargetPinningAnimations();
     void scheduleHoveredTabRefresh();
     void setHoveredTab(int index);
+    void startPinningMinimumAnimation(
+        int startWidth,
+        int targetWidth,
+        int duration
+    );
+    void stopPinningMinimumAnimation();
     void updateTabWidths();
     void updateCloseButtonVisibility(int index);
     void updateLeadingButton(int index);
@@ -55,7 +65,10 @@ private:
     quint64 m_hoveredTabIdentity = 0;
     int m_availableWidth = -1;
     int m_regularTabWidth = 220;
+    int m_animatedMinimumWidth = -1;
     bool m_hoverRefreshScheduled = false;
     QHash<quint64, QVariantAnimation *> m_openingAnimations;
+    QHash<quint64, QVariantAnimation *> m_pinningAnimations;
     QHash<quint64, QVariantAnimation *> m_closingAnimations;
+    QVariantAnimation *m_pinningMinimumAnimation = nullptr;
 };
